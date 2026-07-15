@@ -1,0 +1,6 @@
+{
+  "name": "Building Culture",
+  "description": "An advanced AI-powered cyber-mining facility where users fuel their rigs through verified real-world attention, learning, and contributions.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
