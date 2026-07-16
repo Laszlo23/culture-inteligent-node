@@ -84,8 +84,78 @@ export interface MemberProfile {
   xPostInteractionClaimed: boolean;
 }
 
+export interface MinerNFT {
+  id: string;
+  name: string;
+  image: string; // Dynamic SVG description index or string URL
+  hashrate: number; // PH/s output addition
+  level: number;
+  maxLevel: number;
+  rarity: 'Common' | 'Rare' | 'Epic' | 'Legendary' | 'Mythic';
+  isListed: boolean;
+  listingPrice: number; // in COGNITIVE tokens
+  upgradeCost: number; // in COGNITIVE tokens
+  mintAddress: string; // Simulated devnet address
+  owner: string; // 'Me' or 'Market' / 'Other Address'
+  description: string;
+}
+
+export interface ProofOfAttention {
+  id: string;
+  walletAddress: string;
+  activity: string;
+  duration: number;
+  verification: string;
+  rewardEnergy: number;
+  rewardBcc: number;
+  timestamp: string;
+  minted: boolean;
+}
+
+export interface AppNotification {
+  id: string;
+  title: string;
+  message: string;
+  timestamp: string;
+  read: boolean;
+  type: 'info' | 'success' | 'warn' | 'message';
+  relatedId?: string;
+  relatedType?: 'message' | 'ticket';
+}
+
+export interface InternalMessage {
+  id: string;
+  sender: string;
+  recipient: string;
+  subject: string;
+  content: string;
+  timestamp: string;
+  isRead: boolean;
+}
+
+export interface FeedbackTicket {
+  id: string;
+  user: string;
+  type: 'Bug' | 'Feature' | 'Feedback';
+  subject: string;
+  message: string;
+  timestamp: string;
+  status: 'Open' | 'Resolved';
+  reply?: string;
+}
+
+export interface PartnerNode {
+  id: string;
+  name: string;
+  logo: string;
+  bonus: string;
+  bccRequired: number;
+  active: boolean;
+  description: string;
+}
+
 export interface GameState {
-  credits: number;
+  credits: number; // Will represent our core $BCC tokens
   miningPower: number; // Total combined output in PH/s
   energy: number; // 0 - 100
   efficiency: number; // multiplier (e.g. 1.0)
@@ -100,4 +170,26 @@ export interface GameState {
   ecosystemRewards: number; // generated passively
   accumulatedRewards: number; // waiting to be claimed
   profile?: MemberProfile;
+  cognitiveTokens: number; // Our own SPL-like custom token
+  minerNFTs: MinerNFT[]; // Custom list of user-owned and listed tradeable NFTs
+  bccTokens?: number; // Building Culture Coin $BCC
+  lastWheelSpinTime?: string; // Timestamp of the last wheel spin (once every 24h)
+  notifications?: AppNotification[];
+  messages?: InternalMessage[];
+  feedback?: FeedbackTicket[];
+  partners?: PartnerNode[];
+  
+  // Living Miner NFT & Personality Extensions
+  nodeArchetype?: 'Researcher' | 'Creator' | 'Builder' | 'Environmentalist' | 'AI Explorer';
+  nodeName?: string;
+  nodeLevel?: number;
+  nodePersonality?: 'Scholar AI' | 'Rogue Agent' | 'Zen Master' | 'Industrial Matrix';
+  nodeExperience?: number; // XP points
+  activeSkin?: string;
+  unlockedSkins?: string[];
+  proofOfAttentions?: ProofOfAttention[];
+  pomodoroActive?: boolean;
+  pomodoroTimeLeft?: number;
+  sharedInsights?: string[];
+  unlockedCompanionUpgrades?: string[];
 }

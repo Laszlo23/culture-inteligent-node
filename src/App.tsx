@@ -8,7 +8,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { 
   Zap, Battery, ShieldAlert, Cpu, Hammer, 
   Compass, Bot, Coins, Users, Calendar, 
-  Map, LogIn, LayoutGrid, Award, Volume2, VolumeX, RefreshCw, User, Trophy
+  Map, LogIn, LayoutGrid, Award, Volume2, VolumeX, RefreshCw, User, Trophy, HelpCircle, Bell, Rocket
 } from 'lucide-react';
 
 import { GameState, HardwareModule, AIWorker, FacilityRoom, Guild, DailyMission, InspectionLog } from './types';
@@ -21,6 +21,35 @@ import GuildHall from './components/GuildHall';
 import Treasury from './components/Treasury';
 import MemberProfile from './components/MemberProfile';
 import Leaderboard from './components/Leaderboard';
+
+import OnboardingModal from './components/OnboardingModal';
+import AuthPortal from './components/AuthPortal';
+import AdminPanel from './components/AdminPanel';
+import FeedbackPortal from './components/FeedbackPortal';
+import PartnerProgram from './components/PartnerProgram';
+import OnboardingHub from './components/OnboardingHub';
+
+const INITIAL_NOTIFICATIONS = [
+  { id: 'n_1', title: 'Welcome to Culture Node!', message: 'Deploy your hardware modules and start mining $BCC tokens.', timestamp: '12:00:00 PM', read: false, type: 'info' as const },
+  { id: 'n_2', title: 'System Diagnostic', message: 'Main Reactor Core energy depleted to 38%. Attention required.', timestamp: '12:15:00 PM', read: false, type: 'warn' as const },
+  { id: 'n_3', title: 'Daily Wheelspin Ready!', message: 'Spin the Lucky Wheel of Fortune to get free $BCC tokens!', timestamp: '12:30:00 PM', read: false, type: 'success' as const },
+  { id: 'n_4', title: 'New Message from System Admin', message: 'Admin broadcast: "Network Optimization" is waiting in your inbox.', timestamp: '12:35:00 PM', read: false, type: 'message' as const, relatedId: 'msg_1', relatedType: 'message' as const },
+  { id: 'n_5', title: 'Support Ticket Resolved!', message: 'Admin responded to your Postgres Sync ticket. Read the response.', timestamp: '12:40:00 PM', read: false, type: 'success' as const, relatedId: 'fb_1', relatedType: 'ticket' as const }
+];
+
+const INITIAL_MESSAGES = [
+  { id: 'msg_1', sender: 'System Admin', recipient: 'All Operators', subject: 'Network Optimization', content: 'Greeting Operator! Ensure your cooling systems are functional to maximize your daily $BCC hash rate. Let me know if you run into any validation anomalies.', timestamp: '10:00:00 AM', isRead: false },
+];
+
+const INITIAL_FEEDBACK = [
+  { id: 'fb_1', user: 'Operator', type: 'Feedback' as const, subject: 'Relational Database Sync', message: 'Would be awesome if we had active Postgres DB persistence behind the Node ledger.', timestamp: 'Yesterday', status: 'Resolved' as const, reply: 'Excellent suggestion! We have prioritized this in the Season 8 roadmap.' }
+];
+
+const INITIAL_PARTNERS = [
+  { id: 'p_1', name: 'Solana Devnet Syndicate', logo: 'https://images.unsplash.com/photo-1639762681485-074b7f938ba0?w=300&auto=format&fit=crop&q=80', bonus: '+5% Global Efficiency Multiplier', bccRequired: 500, active: false, description: 'Direct data pipeline bridge to the devnet cluster validator.' },
+  { id: 'p_2', name: 'Rust Core Foundation', logo: 'https://images.unsplash.com/photo-1607799279861-4dd421887fb3?w=300&auto=format&fit=crop&q=80', bonus: '+15 PH/s Core Mining Power boost', bccRequired: 1200, active: false, description: 'Optimizes microcode loops using high-performance compiler tools.' },
+  { id: 'p_3', name: 'Jupiter Aggregator', logo: 'https://images.unsplash.com/photo-1621761191319-c6fb62004040?w=300&auto=format&fit=crop&q=80', bonus: '+10% Global Efficiency booster', bccRequired: 800, active: false, description: 'Routes and pools swap volume across multiple decentralized DEX platforms.' }
+];
 
 const INITIAL_HARDWARE: HardwareModule[] = [
   { id: 'gpu_1', name: 'Quantum GPU Core', type: 'gpu', rarity: 'Common', bonusPower: 120, bonusEfficiency: 0.05, cost: 300, unlocked: true, installed: false, description: 'Basic graphics core used for computing standard blockchain hashes.' },
@@ -66,7 +95,7 @@ const INITIAL_MISSIONS: DailyMission[] = [
 export default function App() {
   const [state, setState] = useState<GameState>({
     credits: 1200,
-    miningPower: 4.8, // starts at base 4.8 PH/s
+    miningPower: 154.8, // Base (4.8) + Initial owned Miner NFT (150)
     energy: 38, // Starts at 38% low as requested!
     efficiency: 1.0,
     facilityLevel: 1,
@@ -90,12 +119,125 @@ export default function App() {
       telegramJoinClaimed: false,
       discordJoinClaimed: false,
       xPostInteractionClaimed: false
-    }
+    },
+    cognitiveTokens: 250, // Starting COGNITIVE utility tokens (CGT)
+    minerNFTs: [
+      {
+        id: 'miner_1',
+        name: 'Obsidian Pulse-Core',
+        image: 'obsidian',
+        hashrate: 150,
+        level: 1,
+        maxLevel: 5,
+        rarity: 'Common',
+        isListed: false,
+        listingPrice: 0,
+        upgradeCost: 50,
+        mintAddress: 'ObsDN4b1tD777777777777777777777777777777',
+        owner: 'Me',
+        description: 'A dark obsidian rig housing dense silicon matrix processors.'
+      },
+      {
+        id: 'miner_2',
+        name: 'Helix Fusion-Cell',
+        image: 'helix',
+        hashrate: 450,
+        level: 1,
+        maxLevel: 5,
+        rarity: 'Epic',
+        isListed: true,
+        listingPrice: 150,
+        upgradeCost: 150,
+        mintAddress: 'HlxFS4b1tD777777777777777777777777777777',
+        owner: 'HackerStation9',
+        description: 'Bends neural magnetic fields to optimize hash rate density.'
+      },
+      {
+        id: 'miner_3',
+        name: 'Quantum Nexus-Shard',
+        image: 'quantum',
+        hashrate: 1200,
+        level: 1,
+        maxLevel: 5,
+        rarity: 'Mythic',
+        isListed: true,
+        listingPrice: 500,
+        upgradeCost: 500,
+        mintAddress: 'QtmNX4b1tD777777777777777777777777777777',
+        owner: 'EcosystemVentures',
+        description: 'Our top-tier quantum supercomputer rig with real on-chain ledger proofing.'
+      }
+    ],
+    notifications: INITIAL_NOTIFICATIONS,
+    messages: INITIAL_MESSAGES,
+    feedback: INITIAL_FEEDBACK,
+    partners: INITIAL_PARTNERS
   });
 
   const [activeRoom, setActiveRoom] = useState<string>('map');
+  const [showNotificationsDropdown, setShowNotificationsDropdown] = useState<boolean>(false);
+  const [notificationTarget, setNotificationTarget] = useState<{ type: 'message' | 'ticket'; id: string } | null>(null);
+
+  // Auth Session State
+  const [currentUser, setCurrentUser] = useState<{ username: string; email: string; walletAddress?: string } | null>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('solana_current_user_session_v1');
+      return saved ? JSON.parse(saved) : null;
+    }
+    return null;
+  });
+
+  const handleLoginSuccess = (user: { username: string; email: string; walletAddress?: string }) => {
+    setCurrentUser(user);
+    localStorage.setItem('solana_current_user_session_v1', JSON.stringify(user));
+    
+    // Check if there is a saved game state for this specific user
+    const userSavedState = localStorage.getItem(`building_culture_state_${user.username}_v1`);
+    if (userSavedState) {
+      try {
+        const parsed = JSON.parse(userSavedState);
+        setState({
+          ...parsed,
+          notifications: parsed.notifications || INITIAL_NOTIFICATIONS,
+          messages: parsed.messages || INITIAL_MESSAGES,
+          feedback: parsed.feedback || INITIAL_FEEDBACK,
+          partners: parsed.partners || INITIAL_PARTNERS
+        });
+        addLog(`DATA SYNCHRONIZED: Loaded operational state from secure cloud ledger for "${user.username}".`, "success");
+      } catch (e) {
+        console.error("Failed to parse user saved state", e);
+      }
+    } else {
+      // Migrate guest progress to this new user slot
+      localStorage.setItem(`building_culture_state_${user.username}_v1`, JSON.stringify(state));
+      addLog(`DATA SECURED: Progress linked to registered account "${user.username}".`, "info");
+    }
+    
+    addLog(`GATEWAY AUTHORIZED: Active credential session established for "${user.username}".`, "success");
+  };
+
+  const handleLogout = () => {
+    if (currentUser) {
+      // Secure current progress into user slot
+      localStorage.setItem(`building_culture_state_${currentUser.username}_v1`, JSON.stringify(state));
+      localStorage.removeItem('solana_current_user_session_v1');
+      addLog(`GATEWAY SECURED: Active session for "${currentUser.username}" closed. Cryptographic locks engaged.`, "system");
+      setCurrentUser(null);
+      setActiveRoom('map');
+    }
+  };
+
+  const [showOnboarding, setShowOnboarding] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('solana_onboarding_dismissed');
+      return saved !== 'true';
+    }
+    return true;
+  });
   const [logs, setLogs] = useState<InspectionLog[]>([]);
   const [soundOn, setSoundOn] = useState<boolean>(true);
+  const [showSaveToast, setShowSaveToast] = useState<boolean>(false);
+  const lastUserActionStateRef = React.useRef<string>('');
 
   // Helper log function
   const addLog = (message: string, type: 'info' | 'success' | 'warn' | 'system') => {
@@ -112,7 +254,13 @@ export default function App() {
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        setState(parsed);
+        setState({
+          ...parsed,
+          notifications: parsed.notifications || INITIAL_NOTIFICATIONS,
+          messages: parsed.messages || INITIAL_MESSAGES,
+          feedback: parsed.feedback || INITIAL_FEEDBACK,
+          partners: parsed.partners || INITIAL_PARTNERS
+        });
       } catch (e) {
         console.error("Failed to parse local storage game state.", e);
       }
@@ -126,11 +274,50 @@ export default function App() {
   // Save state to localStorage whenever it modifies
   useEffect(() => {
     localStorage.setItem('building_culture_state_v1', JSON.stringify(state));
+    if (currentUser) {
+      localStorage.setItem(`building_culture_state_${currentUser.username}_v1`, JSON.stringify(state));
+    }
+
+    // Construct a signature representing only the user-driven values of the state.
+    // This filters out passive, high-frequency background updates (like the Treasury's ticker).
+    const userActionSignature = JSON.stringify({
+      credits: state.credits,
+      miningPower: state.miningPower,
+      energy: state.energy,
+      efficiency: state.efficiency,
+      facilityLevel: state.facilityLevel,
+      hardware: state.hardware.map(h => ({ installed: h.installed, unlocked: h.unlocked })),
+      workers: state.workers.map(w => ({ unlocked: w.unlocked, level: w.level, status: w.status })),
+      rooms: state.rooms.map(r => ({ level: r.level, unlocked: r.unlocked })),
+      dailyMissions: state.dailyMissions.map(m => m.completed),
+      profile: state.profile
+    });
+
+    if (lastUserActionStateRef.current && lastUserActionStateRef.current !== userActionSignature) {
+      setShowSaveToast(true);
+      const timer = setTimeout(() => {
+        setShowSaveToast(false);
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+
+    lastUserActionStateRef.current = userActionSignature;
   }, [state]);
 
   const changeRoom = (roomId: string) => {
     setActiveRoom(roomId);
-    const roomName = state.rooms.find(r => r.id === roomId)?.name || "Facility Schematic";
+    let roomName = "Facility Schematic";
+    if (roomId === 'admin') {
+      roomName = "Backstage Admin Control Centre";
+    } else if (roomId === 'feedback') {
+      roomName = "Feedback & Telemetry Support Portal";
+    } else if (roomId === 'partners') {
+      roomName = "Cooperative Node Alliances";
+    } else if (roomId === 'onboarding') {
+      roomName = "Ecosystem Hub & Onboarding Portal";
+    } else {
+      roomName = state.rooms.find(r => r.id === roomId)?.name || "Facility Schematic";
+    }
     addLog(`Entering ${roomName}...`, "info");
   };
 
@@ -228,6 +415,12 @@ export default function App() {
   return (
     <div className="min-h-screen bg-[#050506] text-slate-300 flex flex-col justify-between font-sans selection:bg-cyan-500/30 selection:text-cyan-300 relative overflow-hidden">
       
+      <AnimatePresence>
+        {!currentUser && (
+          <AuthPortal onLoginSuccess={handleLoginSuccess} />
+        )}
+      </AnimatePresence>
+
       {/* Background Atmosphere */}
       <div className="absolute inset-0 pointer-events-none z-0">
         <div className="absolute top-[-10%] right-[-10%] w-[500px] h-[500px] bg-cyan-900/10 rounded-full blur-[120px]"></div>
@@ -281,13 +474,42 @@ export default function App() {
           </div>
 
           <div className="flex flex-col">
-            <span className="text-[9px] font-mono tracking-widest uppercase text-slate-500">WALLET</span>
-            <span className="text-base font-black text-amber-400">{state.credits} <span className="text-[10px] font-normal">CP</span></span>
+            <span className="text-[9px] font-mono tracking-widest uppercase text-amber-500 font-bold">WALLET ($BCC)</span>
+            <span className="text-base font-black text-amber-400" title="Building Culture Coins">{state.credits} <span className="text-[10px] font-normal">BCC</span></span>
           </div>
         </div>
 
         {/* Global Season / Reset controls */}
         <div className="flex items-center gap-3">
+          {currentUser && (
+            <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-cyan-950/20 border border-cyan-500/20 rounded-lg font-mono text-[10px] text-cyan-400 font-bold uppercase">
+              <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
+              <span>@{currentUser.username}</span>
+            </div>
+          )}
+
+          <button
+            onClick={() => setShowOnboarding(true)}
+            title="Open Operational Handbook / Onboarding Guide"
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-white/5 border border-white/10 hover:border-cyan-500/30 hover:bg-cyan-950/10 text-slate-400 hover:text-cyan-400 rounded-lg font-mono text-[10px] tracking-wider uppercase font-black transition-all cursor-pointer"
+          >
+            <HelpCircle className="w-3.5 h-3.5 text-cyan-400" />
+            <span>GUIDE</span>
+          </button>
+
+          <button
+            onClick={() => changeRoom('onboarding')}
+            title="Open Building Culture Onboarding & Ecosystem Hub"
+            className={`flex items-center gap-1.5 px-3 py-1.5 border rounded-lg font-mono text-[10px] tracking-wider uppercase font-black transition-all cursor-pointer ${
+              activeRoom === 'onboarding'
+                ? 'bg-amber-600/20 border-amber-500/50 text-amber-400 shadow-[0_0_12px_rgba(245,158,11,0.15)]'
+                : 'bg-white/5 border-white/10 hover:border-amber-500/30 hover:bg-amber-950/10 text-slate-400 hover:text-amber-400'
+            }`}
+          >
+            <Rocket className="w-3.5 h-3.5 text-amber-400" />
+            <span>ECOSYSTEM HUB</span>
+          </button>
+
           <button
             onClick={() => changeRoom('profile')}
             className={`flex items-center gap-2 px-3 py-1.5 border rounded-lg font-mono text-[10px] tracking-wider uppercase font-black transition-all cursor-pointer ${
@@ -304,6 +526,95 @@ export default function App() {
             <Calendar className="w-3 h-3 text-cyan-400" />
             <span>{state.currentSeason.toUpperCase()}</span>
           </div>
+
+          {/* Notifications Bell Center */}
+          <div className="relative">
+            <button
+              onClick={() => {
+                setShowNotificationsDropdown(!showNotificationsDropdown);
+                if (!showNotificationsDropdown) {
+                  setState(prev => ({
+                    ...prev,
+                    notifications: (prev.notifications || []).map(n => ({ ...n, read: true }))
+                  }));
+                }
+              }}
+              title="Notifications Center"
+              className="w-9 h-9 rounded-xl bg-white/5 border border-white/10 hover:border-cyan-500/40 hover:bg-cyan-950/10 text-slate-400 hover:text-cyan-400 flex items-center justify-center transition-all cursor-pointer relative"
+            >
+              <Bell className="w-4 h-4" />
+              {(state.notifications || []).filter(n => !n.read).length > 0 && (
+                <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-red-500 border-2 border-[#0a0a0c] text-[8px] font-black font-mono text-white flex items-center justify-center animate-bounce">
+                  {(state.notifications || []).filter(n => !n.read).length}
+                </span>
+              )}
+            </button>
+
+            <AnimatePresence>
+              {showNotificationsDropdown && (
+                <motion.div
+                  initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: 8 }}
+                  className="absolute right-0 mt-2 w-72 bg-[#0a0a0c]/95 border border-white/10 rounded-2xl shadow-2xl p-4 z-50 font-mono text-xs space-y-3 backdrop-blur-md"
+                >
+                  <div className="flex justify-between items-center pb-2 border-b border-white/5">
+                    <span className="font-bold text-slate-200 uppercase tracking-widest text-[9px] flex items-center gap-1">
+                      <Bell className="w-3.5 h-3.5 text-cyan-400" /> Notifications Centre
+                    </span>
+                    <button
+                      onClick={() => {
+                        setState(prev => ({
+                          ...prev,
+                          notifications: []
+                        }));
+                      }}
+                      className="text-[8px] text-slate-500 hover:text-red-400 uppercase font-black"
+                    >
+                      Clear All
+                    </button>
+                  </div>
+
+                  <div className="space-y-2 max-h-60 overflow-y-auto divide-y divide-white/[0.03]">
+                    {(state.notifications || []).length === 0 ? (
+                      <div className="text-center py-4 text-slate-500 text-[10px] italic">
+                        No notifications to report. Node is peaceful.
+                      </div>
+                    ) : (
+                      (state.notifications || []).map(noti => (
+                        <div 
+                          key={noti.id} 
+                          onClick={() => {
+                            if (noti.relatedId && noti.relatedType) {
+                              setNotificationTarget({ type: noti.relatedType, id: noti.relatedId });
+                              changeRoom('feedback');
+                              setShowNotificationsDropdown(false);
+                            }
+                          }}
+                          className={`pt-2 pb-1.5 px-1.5 flex gap-2 items-start text-[10px] rounded-lg transition-colors ${noti.relatedId ? 'cursor-pointer hover:bg-white/5 border border-white/5 hover:border-cyan-500/20' : ''}`}
+                        >
+                          <span className={`w-1.5 h-1.5 rounded-full mt-1.5 shrink-0 ${
+                            noti.type === 'warn' ? 'bg-red-500 animate-pulse' :
+                            noti.type === 'success' ? 'bg-emerald-500' :
+                            noti.type === 'message' ? 'bg-purple-500' : 'bg-cyan-500'
+                          }`} />
+                          <div className="flex-1">
+                            <span className="text-white font-bold block">{noti.title}</span>
+                            <p className="text-slate-400 mt-0.5 leading-relaxed text-[9px]">{noti.message}</p>
+                            <span className="text-[8px] text-slate-600 block mt-1 flex justify-between items-center">
+                              <span>{noti.timestamp}</span>
+                              {noti.relatedId && <span className="text-[7px] text-cyan-400 font-bold uppercase tracking-widest">View details &rarr;</span>}
+                            </span>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+
           <button
             onClick={resetProgress}
             title="Wipe diagnostics ledger & restart simulation"
@@ -573,8 +884,21 @@ export default function App() {
               {activeRoom === 'missions' && <DailyMissions state={state} setState={setState} addLog={addLog} />}
               {activeRoom === 'guild' && <GuildHall state={state} setState={setState} addLog={addLog} />}
               {activeRoom === 'treasury' && <Treasury state={state} setState={setState} addLog={addLog} />}
-              {activeRoom === 'profile' && <MemberProfile state={state} setState={setState} addLog={addLog} />}
+              {activeRoom === 'profile' && <MemberProfile state={state} setState={setState} addLog={addLog} currentUser={currentUser} onLogout={handleLogout} />}
               {activeRoom === 'leaderboard' && <Leaderboard state={state} setState={setState} addLog={addLog} />}
+              {activeRoom === 'admin' && <AdminPanel state={state} setState={setState} addLog={addLog} currentUser={currentUser} />}
+              {activeRoom === 'feedback' && (
+                <FeedbackPortal 
+                  state={state} 
+                  setState={setState} 
+                  addLog={addLog} 
+                  currentUser={currentUser} 
+                  notificationTarget={notificationTarget} 
+                  setNotificationTarget={setNotificationTarget} 
+                />
+              )}
+              {activeRoom === 'partners' && <PartnerProgram state={state} setState={setState} addLog={addLog} />}
+              {activeRoom === 'onboarding' && <OnboardingHub state={state} setState={setState} addLog={addLog} onEnterApp={() => changeRoom('reactor')} />}
             </motion.div>
           )}
         </AnimatePresence>
@@ -587,12 +911,80 @@ export default function App() {
           <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-ping"></div>
           <span>COGNITIVE COLD STATION DEPLOYED // RIG SYNC ACTIVE</span>
         </div>
-        <div className="flex gap-4">
-          <a href="#" className="hover:text-cyan-400 transition-colors">DECENTRALIZED CONSENSUS</a>
+        <div className="flex flex-wrap gap-4 justify-center">
+          <button
+            onClick={() => changeRoom('onboarding')}
+            className={`hover:text-cyan-400 transition-colors cursor-pointer uppercase font-mono text-[9px] tracking-widest flex items-center gap-1 ${activeRoom === 'onboarding' ? 'text-cyan-400 font-bold' : ''}`}
+          >
+            <Rocket className="w-2.5 h-2.5 text-cyan-400" /> Onboarding & Ecosystem
+          </button>
           <span>•</span>
-          <a href="#" className="hover:text-cyan-400 transition-colors">SYSTEM STABILITY CERTIFIED</a>
+          <button
+            onClick={() => changeRoom('partners')}
+            className={`hover:text-amber-400 transition-colors cursor-pointer uppercase font-mono text-[9px] tracking-widest ${activeRoom === 'partners' ? 'text-amber-400 font-bold' : ''}`}
+          >
+            Partners Program
+          </button>
+          <span>•</span>
+          <button
+            onClick={() => changeRoom('feedback')}
+            className={`hover:text-cyan-400 transition-colors cursor-pointer uppercase font-mono text-[9px] tracking-widest ${activeRoom === 'feedback' ? 'text-cyan-400 font-bold' : ''}`}
+          >
+            Lodge Feedback
+          </button>
+          <span>•</span>
+          <button
+            onClick={() => changeRoom('admin')}
+            className={`hover:text-red-400 font-bold transition-colors cursor-pointer uppercase font-mono text-[9px] tracking-widest flex items-center gap-1 ${activeRoom === 'admin' ? 'text-red-400' : ''}`}
+          >
+            <span className="w-1 h-1 bg-red-500 rounded-full animate-ping" /> Admin Panel
+          </button>
         </div>
       </footer>
+
+      {/* Subtle 'System State Saved' Toast Notification */}
+      <AnimatePresence>
+        {showSaveToast && (
+          <motion.div
+            initial={{ opacity: 0, y: 20, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 15, scale: 0.95 }}
+            transition={{ duration: 0.25, ease: 'easeOut' }}
+            className="fixed bottom-6 right-6 z-50 flex items-center gap-3 bg-[#07070a]/95 border border-emerald-500/20 backdrop-blur-md px-4 py-3 rounded-xl shadow-[0_10px_30px_-5px_rgba(16,185,129,0.1)] pointer-events-none"
+          >
+            <div className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+            </div>
+            
+            <div className="flex flex-col">
+              <span className="font-mono text-[9px] font-black tracking-widest text-emerald-400 leading-none">
+                LEDGER SECURED
+              </span>
+              <span className="font-sans text-[11px] font-semibold text-slate-200 mt-1">
+                System State Saved
+              </span>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Onboarding Handbook Modal Overlay */}
+      <AnimatePresence>
+        {showOnboarding && (
+          <OnboardingModal
+            onClose={(dontShowAgain) => {
+              setShowOnboarding(false);
+              if (dontShowAgain) {
+                localStorage.setItem('solana_onboarding_dismissed', 'true');
+                addLog("ONBOARDING: Handbook permanently dismissed from startup.", "system");
+              } else {
+                addLog("ONBOARDING: Handbook completed. Safe travels!", "info");
+              }
+            }}
+          />
+        )}
+      </AnimatePresence>
 
     </div>
   );

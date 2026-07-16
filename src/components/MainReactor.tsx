@@ -7,7 +7,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   Zap, ShieldAlert, Thermometer, Wind, RefreshCw, Cpu, Database, Activity, 
-  Award, Brain, BookOpen, Check, Lock, Play, CheckCircle, Flame, Clock, Sparkles 
+  Award, Brain, BookOpen, Check, Lock, Play, CheckCircle, Flame, Clock, Sparkles,
+  Smartphone, User, Edit3, ShoppingBag, Trophy
 } from 'lucide-react';
 import { GameState, HardwareModule } from '../types';
 
@@ -23,7 +24,8 @@ export default function MainReactor({ state, setState, addLog, logs }: MainReact
   const [temperature, setTemperature] = useState(42); // in celsius
   const [venting, setVenting] = useState(false);
   const [rgbTheme, setRgbTheme] = useState<'cyan' | 'magenta' | 'emerald' | 'amber'>('cyan');
-  const [activeLeftTab, setActiveLeftTab] = useState<'schematic' | 'coresync' | 'academy'>('schematic');
+  const [activeLeftTab, setActiveLeftTab] = useState<'living-miner' | 'schematic' | 'coresync' | 'academy'>('living-miner');
+  const [showMobileDashboard, setShowMobileDashboard] = useState(false);
 
   // Zen Breathing Game States
   const [showBreathGame, setShowBreathGame] = useState(false);
@@ -421,10 +423,183 @@ export default function MainReactor({ state, setState, addLog, logs }: MainReact
   }[rgbTheme];
 
   return (
-    <div id="reactor-room" className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-      
-      {/* Visual Miner Rig Box */}
-      <div className="lg:col-span-2 bg-[#0a0a0c] border border-white/5 rounded-2xl p-6 flex flex-col justify-between relative overflow-hidden shadow-2xl min-h-[580px]">
+    <div id="reactor-room" className="space-y-4">
+      {/* Mobile Operator Console Switcher */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-[#0a0a0c] border border-white/5 p-4 rounded-2xl gap-3">
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-lg bg-teal-500/10 border border-teal-500/30 flex items-center justify-center text-teal-400">
+            <Smartphone className="w-4 h-4" />
+          </div>
+          <div>
+            <h4 className="text-xs font-bold text-slate-100 font-mono tracking-wide">OPERATOR CONSOLE SWITCHER</h4>
+            <span className="text-[9px] text-slate-500 font-mono block">TAP TO ACCELERATE DAILY CHORES IN COMPACT MODE</span>
+          </div>
+        </div>
+        <button
+          onClick={() => setShowMobileDashboard(!showMobileDashboard)}
+          className={`px-3 py-1.5 rounded-xl font-mono text-[9px] font-black tracking-widest transition-all flex items-center gap-1.5 uppercase cursor-pointer ${
+            showMobileDashboard 
+              ? 'bg-teal-500/20 text-teal-300 border border-teal-500/40 shadow-[0_0_12px_rgba(20,184,166,0.15)]' 
+              : 'bg-[#050506] text-slate-400 hover:text-white border border-white/5'
+          }`}
+        >
+          {showMobileDashboard ? 'Dismiss Operator Deck' : 'Launch Operator Deck'}
+        </button>
+      </div>
+
+      {showMobileDashboard ? (
+        /* Operator Compact Mobile Card Deck */
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 font-mono">
+          {/* Node Profile Compact Card */}
+          <div className="bg-[#0a0a0c] border border-teal-500/15 rounded-2xl p-4 space-y-4 relative overflow-hidden flex flex-col justify-between min-h-[220px]">
+            <div className="absolute inset-0 bg-cyber-grid bg-[size:16px_16px] opacity-10 pointer-events-none" />
+            
+            <div className="flex justify-between items-start z-10">
+              <div>
+                <span className="text-[8px] text-slate-500 uppercase block tracking-wider">NODE IDENTITY SPEC</span>
+                <h4 className="text-xs font-black text-slate-200 mt-0.5">{state.nodeName || 'NODE #48392'}</h4>
+              </div>
+              <div className="bg-teal-500/10 border border-teal-500/30 text-teal-300 text-[8px] px-2 py-0.5 rounded-full font-black tracking-widest">
+                LVL {state.nodeLevel || 1}
+              </div>
+            </div>
+
+            <div className="flex items-center gap-4 py-3 border-y border-white/5 z-10">
+              <div className="w-12 h-12 rounded-xl bg-teal-950/20 border border-teal-500/30 flex items-center justify-center relative">
+                <Brain className="w-5 h-5 text-teal-400" />
+                <span className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-emerald-500 rounded-full border-2 border-[#0a0a0c] flex items-center justify-center text-[7px] text-black font-black">✓</span>
+              </div>
+              <div className="flex-1 space-y-1">
+                <div className="flex justify-between text-[9px] text-slate-400">
+                  <span>TRAIT:</span>
+                  <span className="text-teal-400 font-bold">{state.nodePersonality || 'Scholar AI'}</span>
+                </div>
+                <div className="flex justify-between text-[9px] text-slate-400">
+                  <span>ACCUMULATED:</span>
+                  <span className="text-slate-200">{(state.nodeExperience || 12420).toLocaleString()} XP</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="pt-1 z-10">
+              <button
+                onClick={() => {
+                  const cost = (state.nodeLevel || 1) * 200;
+                  if (state.credits < cost) {
+                    addLog(`EVOLUTION REJECTED: Need ${cost} BCC to evolve.`, 'warn');
+                    return;
+                  }
+                  setState(prev => ({
+                    ...prev,
+                    credits: prev.credits - cost,
+                    nodeLevel: (prev.nodeLevel || 1) + 1,
+                    miningPower: prev.miningPower + 15,
+                    nodeExperience: (prev.nodeExperience || 0) + 250
+                  }));
+                  addLog(`MOBILE DECK: Evolved Node to Level ${(state.nodeLevel || 1) + 1}!`, 'success');
+                }}
+                className="w-full py-2.5 bg-teal-500/10 hover:bg-teal-500/20 border border-teal-500/30 text-teal-300 text-[10px] rounded-xl font-bold uppercase tracking-wider transition-all cursor-pointer"
+              >
+                EVOLVE NODE ({(state.nodeLevel || 1) * 200} BCC)
+              </button>
+            </div>
+          </div>
+
+          {/* Quick Maintenance Card */}
+          <div className="bg-[#0a0a0c] border border-white/5 rounded-2xl p-4 space-y-4 flex flex-col justify-between min-h-[220px]">
+            <div className="flex justify-between items-start">
+              <div>
+                <span className="text-[8px] text-slate-500 uppercase block tracking-wider">CORE MAINTENANCE STATUS</span>
+                <div className="flex items-baseline gap-2 mt-1">
+                  <span className="text-base font-bold text-slate-200">{temperature.toFixed(1)}°C</span>
+                  <span className="text-[8px] text-emerald-400">NOMINAL</span>
+                </div>
+              </div>
+              <Wind className="w-4 h-4 text-slate-400" />
+            </div>
+
+            <div className="space-y-2 py-3 border-y border-white/5">
+              <div className="flex justify-between text-[9px] text-slate-400 font-mono">
+                <span>CORE ENERGY MATRIX:</span>
+                <span className="font-bold text-cyan-400">{state.energy}%</span>
+              </div>
+              <div className="h-1.5 bg-[#050506] border border-white/5 p-0.5 rounded-full overflow-hidden">
+                <div style={{ width: `${state.energy}%` }} className="h-full bg-gradient-to-r from-cyan-500 to-indigo-500 rounded-full transition-all duration-300" />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2 pt-1">
+              <button
+                onClick={() => {
+                  setVenting(true);
+                  setTemperature(35);
+                  addLog("MOBILE DECK: Venting thermal core. Temperature dropped to 35°C.", "success");
+                  setTimeout(() => setVenting(false), 2000);
+                }}
+                disabled={venting}
+                className="py-2.5 bg-cyan-500/15 text-cyan-300 border border-cyan-500/30 text-[10px] rounded-xl font-bold uppercase tracking-wider cursor-pointer"
+              >
+                {venting ? "COOLING..." : "VENT RIG"}
+              </button>
+              <button
+                onClick={() => {
+                  if (state.energy >= 100) {
+                    addLog("MOBILE DECK: Core already at maximum capacity.", "info");
+                    return;
+                  }
+                  setState(prev => ({
+                    ...prev,
+                    energy: Math.min(100, prev.energy + 30)
+                  }));
+                  addLog("MOBILE DECK: Refuel secured (+30% Energy).", "success");
+                }}
+                className="py-2.5 bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 text-[10px] rounded-xl font-bold uppercase tracking-wider cursor-pointer"
+              >
+                REFUEL RIG
+              </button>
+            </div>
+          </div>
+
+          {/* Dynamic Check-in Rewards Card */}
+          <div className="bg-[#0a0a0c] border border-white/5 rounded-2xl p-4 space-y-4 flex flex-col justify-between md:col-span-2 min-h-[160px]">
+            <div className="flex justify-between items-start">
+              <div>
+                <span className="text-[8px] text-slate-500 uppercase block tracking-wider">DAILY CHECK-IN GATEWAY</span>
+                <h4 className="text-xs font-black text-slate-200 mt-0.5">SYNCHRONIZE DAILY NETWORK STATE</h4>
+              </div>
+              <Trophy className="w-5 h-5 text-amber-400" />
+            </div>
+
+            <p className="text-[10px] text-slate-400 leading-relaxed font-sans">
+              Perform simple daily attention check-ins to secure your neural data states. Instantly claims morning, lunch, and evening yields of BCC and Node XP.
+            </p>
+
+            <div className="bg-black/40 border border-white/5 p-3 rounded-xl flex items-center justify-between text-[11px]">
+              <div>
+                <span className="text-slate-500 text-[8px] block uppercase">SHIFT BONUS YIELD</span>
+                <span className="text-amber-300 font-bold font-mono">+25 BCC & +50 XP</span>
+              </div>
+              <button
+                onClick={() => {
+                  setState(prev => ({
+                    ...prev,
+                    credits: prev.credits + 25,
+                    nodeExperience: (prev.nodeExperience || 12420) + 50
+                  }));
+                  addLog("DAILY CHECK-IN: Synchronized attention yield on Solana network (+25 BCC, +50 XP).", "success");
+                }}
+                className="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-black font-black text-[10px] tracking-wider rounded-xl uppercase cursor-pointer"
+              >
+                Claim Shift Yield
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          
+          {/* Visual Miner Rig Box */}
+          <div className="lg:col-span-2 bg-[#0a0a0c] border border-white/5 rounded-2xl p-6 flex flex-col justify-between relative overflow-hidden shadow-2xl min-h-[580px]">
         {/* Futuristic Grid Overlays */}
         <div className="absolute inset-0 bg-cyber-grid bg-[size:24px_24px] opacity-[0.03] pointer-events-none" />
         <div className="absolute top-0 left-0 w-full h-[2px] bg-gradient-to-r from-transparent via-cyan-500 to-transparent opacity-40" />
@@ -459,7 +634,17 @@ export default function MainReactor({ state, setState, addLog, logs }: MainReact
           </div>
 
           {/* Interactive Navigation Tabs */}
-          <div className="flex bg-[#050506] border border-white/10 rounded-xl p-1 font-mono text-[10px]">
+          <div className="flex bg-[#050506] border border-white/10 rounded-xl p-1 font-mono text-[10px] flex-wrap gap-0.5">
+            <button
+              onClick={() => setActiveLeftTab('living-miner')}
+              className={`px-3 py-1.5 rounded-lg font-bold transition-all flex items-center gap-1 ${
+                activeLeftTab === 'living-miner'
+                  ? 'bg-teal-500/15 text-teal-300 border border-teal-500/30'
+                  : 'text-slate-400 hover:text-white border border-transparent'
+              }`}
+            >
+              <Sparkles className="w-3.5 h-3.5 text-teal-400" /> LIVING MINER
+            </button>
             <button
               onClick={() => setActiveLeftTab('schematic')}
               className={`px-3 py-1.5 rounded-lg font-bold transition-all ${
@@ -482,7 +667,7 @@ export default function MainReactor({ state, setState, addLog, logs }: MainReact
                   : 'text-slate-400 hover:text-white border border-transparent'
               }`}
             >
-              <Flame className="w-3 h-3 text-fuchsia-400" /> CORESYNC BREATH
+              <Flame className="w-3.5 h-3.5 text-fuchsia-400" /> BREATH
             </button>
             <button
               onClick={() => setActiveLeftTab('academy')}
@@ -492,7 +677,7 @@ export default function MainReactor({ state, setState, addLog, logs }: MainReact
                   : 'text-slate-400 hover:text-white border border-transparent'
               }`}
             >
-              <BookOpen className="w-3 h-3 text-amber-400" /> ACADEMY
+              <BookOpen className="w-3.5 h-3.5 text-amber-400" /> ACADEMY
             </button>
           </div>
 
@@ -732,6 +917,249 @@ export default function MainReactor({ state, setState, addLog, logs }: MainReact
                 transition={{ repeat: Infinity, duration: 1, ease: "linear" }}
               />
             </svg>
+          </div>
+        )}
+
+        {/* Living NFT Character Profile & Evolution View */}
+        {activeLeftTab === 'living-miner' && (
+          <div className="my-6 flex-1 flex flex-col justify-between font-mono p-4 md:p-6 bg-[#050507] border border-teal-500/10 rounded-2xl relative">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-teal-500/5 rounded-full blur-2xl pointer-events-none" />
+            
+            <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-stretch flex-1">
+              {/* Evolving Visual Avatar Frame */}
+              <div className="md:col-span-5 bg-[#0a0a0f] border border-white/5 rounded-2xl p-4 flex flex-col justify-between items-center relative overflow-hidden min-h-[300px]">
+                <div className="absolute inset-0 bg-cyber-grid bg-[size:16px_16px] opacity-10 pointer-events-none" />
+                
+                {/* Aura depending on selected skin */}
+                <div className={`absolute w-36 h-36 rounded-full blur-3xl opacity-30 animate-pulse pointer-events-none ${
+                  state.activeSkin === 'Obsidian Gold' ? 'bg-amber-400' :
+                  state.activeSkin === 'Holographic Fusion' ? 'bg-fuchsia-500' :
+                  state.activeSkin === 'Cosmic Stardust' ? 'bg-indigo-500' : 'bg-teal-500'
+                }`} />
+
+                <div className="w-full flex justify-between text-[9px] text-slate-500">
+                  <span>NFT SPECIFICATION</span>
+                  <span>NODE ID: #{(state.nodeName || '48392').length * 7 + 41200}</span>
+                </div>
+
+                {/* Evolving Avatar Graphic Representation */}
+                <div className="my-6 relative w-40 h-40 flex items-center justify-center">
+                  {/* Outer spinning aura rings */}
+                  <motion.div
+                    animate={{ rotate: 360 }}
+                    transition={{ duration: state.activeSkin === 'Cosmic Stardust' ? 15 : 8, repeat: Infinity, ease: "linear" }}
+                    className={`absolute inset-2 rounded-full border border-dashed ${
+                      state.activeSkin === 'Obsidian Gold' ? 'border-amber-500/40' :
+                      state.activeSkin === 'Holographic Fusion' ? 'border-fuchsia-500/40' :
+                      state.activeSkin === 'Cosmic Stardust' ? 'border-indigo-500/40' : 'border-teal-500/40'
+                    }`}
+                  />
+                  
+                  {/* Extra orbital helices for higher levels */}
+                  {(state.nodeLevel || 1) >= 4 && (
+                    <motion.div
+                      animate={{ rotate: -360 }}
+                      transition={{ duration: 6, repeat: Infinity, ease: "linear" }}
+                      className={`absolute inset-6 rounded-full border border-dotted ${
+                        state.activeSkin === 'Obsidian Gold' ? 'border-amber-400/50' :
+                        state.activeSkin === 'Holographic Fusion' ? 'border-fuchsia-400/50' :
+                        state.activeSkin === 'Cosmic Stardust' ? 'border-indigo-400/50' : 'border-teal-400/50'
+                      }`}
+                    />
+                  )}
+
+                  {/* Level Evolution Title Badge */}
+                  <div className="absolute top-0 bg-black/80 border border-white/10 px-2 py-0.5 rounded text-[8px] font-black tracking-widest text-slate-300">
+                    {(state.nodeLevel || 1) <= 3 ? "SEED CORE" :
+                     (state.nodeLevel || 1) <= 6 ? "HELIX NEXUS" :
+                     (state.nodeLevel || 1) <= 9 ? "SINGULARITY" : "CELESTIAL MATRIX"}
+                  </div>
+
+                  {/* Ultimate Singularity lightning bars */}
+                  {(state.nodeLevel || 1) >= 10 && (
+                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                      <motion.div animate={{ opacity: [0, 1, 0], scale: [0.8, 1.3, 0.8] }} transition={{ duration: 0.8, repeat: Infinity }} className="absolute w-full h-[1px] bg-cyan-400" />
+                      <motion.div animate={{ opacity: [0, 1, 0], scale: [0.8, 1.3, 0.8] }} transition={{ duration: 1.1, repeat: Infinity, delay: 0.2 }} className="absolute h-full w-[1px] bg-fuchsia-400" />
+                    </div>
+                  )}
+
+                  {/* Custom SVG node rendering */}
+                  <div className="w-24 h-24 rounded-3xl bg-black/60 border border-white/10 flex items-center justify-center relative overflow-hidden shadow-2xl">
+                    <div className="absolute inset-1 rounded-2xl bg-gradient-to-tr from-slate-950 to-slate-900 opacity-80" />
+                    <motion.div
+                      animate={{ 
+                        scale: (state.nodeLevel || 1) >= 10 ? [0.95, 1.12, 0.95] : [0.95, 1.04, 0.95],
+                        rotate: (state.nodeLevel || 1) >= 7 ? [0, 90, 180, 270, 360] : 0
+                      }}
+                      transition={{ duration: 10, repeat: Infinity, ease: "linear" }}
+                      className={`w-12 h-12 rounded-xl flex items-center justify-center border-2 z-10 ${
+                        state.activeSkin === 'Obsidian Gold' ? 'border-amber-400 bg-amber-950/20 shadow-[0_0_20px_rgba(245,158,11,0.4)]' :
+                        state.activeSkin === 'Holographic Fusion' ? 'border-fuchsia-400 bg-fuchsia-950/20 shadow-[0_0_20px_rgba(236,72,153,0.4)]' :
+                        state.activeSkin === 'Cosmic Stardust' ? 'border-indigo-400 bg-indigo-950/20 shadow-[0_0_20px_rgba(99,102,241,0.4)]' :
+                        'border-teal-400 bg-teal-950/20 shadow-[0_0_20px_rgba(20,184,166,0.4)]'
+                      }`}
+                    >
+                      {(state.nodePersonality === 'Scholar AI' || !state.nodePersonality) && <Brain className="w-6 h-6 text-slate-100" />}
+                      {state.nodePersonality === 'Rogue Agent' && <Wind className="w-6 h-6 text-slate-100 animate-pulse" />}
+                      {state.nodePersonality === 'Zen Master' && <Activity className="w-6 h-6 text-slate-100" />}
+                      {state.nodePersonality === 'Industrial Matrix' && <Cpu className="w-6 h-6 text-slate-100" />}
+                    </motion.div>
+                  </div>
+                </div>
+
+                <div className="text-center font-mono z-10">
+                  <span className="text-[10px] text-teal-400 font-bold block tracking-widest">LEVEL {state.nodeLevel || 1} EVOLUTION</span>
+                  <span className="text-xs text-slate-300 font-bold tracking-wide mt-1 uppercase block">{state.activeSkin || 'Genesis Slate'}</span>
+                </div>
+              </div>
+
+              {/* Character Attributes Panel */}
+              <div className="md:col-span-7 flex flex-col justify-between space-y-4">
+                {/* Node Identity card */}
+                <div className="space-y-3 bg-[#0a0a0f] border border-white/5 p-4 rounded-xl font-mono text-xs">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <span className="text-[9px] text-slate-500 block">EDIT NODE CALLSIGN:</span>
+                      <input
+                        type="text"
+                        maxLength={15}
+                        value={state.nodeName || 'NODE #48392'}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setState(prev => ({ ...prev, nodeName: val }));
+                        }}
+                        className="bg-[#050506] border border-white/10 px-2.5 py-1 rounded-lg text-xs text-teal-400 font-bold focus:border-teal-500 focus:outline-none max-w-[150px]"
+                      />
+                    </div>
+                    
+                    <div className="text-right">
+                      <span className="text-[9px] text-slate-500 block">KNOWLEDGE PROGRESS:</span>
+                      <span className="font-bold text-slate-200">{(state.nodeExperience || 12420).toLocaleString()} XP</span>
+                    </div>
+                  </div>
+
+                  {/* Level Up Button */}
+                  <div className="bg-[#050506] border border-white/5 p-3 rounded-xl flex items-center justify-between gap-2">
+                    <div>
+                      <span className="text-[9px] text-slate-500 block uppercase">EVOLVE REACTOR CORE</span>
+                      <span className="text-amber-400 font-bold">{(state.nodeLevel || 1) * 200} BCC REQUIRED</span>
+                    </div>
+                    <button
+                      onClick={() => {
+                        const cost = (state.nodeLevel || 1) * 200;
+                        if (state.credits < cost) {
+                          addLog(`EVOLUTION REJECTED: Insufficient BCC. Need ${cost} BCC for next phase.`, 'warn');
+                          return;
+                        }
+                        setState(prev => ({
+                          ...prev,
+                          credits: prev.credits - cost,
+                          nodeLevel: (prev.nodeLevel || 1) + 1,
+                          miningPower: prev.miningPower + 15,
+                          nodeExperience: (prev.nodeExperience || 0) + 250
+                        }));
+                        addLog(`CONGRATULATIONS: Node evolved to Level ${(state.nodeLevel || 1) + 1}! Baseline Output expanded (+15 PH/s).`, 'success');
+                      }}
+                      className="px-4 py-2 bg-gradient-to-r from-teal-500 to-emerald-600 hover:from-teal-400 hover:to-emerald-500 text-black font-black text-[10px] tracking-wider rounded-lg transition-all cursor-pointer shadow-md shadow-teal-500/10 uppercase"
+                    >
+                      Evolve Level
+                    </button>
+                  </div>
+                </div>
+
+                {/* AI Node Personality selection */}
+                <div className="space-y-2">
+                  <span className="text-[9px] text-slate-500 block font-bold tracking-widest uppercase">AI COGNITIVE PERSONALITY LAYER:</span>
+                  <div className="grid grid-cols-2 gap-2 text-[10px]">
+                    {[
+                      { id: 'Scholar AI' as const, icon: '🧠', desc: '+15% Learning Efficiency' },
+                      { id: 'Rogue Agent' as const, icon: '🥷', desc: '+10% PH/s Output Power' },
+                      { id: 'Zen Master' as const, icon: '☯', desc: '+20% Breathing Range' },
+                      { id: 'Industrial Matrix' as const, icon: '🦾', desc: '+15% Hardware Multipliers' }
+                    ].map((p) => {
+                      const isActive = state.nodePersonality === p.id || (!state.nodePersonality && p.id === 'Scholar AI');
+                      return (
+                        <button
+                          key={p.id}
+                          onClick={() => {
+                            setState(prev => ({ ...prev, nodePersonality: p.id }));
+                            addLog(`COGNITIVE RECONFIGURED: Personality layer adapted to "${p.id}". Core traits loaded.`, 'success');
+                          }}
+                          className={`p-2.5 rounded-xl border text-left transition-all ${
+                            isActive 
+                              ? 'bg-teal-950/20 border-teal-500/50 text-teal-300' 
+                              : 'bg-black border-white/5 text-slate-500 hover:text-slate-300 hover:border-white/10'
+                          }`}
+                        >
+                          <div className="flex items-center gap-1.5 font-bold">
+                            <span>{p.icon}</span>
+                            <span>{p.id}</span>
+                          </div>
+                          <span className="text-[8px] text-slate-400 block mt-1">{p.desc}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* NFT Skins Gallery */}
+                <div className="space-y-2">
+                  <span className="text-[9px] text-slate-500 block font-bold tracking-widest uppercase">CORESYNC NFT SKINS HARBOUR:</span>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[10px]">
+                    {[
+                      { id: 'Genesis Slate', price: 0 },
+                      { id: 'Obsidian Gold', price: 300 },
+                      { id: 'Holographic Fusion', price: 500 },
+                      { id: 'Cosmic Stardust', price: 800 }
+                    ].map((s) => {
+                      const unlocked = (state.unlockedSkins || ['Genesis Slate']).includes(s.id);
+                      const isActive = state.activeSkin === s.id || (!state.activeSkin && s.id === 'Genesis Slate');
+                      return (
+                        <button
+                          key={s.id}
+                          onClick={() => {
+                            if (!unlocked) {
+                              // Trigger purchase
+                              if (state.credits < s.price) {
+                                addLog(`TRANSACTION LOCKED: Insufficient BCC to buy "${s.id}". Need ${s.price} BCC.`, 'warn');
+                                return;
+                              }
+                              setState(prev => ({
+                                ...prev,
+                                credits: prev.credits - s.price,
+                                unlockedSkins: [...(prev.unlockedSkins || ['Genesis Slate']), s.id],
+                                activeSkin: s.id
+                              }));
+                              addLog(`SKIN UNLOCKED: Acquired and activated "${s.id}"! Ledger updated.`, 'success');
+                            } else {
+                              setState(prev => ({ ...prev, activeSkin: s.id }));
+                              addLog(`LEDGER SYNC: Selected core skin changed to "${s.id}".`, 'info');
+                            }
+                          }}
+                          className={`p-2 rounded-xl border flex flex-col justify-between min-h-[64px] transition-all text-center ${
+                            isActive 
+                              ? 'bg-teal-950/25 border-teal-500/60 text-teal-400 font-bold' 
+                              : unlocked 
+                                ? 'bg-[#0a0a0f] border-white/10 text-slate-300 hover:border-white/20' 
+                                : 'bg-[#050506] border-white/5 text-slate-500 hover:border-white/10'
+                          }`}
+                        >
+                          <span className="text-[8px] block uppercase truncate">{s.id}</span>
+                          <span className="text-[9px] font-bold mt-1.5 font-mono">
+                            {isActive ? 'ACTIVE' : unlocked ? 'EQUIP' : `${s.price} BCC`}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+              </div>
+            </div>
+            
+            <div className="border-t border-white/5 pt-3.5 mt-5 text-[9px] text-slate-500 text-center uppercase tracking-widest">
+              Living NFT Node evolution operates securely under Solana metadata pipeline.
+            </div>
           </div>
         )}
 
@@ -1176,6 +1604,8 @@ export default function MainReactor({ state, setState, addLog, logs }: MainReact
           </div>
         </div>
       </div>
+      </div>
+      )}
 
       {/* MINER_X1-QUANTUM ZEN RECALIBRATION MODAL */}
       <AnimatePresence>
