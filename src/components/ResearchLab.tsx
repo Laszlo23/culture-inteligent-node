@@ -31,7 +31,14 @@ import {
   Terminal,
   ShieldCheck
 } from 'lucide-react';
-import { GameState } from '../types';
+import { GameState, ProofOfAttention } from '../types';
+import {
+  verifyAttentionSession,
+  sendPoaMemoAttestation,
+  ensureWalletApiSession,
+  getWalletToken,
+} from '../lib/api.ts';
+import { Keypair } from '@solana/web3.js';
 
 interface ResearchLabProps {
   state: GameState;
@@ -174,6 +181,8 @@ export default function ResearchLab({ state, setState, addLog }: ResearchLabProp
   const [quizScore, setQuizScore] = useState(0);
   const [quizState, setQuizState] = useState<'idle' | 'quiz' | 'passed' | 'failed'>('idle');
   const [isScanningOverlay, setIsScanningOverlay] = useState(false);
+  const [agentVerifyMsg, setAgentVerifyMsg] = useState<string>('');
+  const [pendingAttestId, setPendingAttestId] = useState<string | null>(null);
   const [pendingSessionIdx, setPendingSessionIdx] = useState<number | null>(null);
 
   // Attention Academy Progress loaded from LocalStorage
@@ -227,7 +236,7 @@ export default function ResearchLab({ state, setState, addLog }: ResearchLabProp
     "CONFIRMING ACADEMIC ENGAGEMENT FACTORS...",
     "CORRELATING STUDY SESSION STUDY LENGTH...",
     "VALIDATING FOCUS PROOF ON DECENTRALIZED POOLS...",
-    "SYNCING TO MAINNET LEDGER...",
+    "SYNCING TO DEVNET LEDGER...",
   ];
 
   // Save Academy State
@@ -380,28 +389,59 @@ export default function ResearchLab({ state, setState, addLog }: ResearchLabProp
     setSuccessResult(false);
   };
 
-  const applyPendingRewards = (index: number) => {
+  const applyPendingRewards = (
+    index: number,
+    agent?: { verification: string; score: number; proof?: ProofOfAttention | null; verificationId?: string }
+  ) => {
     const session = ATTENTION_SESSIONS[index];
     if (completedSessions.includes(session.id)) return;
 
-    // Trigger glowing/upgrading visual hardware representation
     setJustUpgraded(true);
     setTimeout(() => {
       setJustUpgraded(false);
     }, 4000);
 
-    // Award CP, Energy, Efficiency
     setState(prev => {
       const nextEnergy = Math.min(100, prev.energy + session.rewards.energy);
       const nextEfficiency = parseFloat((prev.efficiency + session.rewards.efficiency).toFixed(3));
       const nextCredits = prev.credits + session.rewards.cp;
+      const proofs = [...(prev.proofOfAttentions || [])];
+      if (agent?.proof) {
+        proofs.unshift(agent.proof);
+      } else if (agent) {
+        proofs.unshift({
+          id: `poa_local_${Date.now()}`,
+          walletAddress:
+            (typeof window !== 'undefined' &&
+              JSON.parse(localStorage.getItem('solana_current_user_session_v1') || '{}')?.walletAddress) ||
+            'unknown',
+          activity: session.title,
+          duration: parseInt(session.duration) || 25,
+          verification: agent.verification,
+          rewardEnergy: session.rewards.energy,
+          rewardBcc: session.rewards.cp,
+          timestamp: new Date().toISOString(),
+          minted: false,
+          sessionId: session.id,
+          score: agent.score,
+          attestPending: true,
+        });
+      }
       return {
         ...prev,
         energy: nextEnergy,
         efficiency: nextEfficiency,
-        credits: nextCredits
+        credits: nextCredits,
+        proofOfAttentions: proofs,
+        dailyMissions: prev.dailyMissions.map((m) =>
+          m.id === 'm_academy' ? { ...m, completed: true } : m
+        ),
       };
     });
+
+    if (agent?.verificationId) {
+      setPendingAttestId(agent.verificationId);
+    }
 
     setCompletedSessions(prev => {
       const updated = [...prev, session.id];
@@ -409,7 +449,6 @@ export default function ResearchLab({ state, setState, addLog }: ResearchLabProp
       return updated;
     });
 
-    // Save to local ledger
     const newSession: SavedSession = {
       id: Date.now().toString(),
       topic: `Session ${index + 1}: ${session.title}`,
@@ -420,13 +459,134 @@ export default function ResearchLab({ state, setState, addLog }: ResearchLabProp
     };
     setHistory(prev => [newSession, ...prev]);
 
-    addLog(`ATTENTION VERIFIED: Passed Neural Snap quiz for ${session.title}! SECURED +${session.rewards.cp} CP, +${session.rewards.energy}% Energy, +${session.rewards.efficiency}x Efficiency.`, 'success');
+    addLog(
+      `AGENT VERIFIED: ${session.title} — ${agent?.verification || 'local'} → +${session.rewards.cp} CP. Attest on Devnet when ready.`,
+      'success'
+    );
 
-    // Automatically transition to next session if there is one
     if (index < ATTENTION_SESSIONS.length - 1) {
       setActiveSessionIdx(index + 1);
     }
     setPendingSessionIdx(null);
+  };
+
+  const runAgentVerification = async (index: number, quizScoreValue: number, quizTotal: number) => {
+    const session = ATTENTION_SESSIONS[index];
+    setAgentVerifyMsg('Contacting attention agent…');
+    setIsScanningOverlay(true);
+
+    try {
+      const sessionRaw = localStorage.getItem('solana_current_user_session_v1');
+      const sessionUser = sessionRaw ? JSON.parse(sessionRaw) : null;
+      const walletAddress = sessionUser?.walletAddress;
+      const walletType = sessionUser?.walletType || 'local';
+
+      if (walletAddress && !getWalletToken()) {
+        let localKeypair: Keypair | null = null;
+        const secret = localStorage.getItem('solana_local_secret');
+        if (secret && walletType === 'local') {
+          localKeypair = Keypair.fromSecretKey(Uint8Array.from(JSON.parse(secret)));
+        }
+        await ensureWalletApiSession({ walletAddress, walletType, localKeypair });
+      }
+
+      const artifacts = [
+        s1Skill && `Skill: ${s1Skill}`,
+        s1Observation && `Observation: ${s1Observation}`,
+        s2Journal && `Journal: ${s2Journal}`,
+        s3Grounding.see && `Grounding: ${JSON.stringify(s3Grounding)}`,
+        s4Summary && `Focus summary: ${s4Summary}`,
+        s5FrictionNote && `Friction: ${s5FrictionNote}`,
+        `Quiz ${quizScoreValue}/${quizTotal}`,
+      ]
+        .filter(Boolean)
+        .join('\n');
+
+      const result = await verifyAttentionSession({
+        sessionId: session.id,
+        title: session.title,
+        artifacts: artifacts || `Completed Neural Snap ${quizScoreValue}/${quizTotal} for ${session.title}`,
+        quizScore: quizScoreValue,
+        quizTotal,
+      });
+
+      setIsScanningOverlay(false);
+
+      if (!result.passed) {
+        setAgentVerifyMsg(result.reason || 'Agent rejected session');
+        setQuizState('failed');
+        addLog(`AGENT REJECTED: ${result.reason}`, 'warn');
+        return;
+      }
+
+      setAgentVerifyMsg(result.verification);
+      setQuizState('passed');
+      applyPendingRewards(index, {
+        verification: result.verification,
+        score: result.score,
+        proof: result.proofOfAttention,
+        verificationId: result.verificationId,
+      });
+    } catch (err: any) {
+      setIsScanningOverlay(false);
+      // Offline / no API: still allow rewards with heuristic note for demo resilience
+      const fallbackScore = Math.round((quizScoreValue / Math.max(1, quizTotal)) * 100);
+      setAgentVerifyMsg(`Local fallback verify (${err?.message || 'API unavailable'})`);
+      addLog(`AGENT API FALLBACK: ${err?.message || 'unavailable'} — applying quiz-gated rewards`, 'warn');
+      applyPendingRewards(index, {
+        verification: `Local quiz gate (${fallbackScore}%) — server agent unreachable`,
+        score: fallbackScore,
+      });
+      setQuizState('passed');
+    }
+  };
+
+  const attestPendingPoa = async () => {
+    if (!pendingAttestId) return;
+    try {
+      const sessionRaw = localStorage.getItem('solana_current_user_session_v1');
+      const sessionUser = sessionRaw ? JSON.parse(sessionRaw) : null;
+      if (!sessionUser?.walletAddress) {
+        addLog('ATTEST BLOCKED: No wallet session', 'warn');
+        return;
+      }
+      let localKeypair: Keypair | null = null;
+      if (sessionUser.walletType === 'local') {
+        const secret = localStorage.getItem('solana_local_secret');
+        if (secret) localKeypair = Keypair.fromSecretKey(Uint8Array.from(JSON.parse(secret)));
+      }
+      const poa = (state.proofOfAttentions || []).find((p) => p.id === pendingAttestId);
+      const memo = `poa:${poa?.sessionId || pendingAttestId}:${poa?.score ?? 0}`;
+      addLog('ATTEST: Broadcasting Devnet memo…', 'info');
+      const { attestAttentionProof } = await import('../lib/api.ts');
+      const signature = await sendPoaMemoAttestation({
+        walletAddress: sessionUser.walletAddress,
+        walletType: sessionUser.walletType || 'local',
+        localKeypair,
+        memo,
+      });
+      await attestAttentionProof({
+        verificationId: pendingAttestId,
+        signature,
+        sessionId: poa?.sessionId,
+        score: poa?.score,
+      });
+      setState((prev) => ({
+        ...prev,
+        proofOfAttentions: (prev.proofOfAttentions || []).map((p) =>
+          p.id === pendingAttestId
+            ? { ...p, minted: true, signature, attestPending: false }
+            : p
+        ),
+      }));
+      setPendingAttestId(null);
+      addLog(
+        `ATTESTED ON DEVNET: ${signature.slice(0, 16)}… https://solscan.io/tx/${signature}?cluster=devnet`,
+        'success'
+      );
+    } catch (err: any) {
+      addLog(`ATTEST FAILED: ${err?.message || err}`, 'warn');
+    }
   };
 
   const claimSessionRewards = (index: number) => {
@@ -1792,15 +1952,10 @@ export default function ResearchLab({ state, setState, addLog }: ResearchLabProp
                           if (isPass) {
                             setQuizScore(nextScore);
                             setQuizState('passed');
-                            setIsScanningOverlay(true);
-                            addLog(`VERIFICATION TERMINAL: All attention checks correct. Initiating AI Inspection Sweep...`, 'success');
-                            setTimeout(() => {
-                              setIsScanningOverlay(false);
-                              if (pendingSessionIdx !== null) {
-                                applyPendingRewards(pendingSessionIdx);
-                              }
-                              setQuizState('idle');
-                            }, 3500);
+                            addLog(`VERIFICATION TERMINAL: Quiz passed. Running Gemini attention agent…`, 'success');
+                            if (pendingSessionIdx !== null) {
+                              void runAgentVerification(pendingSessionIdx, nextScore, activeQuizQuestions.length);
+                            }
                           } else {
                             setQuizState('failed');
                             addLog(`VERIFICATION TERMINAL: Score ${nextScore}/${activeQuizQuestions.length} is below standard. Verification rejected.`, 'warn');
@@ -1827,21 +1982,35 @@ export default function ResearchLab({ state, setState, addLog }: ResearchLabProp
 
                   <div className="space-y-2">
                     <span className="text-[10px] text-emerald-400 font-bold tracking-widest block uppercase">
-                      Attention Integrity Verified
+                      Agent Attention Verified
                     </span>
                     <h3 className="text-sm font-black text-slate-100">
-                      POL PROOF RECORDED ON CONSTITUENT CHANNELS
+                      PROOF OF ATTENTION RECORDED
                     </h3>
+                    {agentVerifyMsg && (
+                      <p className="text-[11px] text-slate-400 font-sans max-w-md mx-auto">{agentVerifyMsg}</p>
+                    )}
+                    {pendingAttestId && (
+                      <button
+                        type="button"
+                        onClick={() => void attestPendingPoa()}
+                        className="mt-3 px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-mono text-[10px] font-black tracking-wider"
+                      >
+                        ATTEST ON DEVNET (MEMO TX)
+                      </button>
+                    )}
                   </div>
 
                   <p className="text-[11px] text-slate-400 max-w-sm mx-auto leading-relaxed font-sans">
-                    Analyzing attention density arrays. Calibrating hardware nodes with mainnet ledger credentials. Please wait for the AI Inspection Scanner sweep.
+                    Facility rewards applied after agent verification. Optional next step: attest this PoA with a Solana Devnet memo transaction for Solscan proof.
                   </p>
 
-                  <div className="flex items-center justify-center gap-2 text-[10px] text-slate-500 border border-white/5 bg-[#030304] p-3 rounded-xl max-w-xs mx-auto">
-                    <Sparkles className="w-4 h-4 text-emerald-400 animate-spin" />
-                    <span>SYNCHRONIZING REWARD METRICS...</span>
-                  </div>
+                  {!pendingAttestId && (
+                    <div className="flex items-center justify-center gap-2 text-[10px] text-emerald-500/80 border border-emerald-500/20 bg-[#030304] p-3 rounded-xl max-w-xs mx-auto">
+                      <CheckCircle className="w-4 h-4" />
+                      <span>SESSION COMPLETE — OPEN ECOSYSTEM HUB TO VIEW PoA LEDGER</span>
+                    </div>
+                  )}
                 </div>
               )}
 

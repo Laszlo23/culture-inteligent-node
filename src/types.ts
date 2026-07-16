@@ -110,6 +110,10 @@ export interface ProofOfAttention {
   rewardBcc: number;
   timestamp: string;
   minted: boolean;
+  sessionId?: string;
+  score?: number;
+  signature?: string;
+  attestPending?: boolean;
 }
 
 export interface AppNotification {
@@ -178,6 +182,16 @@ export interface GameState {
   messages?: InternalMessage[];
   feedback?: FeedbackTicket[];
   partners?: PartnerNode[];
+
+  /** Primary KPI proof: confirmed Devnet contribution tx */
+  kpiProof?: {
+    signature: string;
+    walletAddress: string;
+    confirmedAt: string;
+    amountSol: number;
+    creditsAwarded: number;
+    energyAwarded: number;
+  };
   
   // Living Miner NFT & Personality Extensions
   nodeArchetype?: 'Researcher' | 'Creator' | 'Builder' | 'Environmentalist' | 'AI Explorer';

@@ -8,9 +8,10 @@ import { motion, AnimatePresence } from 'motion/react';
 import { 
   Zap, Battery, ShieldAlert, Cpu, Hammer, 
   Compass, Bot, Coins, Users, Calendar, 
-  Map, LogIn, LayoutGrid, Award, Volume2, VolumeX, RefreshCw, User, Trophy, HelpCircle, Bell, Rocket
+  Map, LogIn, LayoutGrid, Award, Volume2, VolumeX, RefreshCw, User, Trophy, HelpCircle, Bell, Rocket, Menu
 } from 'lucide-react';
 
+import { clearWalletToken } from './lib/api';
 import { GameState, HardwareModule, AIWorker, FacilityRoom, Guild, DailyMission, InspectionLog } from './types';
 import MainReactor from './components/MainReactor';
 import Workshop from './components/Workshop';
@@ -28,6 +29,8 @@ import AdminPanel from './components/AdminPanel';
 import FeedbackPortal from './components/FeedbackPortal';
 import PartnerProgram from './components/PartnerProgram';
 import OnboardingHub from './components/OnboardingHub';
+import NavMenu, { NavDestination } from './components/NavMenu';
+import LegalPages, { LegalPageId } from './components/LegalPages';
 
 const INITIAL_NOTIFICATIONS = [
   { id: 'n_1', title: 'Welcome to Culture Node!', message: 'Deploy your hardware modules and start mining $BCC tokens.', timestamp: '12:00:00 PM', read: false, type: 'info' as const },
@@ -75,8 +78,8 @@ const INITIAL_ROOMS: FacilityRoom[] = [
   { id: 'workshop', name: 'Hardware Marketplace', level: 1, maxLevel: 5, unlocked: true, costToUnlock: 0, costToUpgrade: 600, description: 'Purchase and install high-performance hardware upgrades.', perk: '-10% Part Purchasing Costs' },
   { id: 'lab', name: 'Attention Academy', level: 1, maxLevel: 5, unlocked: true, costToUnlock: 0, costToUpgrade: 700, description: 'Verify focus logs and complete micro-courses to refuel system energy.', perk: '+20% Energy Refuel Multiplier' },
   { id: 'ai', name: 'Automation Center', level: 0, maxLevel: 3, unlocked: false, costToUnlock: 800, costToUpgrade: 1200, description: 'Deploy helpful helper AI bots to passively boost mining rates.', perk: '+5% Worker Passive Speed' },
-  { id: 'treasury', name: 'Ecosystem Vault', level: 0, maxLevel: 3, unlocked: false, costToUnlock: 1200, costToUpgrade: 1500, description: 'Track ticking ecosystem yield drops and claim your token balances.', perk: '+12% Hourly Claim Multiplier' },
-  { id: 'guild', name: 'Community Guilds', level: 0, maxLevel: 1, unlocked: false, costToUnlock: 1500, costToUpgrade: 0, description: 'Align with global Web3 builder groups to earn team rewards.', perk: '+10% Team Output Boost' },
+  { id: 'treasury', name: 'Ecosystem Vault', level: 1, maxLevel: 3, unlocked: true, costToUnlock: 0, costToUpgrade: 1500, description: 'Track ticking ecosystem yield drops and claim your token balances. Includes Solana Devnet portal for wallet demo.', perk: '+12% Hourly Claim Multiplier' },
+  { id: 'guild', name: 'Community Guilds', level: 1, maxLevel: 1, unlocked: true, costToUnlock: 0, costToUpgrade: 0, description: 'Align with global Web3 builder groups to earn team rewards.', perk: '+10% Team Output Boost' },
 ];
 
 const INITIAL_GUILDS: Guild[] = [
@@ -86,10 +89,11 @@ const INITIAL_GUILDS: Guild[] = [
 ];
 
 const INITIAL_MISSIONS: DailyMission[] = [
-  { id: 'm1', label: 'Watch Solana Developer AI Masterclass (12m)', completed: false, energyReward: 20, powerReward: 10, category: 'video' },
-  { id: 'm2', label: 'Analyze Solana Parallel Execution Docs', completed: false, energyReward: 20, powerReward: 12, category: 'article' },
-  { id: 'm3', label: 'Solve 1 Smart Contract Assembly Bug', completed: false, energyReward: 25, powerReward: 15, category: 'quest' },
-  { id: 'm4', label: 'Contribute Code Snippet to Dev Guild Hub', completed: false, energyReward: 35, powerReward: 20, category: 'build' },
+  { id: 'm_kpi', label: 'KPI: Prove Devnet contribution (0.05 SOL on-chain)', completed: false, energyReward: 25, powerReward: 15, category: 'build' },
+  { id: 'm_academy', label: 'Complete agent-verified Attention Academy session', completed: false, energyReward: 30, powerReward: 20, category: 'build' },
+  { id: 'm1', label: '[Practice] Review Solana Devnet checklist (simulated)', completed: false, energyReward: 15, powerReward: 8, category: 'video' },
+  { id: 'm2', label: '[Practice] Skim parallel execution notes (simulated)', completed: false, energyReward: 15, powerReward: 8, category: 'article' },
+  { id: 'm3', label: '[Practice] Warm-up focus timer (simulated)', completed: false, energyReward: 20, powerReward: 10, category: 'quest' },
 ];
 
 export default function App() {
@@ -175,11 +179,17 @@ export default function App() {
   });
 
   const [activeRoom, setActiveRoom] = useState<string>('map');
+  const [menuOpen, setMenuOpen] = useState(false);
   const [showNotificationsDropdown, setShowNotificationsDropdown] = useState<boolean>(false);
   const [notificationTarget, setNotificationTarget] = useState<{ type: 'message' | 'ticket'; id: string } | null>(null);
 
-  // Auth Session State
-  const [currentUser, setCurrentUser] = useState<{ username: string; email: string; walletAddress?: string } | null>(() => {
+  // Auth Session State (wallet-only — no Firebase email/password gate)
+  const [currentUser, setCurrentUser] = useState<{
+    username: string;
+    email: string;
+    walletAddress?: string;
+    walletType?: 'extension' | 'local';
+  } | null>(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('solana_current_user_session_v1');
       return saved ? JSON.parse(saved) : null;
@@ -187,41 +197,67 @@ export default function App() {
     return null;
   });
 
-  const handleLoginSuccess = (user: { username: string; email: string; walletAddress?: string }) => {
+  const handleLoginSuccess = (user: {
+    username: string;
+    email: string;
+    walletAddress?: string;
+    walletType?: 'extension' | 'local';
+  }) => {
     setCurrentUser(user);
     localStorage.setItem('solana_current_user_session_v1', JSON.stringify(user));
-    
-    // Check if there is a saved game state for this specific user
+
+    // Ensure Ecosystem Vault (Solana portal) is unlocked for demo / jury review
+    setState(prev => ({
+      ...prev,
+      rooms: prev.rooms.map(r =>
+        r.id === 'treasury' ? { ...r, unlocked: true, level: Math.max(r.level, 1) } : r
+      ),
+    }));
+
     const userSavedState = localStorage.getItem(`building_culture_state_${user.username}_v1`);
     if (userSavedState) {
       try {
         const parsed = JSON.parse(userSavedState);
+        const rooms = (parsed.rooms || INITIAL_ROOMS).map((r: FacilityRoom) =>
+          r.id === 'treasury' ? { ...r, unlocked: true, level: Math.max(r.level || 0, 1) } : r
+        );
         setState({
           ...parsed,
+          rooms,
           notifications: parsed.notifications || INITIAL_NOTIFICATIONS,
           messages: parsed.messages || INITIAL_MESSAGES,
           feedback: parsed.feedback || INITIAL_FEEDBACK,
           partners: parsed.partners || INITIAL_PARTNERS
         });
-        addLog(`DATA SYNCHRONIZED: Loaded operational state from secure cloud ledger for "${user.username}".`, "success");
+        addLog(`DATA SYNCHRONIZED: Loaded facility state for wallet operator "${user.username}".`, "success");
       } catch (e) {
         console.error("Failed to parse user saved state", e);
       }
     } else {
-      // Migrate guest progress to this new user slot
       localStorage.setItem(`building_culture_state_${user.username}_v1`, JSON.stringify(state));
-      addLog(`DATA SECURED: Progress linked to registered account "${user.username}".`, "info");
+      addLog(`DATA SECURED: Progress linked to wallet "${user.walletAddress?.slice(0, 8)}…".`, "info");
     }
-    
-    addLog(`GATEWAY AUTHORIZED: Active credential session established for "${user.username}".`, "success");
+
+    const walletHint = user.walletAddress
+      ? ` (${user.walletAddress.slice(0, 4)}…${user.walletAddress.slice(-4)})`
+      : '';
+    addLog(`WALLET GATE AUTHORIZED: Session for "${user.username}"${walletHint}. Open Ecosystem Vault for Solana Portal.`, "success");
   };
 
   const handleLogout = () => {
     if (currentUser) {
-      // Secure current progress into user slot
       localStorage.setItem(`building_culture_state_${currentUser.username}_v1`, JSON.stringify(state));
       localStorage.removeItem('solana_current_user_session_v1');
-      addLog(`GATEWAY SECURED: Active session for "${currentUser.username}" closed. Cryptographic locks engaged.`, "system");
+      localStorage.removeItem('solana_wallet_session_v1');
+      clearWalletToken();
+      if (currentUser.walletType === 'extension' && (window as any).solana) {
+        try {
+          (window as any).solana.disconnect();
+        } catch {
+          // ignore
+        }
+      }
+      addLog(`GATEWAY SECURED: Wallet session for "${currentUser.username}" closed.`, "system");
       setCurrentUser(null);
       setActiveRoom('map');
     }
@@ -254,8 +290,36 @@ export default function App() {
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
+        const missions: DailyMission[] = parsed.dailyMissions || INITIAL_MISSIONS;
+        const hasKpiMission = missions.some((m) => m.id === 'm_kpi');
+        let kpiProof = parsed.kpiProof;
+        try {
+          const rawProof = localStorage.getItem('building_culture_kpi_proof_v1');
+          if (!kpiProof && rawProof) kpiProof = JSON.parse(rawProof);
+        } catch {
+          // ignore
+        }
         setState({
           ...parsed,
+          kpiProof,
+          dailyMissions: hasKpiMission
+            ? missions.map((m) =>
+                m.id === 'm_kpi' && kpiProof?.signature ? { ...m, completed: true } : m
+              )
+            : [
+                {
+                  id: 'm_kpi',
+                  label: 'KPI: Prove Devnet contribution (0.05 SOL on-chain)',
+                  completed: !!kpiProof?.signature,
+                  energyReward: 25,
+                  powerReward: 15,
+                  category: 'build' as const,
+                },
+                ...missions,
+              ],
+          rooms: (parsed.rooms || INITIAL_ROOMS).map((r: FacilityRoom) =>
+            r.id === 'treasury' ? { ...r, unlocked: true, level: Math.max(r.level || 0, 1) } : r
+          ),
           notifications: parsed.notifications || INITIAL_NOTIFICATIONS,
           messages: parsed.messages || INITIAL_MESSAGES,
           feedback: parsed.feedback || INITIAL_FEEDBACK,
@@ -315,10 +379,32 @@ export default function App() {
       roomName = "Cooperative Node Alliances";
     } else if (roomId === 'onboarding') {
       roomName = "Ecosystem Hub & Onboarding Portal";
+    } else if (roomId === 'missions') {
+      roomName = "Daily Missions & Lucky Wheel";
+    } else if (roomId === 'legal-privacy') {
+      roomName = "Privacy Policy";
+    } else if (roomId === 'legal-terms') {
+      roomName = "Terms of Use";
+    } else if (roomId === 'legal-disclaimer') {
+      roomName = "Disclaimer";
+    } else if (roomId === 'profile') {
+      roomName = "Member Profile";
+    } else if (roomId === 'leaderboard') {
+      roomName = "Season Leaderboard";
     } else {
       roomName = state.rooms.find(r => r.id === roomId)?.name || "Facility Schematic";
     }
     addLog(`Entering ${roomName}...`, "info");
+
+    if (roomId === 'missions') {
+      setTimeout(() => {
+        document.getElementById('lucky-wheel')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 350);
+    }
+  };
+
+  const handleNavNavigate = (id: NavDestination) => {
+    changeRoom(id);
   };
 
   const unlockRoom = (roomId: string) => {
@@ -404,7 +490,59 @@ export default function App() {
           telegramJoinClaimed: false,
           discordJoinClaimed: false,
           xPostInteractionClaimed: false
-        }
+        },
+        cognitiveTokens: 250,
+        minerNFTs: [
+          {
+            id: 'miner_1',
+            name: 'Obsidian Pulse-Core',
+            image: 'obsidian',
+            hashrate: 150,
+            level: 1,
+            maxLevel: 5,
+            rarity: 'Common',
+            isListed: false,
+            listingPrice: 0,
+            upgradeCost: 50,
+            mintAddress: 'ObsDN4b1tD777777777777777777777777777777',
+            owner: 'Me',
+            description: 'A dark obsidian rig housing dense silicon matrix processors.'
+          },
+          {
+            id: 'miner_2',
+            name: 'Helix Fusion-Cell',
+            image: 'helix',
+            hashrate: 450,
+            level: 1,
+            maxLevel: 5,
+            rarity: 'Epic',
+            isListed: true,
+            listingPrice: 150,
+            upgradeCost: 150,
+            mintAddress: 'HlxFS4b1tD777777777777777777777777777777',
+            owner: 'HackerStation9',
+            description: 'Bends neural magnetic fields to optimize hash rate density.'
+          },
+          {
+            id: 'miner_3',
+            name: 'Quantum Nexus-Shard',
+            image: 'quantum',
+            hashrate: 1200,
+            level: 1,
+            maxLevel: 5,
+            rarity: 'Mythic',
+            isListed: true,
+            listingPrice: 500,
+            upgradeCost: 500,
+            mintAddress: 'QtmNX4b1tD777777777777777777777777777777',
+            owner: 'EcosystemVentures',
+            description: 'Our top-tier quantum supercomputer rig with real on-chain ledger proofing.'
+          }
+        ],
+        notifications: INITIAL_NOTIFICATIONS,
+        messages: INITIAL_MESSAGES,
+        feedback: INITIAL_FEEDBACK,
+        partners: INITIAL_PARTNERS
       });
       localStorage.removeItem('building_culture_state_v1');
       addLog("SYSTEM REBOOTED: Settings reset to defaults.", "system");
@@ -437,7 +575,7 @@ export default function App() {
           <div>
             <span className="text-[10px] font-mono tracking-widest uppercase text-slate-500">Node Network</span>
             <h1 className="text-sm font-bold tracking-tight text-white flex items-center gap-2">
-              CULTURE NODE <span className="text-[8px] font-mono tracking-widest uppercase bg-cyan-950/60 border border-cyan-800 text-cyan-400 px-1.5 py-0.5 rounded">MAINNET-v1.0</span>
+              CULTURE NODE <span className="text-[8px] font-mono tracking-widest uppercase bg-cyan-950/60 border border-cyan-800 text-cyan-400 px-1.5 py-0.5 rounded">DEVNET</span>
             </h1>
           </div>
         </div>
@@ -482,44 +620,59 @@ export default function App() {
         {/* Global Season / Reset controls */}
         <div className="flex items-center gap-3">
           {currentUser && (
-            <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-cyan-950/20 border border-cyan-500/20 rounded-lg font-mono text-[10px] text-cyan-400 font-bold uppercase">
+            <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-cyan-950/20 border border-cyan-500/20 rounded-lg font-mono text-[10px] text-cyan-400 font-bold uppercase" title={currentUser.walletAddress || currentUser.username}>
               <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
               <span>@{currentUser.username}</span>
+              {currentUser.walletAddress && (
+                <span className="text-slate-500 font-normal normal-case">
+                  {currentUser.walletAddress.slice(0, 4)}…{currentUser.walletAddress.slice(-4)}
+                </span>
+              )}
             </div>
           )}
 
           <button
+            type="button"
+            onClick={() => setMenuOpen(true)}
+            title="Open navigation menu"
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-cyan-600/15 border border-cyan-500/40 hover:bg-cyan-600/25 text-cyan-300 rounded-lg font-mono text-[10px] tracking-wider uppercase font-black transition-all cursor-pointer"
+          >
+            <Menu className="w-4 h-4" />
+            <span className="hidden sm:inline">MENU</span>
+          </button>
+
+          <button
             onClick={() => setShowOnboarding(true)}
             title="Open Operational Handbook / Onboarding Guide"
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-white/5 border border-white/10 hover:border-cyan-500/30 hover:bg-cyan-950/10 text-slate-400 hover:text-cyan-400 rounded-lg font-mono text-[10px] tracking-wider uppercase font-black transition-all cursor-pointer"
+            className="hidden md:flex items-center gap-1.5 px-3 py-1.5 bg-white/5 border border-white/10 hover:border-cyan-500/30 hover:bg-cyan-950/10 text-slate-400 hover:text-cyan-400 rounded-lg font-mono text-[10px] tracking-wider uppercase font-black transition-all cursor-pointer"
           >
             <HelpCircle className="w-3.5 h-3.5 text-cyan-400" />
             <span>GUIDE</span>
           </button>
 
           <button
-            onClick={() => changeRoom('onboarding')}
-            title="Open Building Culture Onboarding & Ecosystem Hub"
-            className={`flex items-center gap-1.5 px-3 py-1.5 border rounded-lg font-mono text-[10px] tracking-wider uppercase font-black transition-all cursor-pointer ${
-              activeRoom === 'onboarding'
-                ? 'bg-amber-600/20 border-amber-500/50 text-amber-400 shadow-[0_0_12px_rgba(245,158,11,0.15)]'
-                : 'bg-white/5 border-white/10 hover:border-amber-500/30 hover:bg-amber-950/10 text-slate-400 hover:text-amber-400'
+            onClick={() => changeRoom('missions')}
+            title="Daily Missions & Lucky Wheel"
+            className={`hidden lg:flex items-center gap-1.5 px-3 py-1.5 border rounded-lg font-mono text-[10px] tracking-wider uppercase font-black transition-all cursor-pointer ${
+              activeRoom === 'missions'
+                ? 'bg-emerald-600/20 border-emerald-500/50 text-emerald-400'
+                : 'bg-white/5 border-white/10 hover:border-emerald-500/30 text-slate-400 hover:text-emerald-400'
             }`}
           >
-            <Rocket className="w-3.5 h-3.5 text-amber-400" />
-            <span>ECOSYSTEM HUB</span>
+            <Calendar className="w-3.5 h-3.5 text-emerald-400" />
+            <span>WHEEL</span>
           </button>
 
           <button
             onClick={() => changeRoom('profile')}
-            className={`flex items-center gap-2 px-3 py-1.5 border rounded-lg font-mono text-[10px] tracking-wider uppercase font-black transition-all cursor-pointer ${
+            className={`hidden md:flex items-center gap-2 px-3 py-1.5 border rounded-lg font-mono text-[10px] tracking-wider uppercase font-black transition-all cursor-pointer ${
               activeRoom === 'profile'
                 ? 'bg-fuchsia-600/20 border-fuchsia-500/50 text-fuchsia-400 shadow-[0_0_12px_rgba(217,70,239,0.15)] animate-pulse'
                 : 'bg-white/5 border-white/10 hover:border-fuchsia-500/30 hover:bg-fuchsia-950/10 text-slate-400 hover:text-fuchsia-400'
             }`}
           >
             <User className="w-3.5 h-3.5 text-fuchsia-400" />
-            <span>MEMBER PROFILE</span>
+            <span>PROFILE</span>
           </button>
 
           <div className="hidden lg:flex items-center gap-2 px-3 py-1.5 bg-white/5 border border-white/10 rounded-lg font-mono text-[10px] tracking-tight text-slate-400">
@@ -669,16 +822,24 @@ export default function App() {
                       <span className="text-[10px] font-mono font-bold text-orange-400 block tracking-widest uppercase">⚠ LOW CORE RESERVES DETECTED</span>
                       <h4 className="text-sm font-semibold font-mono text-slate-200 mt-0.5">Core energy level is low ({state.energy}%).</h4>
                       <p className="text-xs text-slate-400 mt-1 max-w-2xl font-sans leading-relaxed">
-                        Complete courses in the <span className="text-cyan-400 font-bold font-mono">Attention Academy</span> or tackle study tasks to refuel the system now.
+                        Refuel in the <span className="text-cyan-400 font-bold font-mono">Attention Academy</span> (agent-verified sessions) or run daily practice missions.
                       </p>
                     </div>
                   </div>
-                  <button
-                    onClick={() => changeRoom('missions')}
-                    className="px-5 py-2.5 bg-orange-600 hover:bg-orange-500 text-black font-black font-mono text-xs rounded-xl tracking-wider transition-colors cursor-pointer"
-                  >
-                    GO TO MISSIONS
-                  </button>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      onClick={() => changeRoom('lab')}
+                      className="px-5 py-2.5 bg-cyan-600 hover:bg-cyan-500 text-black font-black font-mono text-xs rounded-xl tracking-wider transition-colors cursor-pointer"
+                    >
+                      GO TO ACADEMY
+                    </button>
+                    <button
+                      onClick={() => changeRoom('missions')}
+                      className="px-5 py-2.5 bg-orange-600 hover:bg-orange-500 text-black font-black font-mono text-xs rounded-xl tracking-wider transition-colors cursor-pointer"
+                    >
+                      DAILY MISSIONS
+                    </button>
+                  </div>
                 </div>
               )}
 
@@ -797,6 +958,35 @@ export default function App() {
                     );
                   })}
 
+                  {/* Daily Missions — always available from map */}
+                  <div
+                    className="bg-gradient-to-br from-[#0a120e] to-[#050807] border border-emerald-500/20 hover:border-emerald-500/50 rounded-2xl p-5 shadow-xl flex flex-col justify-between overflow-hidden relative min-h-[210px] transition-all duration-300"
+                  >
+                    <span className="absolute top-4 right-4 font-mono text-[9px] text-emerald-500/60">SECTOR_OPS</span>
+                    <div>
+                      <div className="flex items-center gap-2 mb-3">
+                        <Calendar className="w-4 h-4 text-emerald-400" />
+                        <h4 className="font-sans text-sm font-bold text-white tracking-tight">
+                          Daily Missions & Lucky Wheel
+                        </h4>
+                      </div>
+                      <p className="text-xs text-slate-400 font-sans leading-relaxed">
+                        Spin the daily Lucky Wheel for BCC prizes, then clear practice missions. KPI still needs a real Devnet tx in Ecosystem Vault.
+                      </p>
+                    </div>
+                    <div className="mt-5 pt-3.5 border-t border-white/5 flex items-center justify-between gap-3 font-mono text-[11px]">
+                      <span className="border border-emerald-500/20 px-2 py-0.5 rounded-lg text-[9px] font-bold tracking-widest uppercase bg-emerald-950/20 text-emerald-400">
+                        WHEEL + MISSIONS
+                      </span>
+                      <button
+                        onClick={() => changeRoom('missions')}
+                        className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-black font-black rounded-lg text-[10px] cursor-pointer tracking-wider"
+                      >
+                        SPIN / ENTER
+                      </button>
+                    </div>
+                  </div>
+
                   {/* 7th Premium Card: Member Profile & Social Hub */}
                   <div
                     className="bg-gradient-to-br from-[#0c0a12] to-[#07050a] border border-fuchsia-500/20 hover:border-fuchsia-500/50 rounded-2xl p-5 shadow-xl flex flex-col justify-between overflow-hidden relative min-h-[210px] transition-all duration-300 shadow-[0_0_20px_rgba(217,70,239,0.02)] hover:shadow-[0_0_35px_rgba(217,70,239,0.06)]"
@@ -899,46 +1089,100 @@ export default function App() {
               )}
               {activeRoom === 'partners' && <PartnerProgram state={state} setState={setState} addLog={addLog} />}
               {activeRoom === 'onboarding' && <OnboardingHub state={state} setState={setState} addLog={addLog} onEnterApp={() => changeRoom('reactor')} />}
+              {(activeRoom === 'legal-privacy' || activeRoom === 'legal-terms' || activeRoom === 'legal-disclaimer') && (
+                <LegalPages page={activeRoom as LegalPageId} onBack={() => changeRoom('map')} />
+              )}
             </motion.div>
           )}
         </AnimatePresence>
 
       </main>
 
+      <NavMenu
+        open={menuOpen}
+        onClose={() => setMenuOpen(false)}
+        activeRoom={activeRoom}
+        onNavigate={handleNavNavigate}
+        showAdmin={
+          !!(currentUser as { isAdmin?: boolean } | null)?.isAdmin ||
+          (typeof window !== 'undefined' && localStorage.getItem('building_culture_admin') === '1')
+        }
+        onAdmin={() => changeRoom('admin')}
+      />
+
       {/* Futuristic Cyber-Footer */}
-      <footer className="border-t border-white/5 bg-[#0a0a0c] py-4 px-6 mx-4 mb-2 rounded-2xl text-center font-mono text-[9px] tracking-widest text-slate-500 flex flex-col md:flex-row justify-between items-center gap-2 shadow-lg z-10 relative">
-        <div className="flex items-center gap-2">
-          <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-ping"></div>
-          <span>COGNITIVE COLD STATION DEPLOYED // RIG SYNC ACTIVE</span>
+      <footer className="border-t border-white/5 bg-[#0a0a0c] py-4 px-6 mx-4 mb-2 rounded-2xl text-slate-500 flex flex-col gap-3 shadow-lg z-10 relative">
+        <div className="flex flex-col md:flex-row justify-between items-center gap-2 font-mono text-[9px] tracking-widest">
+          <div className="flex items-center gap-2">
+            <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-ping"></div>
+            <span>COGNITIVE COLD STATION DEPLOYED // RIG SYNC ACTIVE</span>
+          </div>
+          <div className="flex flex-wrap gap-3 justify-center items-center">
+            <button
+              type="button"
+              onClick={() => setMenuOpen(true)}
+              className="hover:text-cyan-400 transition-colors cursor-pointer uppercase"
+            >
+              Menu
+            </button>
+            <span className="text-white/10">·</span>
+            <button
+              onClick={() => changeRoom('missions')}
+              className={`hover:text-emerald-400 transition-colors cursor-pointer uppercase ${activeRoom === 'missions' ? 'text-emerald-400 font-bold' : ''}`}
+            >
+              Lucky Wheel
+            </button>
+            <span className="text-white/10">·</span>
+            <button
+              onClick={() => changeRoom('onboarding')}
+              className={`hover:text-cyan-400 transition-colors cursor-pointer uppercase ${activeRoom === 'onboarding' ? 'text-cyan-400 font-bold' : ''}`}
+            >
+              Ecosystem
+            </button>
+            <span className="text-white/10">·</span>
+            <button
+              onClick={() => changeRoom('feedback')}
+              className={`hover:text-cyan-400 transition-colors cursor-pointer uppercase ${activeRoom === 'feedback' ? 'text-cyan-400 font-bold' : ''}`}
+            >
+              Feedback
+            </button>
+            {((currentUser as { isAdmin?: boolean } | null)?.isAdmin ||
+              (typeof window !== 'undefined' && localStorage.getItem('building_culture_admin') === '1')) && (
+              <>
+                <span className="text-white/10">·</span>
+                <button
+                  onClick={() => changeRoom('admin')}
+                  className="hover:text-red-400 font-bold transition-colors cursor-pointer uppercase"
+                >
+                  Admin
+                </button>
+              </>
+            )}
+          </div>
         </div>
-        <div className="flex flex-wrap gap-4 justify-center">
+        <div className="flex flex-wrap justify-center gap-x-4 gap-y-1 border-t border-white/[0.04] pt-3 text-[10px] font-sans tracking-normal text-slate-600">
           <button
-            onClick={() => changeRoom('onboarding')}
-            className={`hover:text-cyan-400 transition-colors cursor-pointer uppercase font-mono text-[9px] tracking-widest flex items-center gap-1 ${activeRoom === 'onboarding' ? 'text-cyan-400 font-bold' : ''}`}
+            type="button"
+            onClick={() => changeRoom('legal-privacy')}
+            className={`hover:text-slate-400 transition-colors cursor-pointer ${activeRoom === 'legal-privacy' ? 'text-slate-400' : ''}`}
           >
-            <Rocket className="w-2.5 h-2.5 text-cyan-400" /> Onboarding & Ecosystem
+            Privacy
           </button>
-          <span>•</span>
           <button
-            onClick={() => changeRoom('partners')}
-            className={`hover:text-amber-400 transition-colors cursor-pointer uppercase font-mono text-[9px] tracking-widest ${activeRoom === 'partners' ? 'text-amber-400 font-bold' : ''}`}
+            type="button"
+            onClick={() => changeRoom('legal-terms')}
+            className={`hover:text-slate-400 transition-colors cursor-pointer ${activeRoom === 'legal-terms' ? 'text-slate-400' : ''}`}
           >
-            Partners Program
+            Terms
           </button>
-          <span>•</span>
           <button
-            onClick={() => changeRoom('feedback')}
-            className={`hover:text-cyan-400 transition-colors cursor-pointer uppercase font-mono text-[9px] tracking-widest ${activeRoom === 'feedback' ? 'text-cyan-400 font-bold' : ''}`}
+            type="button"
+            onClick={() => changeRoom('legal-disclaimer')}
+            className={`hover:text-slate-400 transition-colors cursor-pointer ${activeRoom === 'legal-disclaimer' ? 'text-slate-400' : ''}`}
           >
-            Lodge Feedback
+            Disclaimer
           </button>
-          <span>•</span>
-          <button
-            onClick={() => changeRoom('admin')}
-            className={`hover:text-red-400 font-bold transition-colors cursor-pointer uppercase font-mono text-[9px] tracking-widest flex items-center gap-1 ${activeRoom === 'admin' ? 'text-red-400' : ''}`}
-          >
-            <span className="w-1 h-1 bg-red-500 rounded-full animate-ping" /> Admin Panel
-          </button>
+          <span className="text-slate-700">Building Culture · Solana Devnet</span>
         </div>
       </footer>
 

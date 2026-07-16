@@ -40,8 +40,16 @@ interface TransactionRecord {
 }
 
 const DEVNET_RPC = 'https://api.devnet.solana.com';
-// A safe target public key for the Devnet transaction
+// Fixed KPI proof destination (Devnet contribution vault)
 const DESTINATION_PUBLIC_KEY = new PublicKey('9Wz5979GjujvG8qAJE9bdfGAvXPMYFCZks3fQ17Y3f2F');
+
+/** Fixed Primary KPI: confirmed Devnet contribution → facility credit */
+const KPI_CONTRIBUTION_SOL = 0.05;
+const KPI_CREDIT_REWARD = 300;
+const KPI_ENERGY_REWARD = 25;
+const KPI_EFFICIENCY_BOOST = 0.15;
+const KPI_PROOF_STORAGE_KEY = 'building_culture_kpi_proof_v1';
+const KPI_MISSION_ID = 'm_kpi';
 
 export default function SolanaPortal({ state, setState, addLog }: SolanaPortalProps) {
   const [walletAddress, setWalletAddress] = useState<string>('');
@@ -59,10 +67,18 @@ export default function SolanaPortal({ state, setState, addLog }: SolanaPortalPr
   // Initialize Connection
   const connection = new Connection(DEVNET_RPC, 'confirmed');
 
-  // Check for local wallet or load on mount
+  // Restore wallet from login gate (local keypair or Phantom session)
   useEffect(() => {
     const savedSecret = localStorage.getItem('solana_local_secret');
-    if (savedSecret) {
+    const walletMetaRaw = localStorage.getItem('solana_wallet_session_v1');
+    let walletMeta: { type?: string; address?: string } | null = null;
+    try {
+      walletMeta = walletMetaRaw ? JSON.parse(walletMetaRaw) : null;
+    } catch {
+      walletMeta = null;
+    }
+
+    if (savedSecret && (!walletMeta || walletMeta.type === 'local')) {
       try {
         const secretKey = Uint8Array.from(JSON.parse(savedSecret));
         const keypair = Keypair.fromSecretKey(secretKey);
@@ -73,15 +89,67 @@ export default function SolanaPortal({ state, setState, addLog }: SolanaPortalPr
       } catch (err) {
         console.error('Failed to restore saved local keypair', err);
       }
+    } else if (walletMeta?.type === 'extension' && walletMeta.address) {
+      const provider = (window as any).solana;
+      if (provider?.isPhantom) {
+        provider.connect({ onlyIfTrusted: true })
+          .then((response: { publicKey: { toString: () => string } }) => {
+            const pubKeyStr = response.publicKey.toString();
+            setWalletAddress(pubKeyStr);
+            setWalletType('extension');
+            setLocalKeypair(null);
+            addLog(`Restored Phantom session (${pubKeyStr.slice(0, 8)}...)`, 'system');
+          })
+          .catch(() => {
+            setWalletAddress(walletMeta.address!);
+            setWalletType('extension');
+            addLog('Wallet address from login session loaded. Reconnect Phantom to sign txs.', 'info');
+          });
+      } else {
+        setWalletAddress(walletMeta.address);
+        setWalletType('extension');
+      }
     }
 
-    // Load saved transactions
     const savedTxs = localStorage.getItem('solana_tx_history_v1');
     if (savedTxs) {
       try {
         setTxHistory(JSON.parse(savedTxs));
       } catch (e) {
         console.error(e);
+      }
+    }
+
+    // Restore KPI proof into game state if missing (e.g. after refresh)
+    if (!state.kpiProof) {
+      try {
+        const raw = localStorage.getItem(KPI_PROOF_STORAGE_KEY);
+        if (raw) {
+          const proof = JSON.parse(raw);
+          if (proof?.signature) {
+            setState((prev) => ({
+              ...prev,
+              kpiProof: proof,
+              dailyMissions: prev.dailyMissions.some((m) => m.id === KPI_MISSION_ID)
+                ? prev.dailyMissions.map((m) =>
+                    m.id === KPI_MISSION_ID ? { ...m, completed: true } : m
+                  )
+                : [
+                    {
+                      id: KPI_MISSION_ID,
+                      label: 'KPI: Prove Devnet contribution (0.05 SOL on-chain)',
+                      completed: true,
+                      energyReward: KPI_ENERGY_REWARD,
+                      powerReward: 15,
+                      category: 'build' as const,
+                    },
+                    ...prev.dailyMissions,
+                  ],
+            }));
+          }
+        }
+      } catch (e) {
+        console.error('Failed to restore KPI proof', e);
       }
     }
   }, []);
@@ -222,32 +290,45 @@ export default function SolanaPortal({ state, setState, addLog }: SolanaPortalPr
     }
   };
 
-  // Trigger on-chain contribution transaction
+  // Trigger fixed KPI proof: Devnet contribution tx → facility credit (only after confirmation)
   const performContribution = async () => {
     if (!walletAddress) return;
-    if (solBalance === null || solBalance < 0.05) {
-      addLog('TRANSACTION DENIED: Insufficient Devnet SOL balance. Please request an airdrop first.', 'warn');
+
+    if (state.kpiProof?.signature) {
+      addLog(
+        `KPI ALREADY PROVED: Signature ${state.kpiProof.signature.slice(0, 12)}… is on file. Open Solscan link in the proof banner.`,
+        'info'
+      );
+      return;
+    }
+
+    if (solBalance === null || solBalance < KPI_CONTRIBUTION_SOL) {
+      addLog(
+        `KPI BLOCKED: Need ≥ ${KPI_CONTRIBUTION_SOL} Devnet SOL. Request a faucet airdrop first.`,
+        'warn'
+      );
       return;
     }
 
     setTxLoading(true);
-    setTxStep('Initializing transaction details...');
-    addLog('ON-CHAIN PROTOCOL: Preparing Devnet transaction...', 'info');
+    setTxStep('Initializing KPI proof transaction…');
+    addLog(
+      `KPI PROOF START: Broadcasting ${KPI_CONTRIBUTION_SOL} SOL Devnet contribution (rewards only after confirmation).`,
+      'info'
+    );
 
     try {
       const senderPubKey = new PublicKey(walletAddress);
-      
-      // Create transfer instruction
+
       const transaction = new Transaction().add(
         SystemProgram.transfer({
           fromPubkey: senderPubKey,
           toPubkey: DESTINATION_PUBLIC_KEY,
-          lamports: 0.05 * LAMPORTS_PER_SOL,
+          lamports: Math.round(KPI_CONTRIBUTION_SOL * LAMPORTS_PER_SOL),
         })
       );
 
-      // Fetch blockhash
-      setTxStep('Querying latest blockchain blockhash...');
+      setTxStep('Querying latest Devnet blockhash…');
       const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash();
       transaction.recentBlockhash = blockhash;
       transaction.feePayer = senderPubKey;
@@ -255,64 +336,106 @@ export default function SolanaPortal({ state, setState, addLog }: SolanaPortalPr
       let signature = '';
 
       if (walletType === 'local' && localKeypair) {
-        // Sign locally with generated keypair
-        setTxStep('Signing transaction payload securely on-device...');
+        setTxStep('Signing KPI payload with local Devnet keypair…');
         transaction.sign(localKeypair);
-        
-        setTxStep('Broadcasting transaction to Solana Devnet validators...');
+
+        setTxStep('Broadcasting to Solana Devnet…');
         const rawTx = transaction.serialize();
         signature = await connection.sendRawTransaction(rawTx, {
           skipPreflight: false,
-          preflightCommitment: 'confirmed'
+          preflightCommitment: 'confirmed',
         });
       } else {
-        // Injected wallet extension signing
         const solanaProvider = (window as any).solana;
         if (!solanaProvider) {
           throw new Error('Wallet extension provider not found.');
         }
 
-        setTxStep('Requesting authorization from Phantom Wallet extension...');
-        // Phantom's signAndSendTransaction helper
+        setTxStep('Approve KPI contribution in Phantom…');
         const result = await solanaProvider.signAndSendTransaction(transaction);
         signature = result.signature;
       }
 
-      setTxStep('Awaiting block confirmation from Devnet cluster consensus...');
+      setTxStep('Awaiting Devnet confirmation (no rewards until confirmed)…');
       const record: TransactionRecord = {
         signature,
         type: 'contribute',
-        amount: 0.05,
+        amount: KPI_CONTRIBUTION_SOL,
         timestamp: new Date().toLocaleTimeString(),
-        status: 'pending'
+        status: 'pending',
       };
       saveTx(record);
 
-      // Await confirmation
-      await connection.confirmTransaction({
-        signature,
-        blockhash,
-        lastValidBlockHeight
-      }, 'confirmed');
+      await connection.confirmTransaction(
+        {
+          signature,
+          blockhash,
+          lastValidBlockHeight,
+        },
+        'confirmed'
+      );
 
-      setTxHistory(prev => {
-        const updated = prev.map(t => t.signature === signature ? { ...t, status: 'confirmed' as const } : t);
+      setTxHistory((prev) => {
+        const updated = prev.map((t) =>
+          t.signature === signature ? { ...t, status: 'confirmed' as const } : t
+        );
         localStorage.setItem('solana_tx_history_v1', JSON.stringify(updated));
         return updated;
       });
 
-      // Grant in-game rewards & state updates
-      setState(prev => ({
+      const confirmedAt = new Date().toISOString();
+      const proof = {
+        signature,
+        walletAddress,
+        confirmedAt,
+        amountSol: KPI_CONTRIBUTION_SOL,
+        creditsAwarded: KPI_CREDIT_REWARD,
+        energyAwarded: KPI_ENERGY_REWARD,
+      };
+
+      localStorage.setItem(KPI_PROOF_STORAGE_KEY, JSON.stringify(proof));
+
+      try {
+        const { ensureWalletApiSession, verifyKpiOnServer, getWalletToken } = await import('../lib/api.ts');
+        if (!getWalletToken()) {
+          await ensureWalletApiSession({
+            walletAddress,
+            walletType: walletType || 'local',
+            localKeypair,
+          });
+        }
+        const serverRes = await verifyKpiOnServer(signature);
+        addLog(
+          `KPI SERVER VERIFIED: ${serverRes.solscan || signature.slice(0, 16)}…`,
+          'success'
+        );
+      } catch (kpiErr: any) {
+        addLog(
+          `KPI on-chain confirmed locally; server verify deferred: ${kpiErr?.message || kpiErr}`,
+          'warn'
+        );
+      }
+
+      // Awards ONLY after on-chain confirmation — this is the fixed Primary KPI
+      setState((prev) => ({
         ...prev,
-        credits: prev.credits + 300,
-        efficiency: parseFloat((prev.efficiency + 0.15).toFixed(2))
+        credits: prev.credits + KPI_CREDIT_REWARD,
+        energy: Math.min(100, prev.energy + KPI_ENERGY_REWARD),
+        efficiency: parseFloat((prev.efficiency + KPI_EFFICIENCY_BOOST).toFixed(2)),
+        kpiProof: proof,
+        dailyMissions: prev.dailyMissions.map((m) =>
+          m.id === KPI_MISSION_ID ? { ...m, completed: true } : m
+        ),
       }));
 
-      addLog(`ON-CHAIN SECURED: Successfully contributed 0.05 Devnet SOL! Transaction Signature verified. Reward of +300 CP & +15% Efficiency multiplier applied.`, 'success');
-      setTxStep('CONFIRMED');
+      addLog(
+        `KPI PROVED ON-CHAIN: ${KPI_CONTRIBUTION_SOL} SOL confirmed. Sig ${signature.slice(0, 16)}… → +${KPI_CREDIT_REWARD} CP, +${KPI_ENERGY_REWARD}% energy. Solscan: https://solscan.io/tx/${signature}?cluster=devnet`,
+        'success'
+      );
+      setTxStep('KPI CONFIRMED');
       await fetchBalance();
     } catch (err: any) {
-      addLog(`ON-CHAIN FAILURE: Transaction rejected or timed out: ${err.message || err}`, 'warn');
+      addLog(`KPI PROOF FAILED: ${err.message || err}`, 'warn');
       setTxStep('FAILED');
     } finally {
       setTimeout(() => {
@@ -344,9 +467,39 @@ export default function SolanaPortal({ state, setState, addLog }: SolanaPortalPr
           </span>
         </div>
 
-        <p className="text-xs text-slate-400 font-sans mb-6 leading-relaxed">
-          Unlock standard Solana Web3 flows. Request on-chain Devnet SOL airdrops, sign real transactions with a secure browser wallet or our browser-based sandboxed keypair, and mint exclusive operations assets directly into the ledger!
+        <p className="text-xs text-slate-400 font-sans mb-4 leading-relaxed">
+          <strong className="text-slate-300">Primary KPI:</strong> connect wallet → send a real Devnet contribution tx → facility credits update only after confirmation. Jury can verify the signature on Solscan.
         </p>
+
+        {state.kpiProof?.signature && (
+          <div className="mb-5 p-4 rounded-xl border border-emerald-500/30 bg-emerald-950/20">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-start gap-2">
+                <CheckCircle className="w-5 h-5 text-emerald-400 flex-shrink-0 mt-0.5" />
+                <div>
+                  <span className="font-mono text-[10px] font-black tracking-widest text-emerald-400 uppercase block">
+                    Primary KPI proved
+                  </span>
+                  <p className="text-xs text-slate-300 font-sans mt-1 leading-relaxed">
+                    Confirmed Devnet contribution of <strong>{state.kpiProof.amountSol} SOL</strong>.
+                    Facility rewarded +{state.kpiProof.creditsAwarded} CP and +{state.kpiProof.energyAwarded}% energy.
+                  </p>
+                  <p className="font-mono text-[9px] text-slate-500 mt-2 break-all">
+                    sig: {state.kpiProof.signature}
+                  </p>
+                </div>
+              </div>
+              <a
+                href={`https://solscan.io/tx/${state.kpiProof.signature}?cluster=devnet`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex-shrink-0 inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-emerald-500/15 border border-emerald-500/40 text-emerald-300 font-mono text-[10px] font-bold uppercase hover:bg-emerald-500/25 transition-colors"
+              >
+                Solscan <ExternalLink className="w-3 h-3" />
+              </a>
+            </div>
+          </div>
+        )}
 
         {/* If Wallet Not Connected */}
         {!walletAddress ? (
@@ -456,37 +609,61 @@ export default function SolanaPortal({ state, setState, addLog }: SolanaPortalPr
                 </button>
               </div>
 
-              {/* On-Chain Action Module */}
+              {/* Fixed Primary KPI proof module */}
               <div className="bg-gradient-to-br from-[#120e1a] to-[#07050d] border border-purple-500/20 p-4 rounded-xl">
                 <div className="flex justify-between items-start mb-2">
                   <div className="flex items-center gap-1.5 text-xs text-purple-400 font-mono font-bold">
                     <Shield className="w-4 h-4" />
-                    <span>ON-CHAIN FACILITY INVESTMENT</span>
+                    <span>PRIMARY KPI — DEVNET PROOF</span>
                   </div>
-                  <span className="text-[9px] text-slate-500 font-mono">COST: 0.05 SOL</span>
+                  <span className="text-[9px] text-slate-500 font-mono">
+                    COST: {KPI_CONTRIBUTION_SOL} SOL
+                  </span>
                 </div>
                 <p className="text-[11px] text-slate-400 font-sans leading-relaxed mb-4">
-                  Construct a real transaction to transmit 0.05 Devnet SOL to the secure cold ledger vault. Upon validation, you will immediately receive <span className="text-amber-400 font-bold">+300 credits (CP)</span> and a <span className="text-fuchsia-400 font-bold">+15% efficiency multiplier</span> boost!
+                  Send a real Devnet transfer of {KPI_CONTRIBUTION_SOL} SOL. Facility rewards
+                  (<span className="text-amber-400 font-bold">+{KPI_CREDIT_REWARD} CP</span>,{' '}
+                  <span className="text-orange-400 font-bold">+{KPI_ENERGY_REWARD}% energy</span>,{' '}
+                  <span className="text-fuchsia-400 font-bold">+{Math.round(KPI_EFFICIENCY_BOOST * 100)}% efficiency</span>)
+                  are applied <strong className="text-slate-300">only after on-chain confirmation</strong>.
                 </p>
 
                 <button
                   onClick={performContribution}
-                  disabled={txLoading || solBalance === null || solBalance < 0.05}
+                  disabled={
+                    txLoading ||
+                    !!state.kpiProof?.signature ||
+                    solBalance === null ||
+                    solBalance < KPI_CONTRIBUTION_SOL
+                  }
                   className={`w-full py-2.5 rounded-lg font-mono text-xs font-bold tracking-wider flex items-center justify-center gap-2 transition-all cursor-pointer ${
-                    solBalance !== null && solBalance >= 0.05 && !txLoading
-                      ? 'bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-600 hover:to-indigo-700 text-white shadow-lg'
-                      : 'bg-[#050506] border border-white/5 text-slate-600 cursor-not-allowed'
+                    state.kpiProof?.signature
+                      ? 'bg-emerald-500/15 border border-emerald-500/40 text-emerald-300 cursor-default'
+                      : solBalance !== null && solBalance >= KPI_CONTRIBUTION_SOL && !txLoading
+                        ? 'bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-600 hover:to-indigo-700 text-white shadow-lg'
+                        : 'bg-[#050506] border border-white/5 text-slate-600 cursor-not-allowed'
                   }`}
                 >
-                  <Send className="w-3.5 h-3.5" />
-                  {txLoading ? 'TRANSACTING ON-CHAIN...' : 'CONTRIBUTE 0.05 SOL & BOOST'}
+                  {state.kpiProof?.signature ? (
+                    <>
+                      <CheckCircle className="w-3.5 h-3.5" />
+                      KPI PROVED — VIEW SOLSCAN ABOVE
+                    </>
+                  ) : (
+                    <>
+                      <Send className="w-3.5 h-3.5" />
+                      {txLoading
+                        ? 'CONFIRMING ON DEVNET…'
+                        : `PROVE KPI: SEND ${KPI_CONTRIBUTION_SOL} SOL`}
+                    </>
+                  )}
                 </button>
 
                 {txLoading && (
                   <div className="mt-3 bg-[#050506] border border-white/5 p-2.5 rounded-lg font-mono text-[9px] space-y-1">
                     <div className="flex items-center gap-2 text-purple-400">
                       <RefreshCw className="w-3 h-3 animate-spin" />
-                      <span className="font-black">BROADCASTING TRANSACTION:</span>
+                      <span className="font-black">KPI TRANSACTION:</span>
                     </div>
                     <span className="text-slate-400">{txStep}</span>
                   </div>
@@ -511,7 +688,7 @@ export default function SolanaPortal({ state, setState, addLog }: SolanaPortalPr
                     </span>
                     <div>
                       <span className="text-slate-300 font-bold block">
-                        {tx.type === 'airdrop' ? 'Faucet Fulfill (+1.0 SOL)' : 'Ecosystem Invest (-0.05 SOL)'}
+                        {tx.type === 'airdrop' ? 'Faucet Fulfill (+1.0 SOL)' : `KPI Proof (−${KPI_CONTRIBUTION_SOL} SOL)`}
                       </span>
                       <span className="text-slate-500">Sig: {tx.signature.slice(0, 16)}...</span>
                     </div>

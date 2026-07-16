@@ -1,0 +1,1045 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Building Culture — Pitch</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=Syne:wght@600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #050508;
+      --bg-elev: #0c0c12;
+      --emerald: #10f5a0;
+      --emerald-dim: rgba(16, 245, 160, 0.14);
+      --violet: #7b5cff;
+      --violet-deep: #3a1f8a;
+      --gold: #f0b429;
+      --cyan: #3de0ff;
+      --text: #f4f6fb;
+      --muted: #8b92a8;
+      --glass: rgba(255, 255, 255, 0.04);
+      --glass-border: rgba(255, 255, 255, 0.1);
+      --radius: 20px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: "Instrument Sans", system-ui, sans-serif;
+      overflow: hidden;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .deck {
+      height: 100%;
+      width: 100%;
+      position: relative;
+    }
+
+    .slide {
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      pointer-events: none;
+      transform: translateY(18px) scale(0.985);
+      transition: opacity 0.55s ease, transform 0.55s ease;
+      padding: clamp(2rem, 4vw, 4.5rem);
+      display: grid;
+      align-content: center;
+      overflow: hidden;
+    }
+
+    .slide.active {
+      opacity: 1;
+      pointer-events: auto;
+      transform: none;
+      z-index: 2;
+    }
+
+    .slide::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background:
+        radial-gradient(ellipse 70% 50% at 15% 10%, rgba(123, 92, 255, 0.18), transparent 55%),
+        radial-gradient(ellipse 55% 45% at 90% 85%, rgba(16, 245, 160, 0.12), transparent 50%),
+        radial-gradient(ellipse 40% 30% at 50% 50%, rgba(61, 224, 255, 0.04), transparent 60%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .slide > * { position: relative; z-index: 1; }
+
+    .eyebrow {
+      font-size: 0.75rem;
+      letter-spacing: 0.28em;
+      text-transform: uppercase;
+      color: var(--emerald);
+      font-weight: 600;
+      margin-bottom: 1rem;
+    }
+
+    h1, h2 {
+      font-family: Syne, sans-serif;
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      line-height: 0.98;
+    }
+
+    h1 { font-size: clamp(2.8rem, 7vw, 5.6rem); }
+    h2 { font-size: clamp(2.2rem, 5vw, 4rem); margin-bottom: 1.25rem; }
+
+    .tagline {
+      font-size: clamp(1.1rem, 2.2vw, 1.65rem);
+      color: var(--muted);
+      font-weight: 500;
+      margin-top: 0.75rem;
+    }
+
+    .lede {
+      max-width: 38rem;
+      font-size: clamp(1rem, 1.4vw, 1.2rem);
+      line-height: 1.65;
+      color: var(--muted);
+      margin-top: 1.5rem;
+    }
+
+    .layout-split {
+      display: grid;
+      grid-template-columns: 1.05fr 1fr;
+      gap: clamp(1.5rem, 4vw, 4rem);
+      align-items: center;
+      height: 100%;
+      max-width: 1280px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    @media (max-width: 900px) {
+      .layout-split { grid-template-columns: 1fr; align-content: start; overflow-y: auto; }
+      .slide { overflow-y: auto; align-content: start; }
+    }
+
+    .glass {
+      background: var(--glass);
+      border: 1px solid var(--glass-border);
+      border-radius: var(--radius);
+      backdrop-filter: blur(18px);
+      -webkit-backdrop-filter: blur(18px);
+      box-shadow: 0 24px 80px rgba(0, 0, 0, 0.45);
+    }
+
+    .shot {
+      width: 100%;
+      border-radius: 16px;
+      border: 1px solid var(--glass-border);
+      display: block;
+      box-shadow:
+        0 0 0 1px rgba(16, 245, 160, 0.08),
+        0 30px 80px rgba(0, 0, 0, 0.55);
+      animation: floatShot 7s ease-in-out infinite;
+    }
+
+    @keyframes floatShot {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-8px); }
+    }
+
+    .shot-wrap {
+      position: relative;
+      padding: 0.5rem;
+    }
+
+    .shot-wrap::after {
+      content: "";
+      position: absolute;
+      inset: 8% 10% auto;
+      height: 60%;
+      background: radial-gradient(ellipse, rgba(16, 245, 160, 0.2), transparent 70%);
+      filter: blur(40px);
+      z-index: -1;
+      pointer-events: none;
+    }
+
+    .hero-slide {
+      text-align: center;
+      justify-items: center;
+    }
+
+    .hero-art {
+      width: min(420px, 70vw);
+      margin: 1.5rem auto 0;
+      border-radius: 24px;
+      box-shadow:
+        0 0 60px rgba(123, 92, 255, 0.35),
+        0 0 100px rgba(240, 180, 41, 0.15);
+      animation: pulseGlow 5s ease-in-out infinite;
+    }
+
+    @keyframes pulseGlow {
+      0%, 100% { filter: brightness(1); }
+      50% { filter: brightness(1.08); }
+    }
+
+    .hero-copy {
+      max-width: 44rem;
+      margin: 1.25rem auto 0;
+      color: var(--muted);
+      line-height: 1.7;
+      font-size: 1.05rem;
+    }
+
+    .site-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin-top: 1.75rem;
+      color: var(--cyan);
+      text-decoration: none;
+      font-size: 0.9rem;
+      letter-spacing: 0.04em;
+      opacity: 0.85;
+      border-bottom: 1px solid transparent;
+      transition: opacity 0.2s, border-color 0.2s;
+    }
+
+    .site-link:hover {
+      opacity: 1;
+      border-color: rgba(61, 224, 255, 0.5);
+    }
+
+    .problem-list {
+      list-style: none;
+      display: grid;
+      gap: 0.65rem;
+      margin-top: 1.5rem;
+    }
+
+    .problem-list li {
+      display: flex;
+      align-items: center;
+      gap: 0.85rem;
+      padding: 0.85rem 1.1rem;
+      border-radius: 14px;
+      background: var(--glass);
+      border: 1px solid var(--glass-border);
+      font-size: 1.05rem;
+    }
+
+    .problem-list li::before {
+      content: "";
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #ff5c7a;
+      box-shadow: 0 0 12px #ff5c7a;
+      flex-shrink: 0;
+    }
+
+    .callout {
+      margin-top: 1.5rem;
+      padding: 1rem 1.25rem;
+      border-radius: 14px;
+      border: 1px solid rgba(123, 92, 255, 0.35);
+      background: rgba(123, 92, 255, 0.08);
+      color: #c9c0ff;
+      font-size: 0.98rem;
+      line-height: 1.5;
+    }
+
+    .islands {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 1rem;
+      padding: 1.5rem;
+    }
+
+    .island {
+      padding: 1.4rem;
+      border-radius: 16px;
+      border: 1px dashed rgba(255, 92, 122, 0.35);
+      background: rgba(255, 92, 122, 0.05);
+      text-align: center;
+      font-size: 0.9rem;
+      color: var(--muted);
+      position: relative;
+    }
+
+    .island strong {
+      display: block;
+      color: var(--text);
+      margin-bottom: 0.35rem;
+      font-family: Syne, sans-serif;
+    }
+
+    .bridge {
+      position: absolute;
+      width: 40%;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(255, 92, 122, 0.5), transparent);
+      top: 50%;
+      left: 80%;
+      opacity: 0.5;
+    }
+
+    .wheel {
+      position: relative;
+      width: min(420px, 90vw);
+      height: min(420px, 90vw);
+      margin: 0 auto;
+    }
+
+    .wheel-core {
+      position: absolute;
+      inset: 32%;
+      border-radius: 50%;
+      display: grid;
+      place-items: center;
+      text-align: center;
+      background: linear-gradient(145deg, rgba(16, 245, 160, 0.2), rgba(123, 92, 255, 0.25));
+      border: 1px solid rgba(16, 245, 160, 0.4);
+      box-shadow: 0 0 50px rgba(16, 245, 160, 0.2);
+      font-family: Syne, sans-serif;
+      font-weight: 700;
+      font-size: 0.95rem;
+      line-height: 1.2;
+      animation: spinSlow 40s linear infinite;
+      animation-direction: reverse;
+    }
+
+    .wheel-core span { animation: spinSlow 40s linear infinite; }
+
+    @keyframes spinSlow {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+
+    .spoke {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: 118px;
+      margin-left: -59px;
+      margin-top: -18px;
+      transform-origin: center;
+      text-align: center;
+      font-size: 0.72rem;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+      padding: 0.45rem 0.5rem;
+      border-radius: 999px;
+      background: rgba(12, 12, 18, 0.9);
+      border: 1px solid var(--glass-border);
+      color: var(--text);
+      white-space: nowrap;
+    }
+
+    .pill-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.6rem;
+      margin-top: 1.5rem;
+    }
+
+    .pill {
+      padding: 0.55rem 0.95rem;
+      border-radius: 999px;
+      border: 1px solid rgba(16, 245, 160, 0.3);
+      background: var(--emerald-dim);
+      color: var(--emerald);
+      font-size: 0.88rem;
+      font-weight: 600;
+    }
+
+    .steps {
+      display: grid;
+      gap: 0.7rem;
+      margin-top: 1.4rem;
+      counter-reset: step;
+    }
+
+    .steps li {
+      list-style: none;
+      display: flex;
+      gap: 0.9rem;
+      align-items: flex-start;
+      padding: 0.85rem 1rem;
+      border-radius: 14px;
+      background: var(--glass);
+      border: 1px solid var(--glass-border);
+      counter-increment: step;
+    }
+
+    .steps li::before {
+      content: counter(step);
+      width: 1.6rem;
+      height: 1.6rem;
+      border-radius: 50%;
+      display: grid;
+      place-items: center;
+      background: rgba(123, 92, 255, 0.25);
+      color: #d4caff;
+      font-size: 0.75rem;
+      font-weight: 700;
+      flex-shrink: 0;
+    }
+
+    .xp-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 0.7rem;
+      margin-top: 1.25rem;
+    }
+
+    .xp-card {
+      padding: 1rem;
+      border-radius: 14px;
+      background: var(--glass);
+      border: 1px solid var(--glass-border);
+      font-size: 0.92rem;
+      font-weight: 600;
+    }
+
+    .xp-card span {
+      display: block;
+      font-size: 0.7rem;
+      color: var(--muted);
+      font-weight: 500;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      margin-bottom: 0.3rem;
+    }
+
+    .level-bar {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      margin-top: 1.5rem;
+      padding: 1rem;
+      border-radius: 14px;
+      background: linear-gradient(90deg, rgba(16, 245, 160, 0.12), rgba(123, 92, 255, 0.15));
+      border: 1px solid var(--glass-border);
+      font-family: Syne, sans-serif;
+      font-weight: 700;
+    }
+
+    .level-bar .bar {
+      flex: 1;
+      height: 6px;
+      border-radius: 99px;
+      background: rgba(255, 255, 255, 0.08);
+      overflow: hidden;
+    }
+
+    .level-bar .bar i {
+      display: block;
+      height: 100%;
+      width: 42%;
+      background: linear-gradient(90deg, var(--emerald), var(--violet));
+      border-radius: 99px;
+      animation: growBar 2.5s ease-in-out infinite alternate;
+    }
+
+    @keyframes growBar {
+      from { width: 28%; }
+      to { width: 72%; }
+    }
+
+    .vision-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.55rem;
+      margin-top: 1.5rem;
+    }
+
+    .vision-chips span {
+      padding: 0.5rem 0.9rem;
+      border-radius: 10px;
+      border: 1px solid rgba(61, 224, 255, 0.25);
+      background: rgba(61, 224, 255, 0.06);
+      font-size: 0.88rem;
+    }
+
+    .network {
+      position: relative;
+      height: min(420px, 55vh);
+      border-radius: 20px;
+      overflow: hidden;
+      background:
+        radial-gradient(circle at 50% 50%, rgba(16, 245, 160, 0.15), transparent 45%),
+        radial-gradient(circle at 20% 30%, rgba(123, 92, 255, 0.2), transparent 40%),
+        #08080e;
+      border: 1px solid var(--glass-border);
+    }
+
+    .node-dot {
+      position: absolute;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--emerald);
+      box-shadow: 0 0 16px var(--emerald);
+      animation: blink 3s ease-in-out infinite;
+    }
+
+    @keyframes blink {
+      0%, 100% { opacity: 0.45; transform: scale(0.9); }
+      50% { opacity: 1; transform: scale(1.15); }
+    }
+
+    .join-list {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 0.65rem;
+      margin-top: 1.5rem;
+      list-style: none;
+    }
+
+    .join-list li {
+      padding: 0.9rem 1rem;
+      border-radius: 14px;
+      background: var(--glass);
+      border: 1px solid var(--glass-border);
+      font-weight: 600;
+    }
+
+    .closing-tag {
+      margin-top: 1.75rem;
+      font-family: Syne, sans-serif;
+      font-size: clamp(1.1rem, 2vw, 1.45rem);
+      background: linear-gradient(90deg, var(--gold), var(--emerald), var(--cyan));
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+
+    .chrome {
+      position: fixed;
+      z-index: 50;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      padding: 1rem 1.5rem 1.25rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      background: linear-gradient(transparent, rgba(5, 5, 8, 0.92));
+      pointer-events: none;
+    }
+
+    .chrome > * { pointer-events: auto; }
+
+    .dots {
+      display: flex;
+      gap: 0.4rem;
+      flex-wrap: wrap;
+      justify-content: center;
+      flex: 1;
+    }
+
+    .dots button {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      border: none;
+      background: rgba(255, 255, 255, 0.2);
+      cursor: pointer;
+      padding: 0;
+      transition: transform 0.2s, background 0.2s;
+    }
+
+    .dots button.active {
+      background: var(--emerald);
+      transform: scale(1.35);
+      box-shadow: 0 0 10px var(--emerald);
+    }
+
+    .nav-btn {
+      border: 1px solid var(--glass-border);
+      background: rgba(255, 255, 255, 0.04);
+      color: var(--text);
+      border-radius: 999px;
+      padding: 0.55rem 1rem;
+      font-size: 0.8rem;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      cursor: pointer;
+      font-family: inherit;
+    }
+
+    .nav-btn:hover {
+      border-color: rgba(16, 245, 160, 0.4);
+      color: var(--emerald);
+    }
+
+    .brand-chip {
+      position: fixed;
+      top: 1.25rem;
+      left: 1.5rem;
+      z-index: 50;
+      font-size: 0.7rem;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--muted);
+      font-weight: 600;
+    }
+
+    .brand-chip a {
+      color: inherit;
+      text-decoration: none;
+    }
+
+    .brand-chip a:hover { color: var(--cyan); }
+
+    .slide-num {
+      position: fixed;
+      top: 1.25rem;
+      right: 1.5rem;
+      z-index: 50;
+      font-size: 0.75rem;
+      color: var(--muted);
+      font-variant-numeric: tabular-nums;
+      letter-spacing: 0.08em;
+    }
+
+    .hint {
+      position: fixed;
+      bottom: 3.6rem;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 40;
+      font-size: 0.7rem;
+      color: rgba(139, 146, 168, 0.7);
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      pointer-events: none;
+      transition: opacity 0.4s;
+    }
+
+    .hint.hide { opacity: 0; }
+
+    /* PDF / print: one slide per landscape page */
+    @page {
+      size: 13.333in 7.5in;
+      margin: 0;
+    }
+
+    @media print {
+      html, body {
+        height: auto !important;
+        overflow: visible !important;
+        background: #050508 !important;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
+
+      .chrome, .hint, .brand-chip, .slide-num, .nav-btn, .dots {
+        display: none !important;
+      }
+
+      .deck {
+        height: auto !important;
+        position: static !important;
+      }
+
+      .slide {
+        position: relative !important;
+        inset: auto !important;
+        opacity: 1 !important;
+        pointer-events: auto !important;
+        transform: none !important;
+        page-break-after: always;
+        break-after: page;
+        height: 7.5in;
+        width: 13.333in;
+        overflow: hidden !important;
+        padding: 0.7in !important;
+      }
+
+      .slide:last-child {
+        page-break-after: auto;
+        break-after: auto;
+      }
+
+      .shot, .hero-art {
+        animation: none !important;
+        box-shadow: none !important;
+      }
+
+      .wheel-core, .wheel-core span, .level-bar .bar i, .node-dot {
+        animation: none !important;
+      }
+    }
+
+    body.print-mode {
+      overflow: auto;
+      height: auto;
+    }
+
+    body.print-mode .chrome,
+    body.print-mode .hint,
+    body.print-mode .brand-chip,
+    body.print-mode .slide-num {
+      display: none !important;
+    }
+
+    body.print-mode .deck {
+      height: auto;
+      position: static;
+    }
+
+    body.print-mode .slide {
+      position: relative;
+      inset: auto;
+      opacity: 1;
+      pointer-events: auto;
+      transform: none;
+      height: 100vh;
+      min-height: 720px;
+      page-break-after: always;
+      overflow: hidden;
+    }
+  </style>
+</head>
+<body>
+  <div class="brand-chip"><a href="https://buildingcultureid.space" target="_blank" rel="noopener">Building Culture</a></div>
+  <div class="slide-num"><span id="cur">01</span> / 10</div>
+  <div class="hint" id="hint">← → to navigate</div>
+
+  <div class="deck" id="deck">
+    <!-- 1 HERO -->
+    <section class="slide hero-slide active" data-i="0">
+      <p class="eyebrow">Pitch Deck</p>
+      <h1>BUILDING CULTURE</h1>
+      <p class="tagline">Fueling the Future of Web3 Builders</p>
+      <img class="hero-art" src="assets/hero-bc.png" alt="Building Culture — Connecting Mining" />
+      <p class="hero-copy">
+        Building Culture is creating a decentralized ecosystem where builders, communities, AI, education, and on-chain participation come together to create sustainable innovation.
+      </p>
+      <a class="site-link" href="https://buildingcultureid.space" target="_blank" rel="noopener">buildingcultureid.space →</a>
+    </section>
+
+    <!-- 2 PROBLEM -->
+    <section class="slide" data-i="1">
+      <div class="layout-split">
+        <div>
+          <p class="eyebrow">The Problem</p>
+          <h2>Web3 is fragmented.</h2>
+          <p class="lede">Builders struggle with the basics of growth — while most ecosystems reward speculation instead of participation.</p>
+          <ul class="problem-list">
+            <li>Getting discovered</li>
+            <li>Growing communities</li>
+            <li>Educating users</li>
+            <li>Sustainable funding</li>
+            <li>Building trust</li>
+            <li>Retaining contributors</li>
+          </ul>
+        </div>
+        <div class="glass islands">
+          <div class="island"><strong>Builders</strong>Isolated discovery<div class="bridge"></div></div>
+          <div class="island"><strong>Communities</strong>Weak retention</div>
+          <div class="island"><strong>Education</strong>No shared loop</div>
+          <div class="island"><strong>Capital</strong>Speculation first</div>
+          <p style="grid-column:1/-1;text-align:center;color:var(--muted);font-size:0.85rem;margin-top:0.5rem;">Broken islands. Weak bridges.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- 3 SOLUTION -->
+    <section class="slide" data-i="2">
+      <div class="layout-split">
+        <div>
+          <p class="eyebrow">Our Solution</p>
+          <h2>One connected ecosystem.</h2>
+          <p class="lede">Building Culture creates a place where builders can discover, build, learn, collaborate, earn, and grow — everything is connected.</p>
+          <div class="pill-grid">
+            <span class="pill">Discover</span>
+            <span class="pill">Build</span>
+            <span class="pill">Learn</span>
+            <span class="pill">Collaborate</span>
+            <span class="pill">Earn</span>
+            <span class="pill">Grow</span>
+          </div>
+          <div class="shot-wrap" style="margin-top:1.75rem;">
+            <img class="shot" src="assets/shot-facility.png" alt="Culture Node facility schematic" />
+          </div>
+        </div>
+        <div class="wheel" aria-hidden="true">
+          <div class="spoke" style="transform: rotate(0deg) translateY(-165px) rotate(0deg);">Builder DEX</div>
+          <div class="spoke" style="transform: rotate(40deg) translateY(-165px) rotate(-40deg);">Attention Academy</div>
+          <div class="spoke" style="transform: rotate(80deg) translateY(-165px) rotate(-80deg);">Culture Nodes</div>
+          <div class="spoke" style="transform: rotate(120deg) translateY(-165px) rotate(-120deg);">AI Assistant</div>
+          <div class="spoke" style="transform: rotate(160deg) translateY(-165px) rotate(-160deg);">Quest System</div>
+          <div class="spoke" style="transform: rotate(200deg) translateY(-165px) rotate(-200deg);">Reputation</div>
+          <div class="spoke" style="transform: rotate(240deg) translateY(-165px) rotate(-240deg);">Guilds</div>
+          <div class="spoke" style="transform: rotate(280deg) translateY(-165px) rotate(-280deg);">Marketplace</div>
+          <div class="spoke" style="transform: rotate(320deg) translateY(-165px) rotate(-320deg);">Governance</div>
+          <div class="wheel-core"><span>Building<br/>Culture</span></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 4 CULTURE NODES -->
+    <section class="slide" data-i="3">
+      <div class="layout-split">
+        <div>
+          <p class="eyebrow">Culture Nodes</p>
+          <h2>Your knowledge powers your node.</h2>
+          <p class="lede">Mining is no longer only hardware. Members fuel their node through learning, missions, community, and AI automation.</p>
+          <div class="pill-grid">
+            <span class="pill">Learning</span>
+            <span class="pill">Missions</span>
+            <span class="pill">Participation</span>
+            <span class="pill">Builder support</span>
+            <span class="pill">Node upgrades</span>
+            <span class="pill">AI automation</span>
+          </div>
+        </div>
+        <div class="shot-wrap">
+          <img class="shot" src="assets/shot-reactor.png" alt="Mining reactor and living NFT miner console" />
+        </div>
+      </div>
+    </section>
+
+    <!-- 5 ATTENTION ACADEMY -->
+    <section class="slide" data-i="4">
+      <div class="layout-split">
+        <div>
+          <p class="eyebrow">Attention Academy</p>
+          <h2>Learn. Complete missions. Fuel your Node.</h2>
+          <p class="lede">Users complete micro courses, AI learning, builder challenges, and community quests. Every lesson generates progress inside the ecosystem.</p>
+          <ul class="steps">
+            <li>Micro courses &amp; study briefs</li>
+            <li>Agent-verified attention sessions</li>
+            <li>Builder challenges &amp; community quests</li>
+            <li>Progress maps directly into node energy</li>
+          </ul>
+        </div>
+        <div class="shot-wrap">
+          <img class="shot" src="assets/shot-academy.png" alt="Attention Academy verification terminal" />
+        </div>
+      </div>
+    </section>
+
+    <!-- 6 BUILD DEX -->
+    <section class="slide" data-i="5">
+      <div class="layout-split">
+        <div>
+          <p class="eyebrow">BUILD DEX</p>
+          <h2>Trade with conviction.</h2>
+          <p class="lede">Instead of hype — discover builders, understand projects, complete quests, read AI analysis, then trade.</p>
+          <ul class="steps">
+            <li>Discover builders &amp; project context</li>
+            <li>Complete quests before you swap</li>
+            <li>AI analysis beside the trade surface</li>
+            <li>Utility loop: credits → CGT → upgrades</li>
+          </ul>
+        </div>
+        <div class="shot-wrap">
+          <img class="shot" src="assets/shot-dex.png" alt="CGT swap and vault trading interface" />
+        </div>
+      </div>
+    </section>
+
+    <!-- 7 GAMIFICATION -->
+    <section class="slide" data-i="6">
+      <div class="layout-split">
+        <div>
+          <p class="eyebrow">Gamification</p>
+          <h2>Everything earns progress.</h2>
+          <div class="xp-grid">
+            <div class="xp-card"><span>Progress</span>XP &amp; Reputation</div>
+            <div class="xp-card"><span>Collectible</span>NFT Miner evolution</div>
+            <div class="xp-card"><span>Social</span>Guild rewards</div>
+            <div class="xp-card"><span>Compete</span>Leaderboards</div>
+            <div class="xp-card"><span>Season</span>Season Pass</div>
+            <div class="xp-card"><span>Daily</span>Check-ins &amp; achievements</div>
+          </div>
+          <div class="level-bar">
+            <span>Lv 1</span>
+            <div class="bar"><i></i></div>
+            <span>Lv 100</span>
+          </div>
+        </div>
+        <div class="shot-wrap">
+          <img class="shot" src="assets/shot-wheel.png" alt="Lucky wheel and daily missions gamification" />
+        </div>
+      </div>
+    </section>
+
+    <!-- 8 AI LAYER -->
+    <section class="slide" data-i="7">
+      <div class="layout-split">
+        <div>
+          <p class="eyebrow">AI Layer</p>
+          <h2>Every member has an AI companion.</h2>
+          <p class="lede">Helps discover projects, suggests learning paths, summarizes builders, creates strategies, answers questions, and automates participation.</p>
+          <div class="pill-grid">
+            <span class="pill">Discover</span>
+            <span class="pill">Learning paths</span>
+            <span class="pill">Builder summaries</span>
+            <span class="pill">Strategies</span>
+            <span class="pill">Q&amp;A</span>
+            <span class="pill">Automation</span>
+          </div>
+          <div class="callout">Cognitive personalities (Scholar, Rogue, Zen, Industrial) buff how your node learns and mines.</div>
+        </div>
+        <div class="shot-wrap">
+          <img class="shot" src="assets/shot-reactor.png" alt="AI cognitive personality layer on Culture Node" style="object-fit:cover;object-position:center 70%;" />
+        </div>
+      </div>
+    </section>
+
+    <!-- 9 VISION -->
+    <section class="slide" data-i="8">
+      <div class="layout-split">
+        <div>
+          <p class="eyebrow">Vision</p>
+          <h2>The operating system for Web3 communities.</h2>
+          <p class="lede">Connecting builders, creators, investors, learners, partners, DAOs, developers, and communities through one unified ecosystem.</p>
+          <div class="vision-chips">
+            <span>Builders</span>
+            <span>Creators</span>
+            <span>Investors</span>
+            <span>Learners</span>
+            <span>Partners</span>
+            <span>DAOs</span>
+            <span>Developers</span>
+            <span>Communities</span>
+          </div>
+        </div>
+        <div class="network" id="network"></div>
+      </div>
+    </section>
+
+    <!-- 10 JOIN -->
+    <section class="slide" data-i="9">
+      <div class="layout-split">
+        <div>
+          <p class="eyebrow">Join Building Culture</p>
+          <h2>Let's build the future together.</h2>
+          <p class="lede">We're looking for people and programs ready to shape the next layer of Web3 culture.</p>
+          <ul class="join-list">
+            <li>Builders</li>
+            <li>Partners</li>
+            <li>Communities</li>
+            <li>Grant programs</li>
+            <li>Investors</li>
+            <li>Early adopters</li>
+          </ul>
+          <p class="closing-tag">Fuel Knowledge. Build Communities. Shape the Future.</p>
+          <a class="site-link" href="https://buildingcultureid.space" target="_blank" rel="noopener">buildingcultureid.space →</a>
+        </div>
+        <div class="shot-wrap">
+          <img class="hero-art" src="assets/hero-bc.png" alt="Building Culture closing hero" style="width:100%;margin:0;" />
+          <div class="shot-wrap" style="margin-top:1rem;">
+            <img class="shot" src="assets/shot-header.png" alt="Culture Node live product header" />
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <div class="chrome">
+    <button class="nav-btn" id="prev" type="button">← Prev</button>
+    <div class="dots" id="dots"></div>
+    <button class="nav-btn" id="next" type="button">Next →</button>
+  </div>
+
+  <script>
+    const slides = [...document.querySelectorAll(".slide")];
+    const dots = document.getElementById("dots");
+    const cur = document.getElementById("cur");
+    const hint = document.getElementById("hint");
+    let i = 0;
+
+    slides.forEach((_, idx) => {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.setAttribute("aria-label", "Go to slide " + (idx + 1));
+      b.addEventListener("click", () => go(idx));
+      dots.appendChild(b);
+    });
+
+    function go(n) {
+      i = (n + slides.length) % slides.length;
+      slides.forEach((s, idx) => s.classList.toggle("active", idx === i));
+      [...dots.children].forEach((d, idx) => d.classList.toggle("active", idx === i));
+      cur.textContent = String(i + 1).padStart(2, "0");
+      if (i > 0) hint.classList.add("hide");
+    }
+
+    document.getElementById("prev").addEventListener("click", () => go(i - 1));
+    document.getElementById("next").addEventListener("click", () => go(i + 1));
+
+    window.addEventListener("keydown", (e) => {
+      if (e.key === "ArrowRight" || e.key === " " || e.key === "PageDown") {
+        e.preventDefault();
+        go(i + 1);
+      } else if (e.key === "ArrowLeft" || e.key === "PageUp") {
+        e.preventDefault();
+        go(i - 1);
+      } else if (e.key === "Home") go(0);
+      else if (e.key === "End") go(slides.length - 1);
+    });
+
+    let touchX = null;
+    window.addEventListener("touchstart", (e) => { touchX = e.changedTouches[0].screenX; }, { passive: true });
+    window.addEventListener("touchend", (e) => {
+      if (touchX == null) return;
+      const dx = e.changedTouches[0].screenX - touchX;
+      if (Math.abs(dx) > 50) go(dx < 0 ? i + 1 : i - 1);
+      touchX = null;
+    }, { passive: true });
+
+    const net = document.getElementById("network");
+    const positions = [
+      [50, 50], [18, 28], [78, 22], [22, 72], [80, 68],
+      [35, 18], [65, 82], [12, 50], [88, 48], [42, 62],
+      [58, 30], [30, 42], [70, 55], [45, 78], [55, 15]
+    ];
+    positions.forEach(([x, y], idx) => {
+      const d = document.createElement("div");
+      d.className = "node-dot";
+      d.style.left = x + "%";
+      d.style.top = y + "%";
+      d.style.animationDelay = (idx * 0.18) + "s";
+      if (idx % 3 === 0) d.style.background = "var(--violet)";
+      if (idx % 3 === 0) d.style.boxShadow = "0 0 16px var(--violet)";
+      if (idx % 5 === 0) d.style.background = "var(--cyan)";
+      if (idx % 5 === 0) d.style.boxShadow = "0 0 16px var(--cyan)";
+      net.appendChild(d);
+    });
+
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("viewBox", "0 0 100 100");
+    svg.style.cssText = "position:absolute;inset:0;width:100%;height:100%;opacity:0.35;";
+    positions.slice(1).forEach(([x, y]) => {
+      const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+      line.setAttribute("x1", "50");
+      line.setAttribute("y1", "50");
+      line.setAttribute("x2", String(x));
+      line.setAttribute("y2", String(y));
+      line.setAttribute("stroke", "rgba(16,245,160,0.45)");
+      line.setAttribute("stroke-width", "0.3");
+      svg.appendChild(line);
+    });
+    net.appendChild(svg);
+
+    if (new URLSearchParams(location.search).has("print")) {
+      document.body.classList.add("print-mode");
+      slides.forEach((s) => s.classList.add("active"));
+    } else {
+      go(0);
+    }
+  </script>
+</body>
+</html>

@@ -74,7 +74,7 @@ export default function Treasury({ state, setState, addLog }: TreasuryProps) {
           }));
           setIsSwapping(false);
           setSwapStep('');
-          addLog(`DEX TRANSACTION CONFIRMED: Successfully swapped ${cpVal} CP for ${cgtGained} COGNITIVE (CGT) tokens on Devnet!`, "success");
+          addLog(`DEX [SIMULATED]: Local swap ${cpVal} CP → ${cgtGained} CGT. Not an on-chain SPL transfer.`, "success");
         }, 800);
       }, 800);
     }, 800);
@@ -87,20 +87,20 @@ export default function Treasury({ state, setState, addLog }: TreasuryProps) {
     }
 
     setIsSigning(true);
-    setSigStep("1/3 Drafting on-chain smart contract call state...");
+    setSigStep("1/3 [SIMULATED] Drafting local streak claim...");
     
     setTimeout(() => {
-      setSigStep("2/3 Requesting cryptographic signature for streak verification...");
+      setSigStep("2/3 [SIMULATED] Generating display-only hex (not a Solana sig)...");
       
       const characters = 'ABCDEFabcdef0123456789';
-      let randomSig = '0x';
+      let randomSig = 'sim_';
       for (let i = 0; i < 40; i++) {
         randomSig += characters.charAt(Math.floor(Math.random() * characters.length));
       }
       setGeneratedSignature(randomSig);
       
       setTimeout(() => {
-        setSigStep("3/3 Broadcasting consensus proof to Solana Devnet cluster...");
+        setSigStep("3/3 [SIMULATED] Applying local facility credits...");
         
         setTimeout(() => {
           const reward = streak * 75;
@@ -121,7 +121,7 @@ export default function Treasury({ state, setState, addLog }: TreasuryProps) {
           setIsSigning(false);
           setSigStep('');
 
-          addLog(`STREAK APPROVED: Cryptographic signature verified. Claimed +${reward} Credits for Day ${streak} streak check-in!`, "success");
+          addLog(`STREAK [SIMULATED]: Local daily claim +${reward} CP for Day ${streak}. Not a Solana signature — use Academy attest for on-chain proof.`, "success");
         }, 800);
       }, 800);
     }, 800);
@@ -444,7 +444,7 @@ export default function Treasury({ state, setState, addLog }: TreasuryProps) {
           <div className="flex items-center justify-between mb-4 pb-3 border-b border-white/5">
             <div className="flex items-center gap-2">
               <Coins className="w-5 h-5 text-cyan-400" />
-              <h3 className="font-mono text-sm font-semibold text-slate-100 tracking-wider">COGNITIVE TOKEN DEX SWAP (CGT)</h3>
+              <h3 className="font-mono text-sm font-semibold text-slate-100 tracking-wider">CGT SWAP [SIMULATED PLAYGROUND]</h3>
             </div>
             <span className="text-[9px] font-mono bg-cyan-950/40 border border-cyan-500/20 text-cyan-400 px-2.5 py-0.5 rounded-lg font-black tracking-widest uppercase">
               LOCAL LIQUIDITY POOL
@@ -523,7 +523,7 @@ export default function Treasury({ state, setState, addLog }: TreasuryProps) {
                   }`}
                 >
                   <RefreshCw className={`w-3.5 h-3.5 ${isSwapping ? 'animate-spin' : ''}`} />
-                  {isSwapping ? 'TRANSACTING ON-CHAIN...' : 'EXECUTE DEX SWAP'}
+                  {isSwapping ? 'SIMULATING…' : 'EXECUTE LOCAL SWAP'}
                 </button>
               </div>
             </div>

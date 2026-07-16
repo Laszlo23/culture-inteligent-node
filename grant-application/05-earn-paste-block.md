@@ -17,9 +17,11 @@ Building Culture — prove Solana Devnet contributions inside an AI cyber-mining
 ```
 Building Culture is a gamified Solana facility where operators connect a wallet, send a real Devnet contribution tx, and unlock AI-powered mining rewards.
 
-Already built: React facility UI, Firebase auth, Postgres (Drizzle), Gemini flows, and a working SolanaPortal (Phantom/local keypair, airdrop, signed SystemProgram.transfer, Solscan links, wallet synced to user profile).
+Primary KPI (fixed): confirmed 0.05 SOL Devnet transfer → +300 CP / +25% energy only after on-chain confirmation (Solscan-verifiable). No confirmed tx = KPI fail.
 
-With $200 USDG I’ll buy one month of Cursor/Claude/Codex Pro to ship a public MVP: connect → faucet → contribute → confirmed signature → facility credit — plus live URL, GitHub, and a short demo.
+Already built: React facility UI, wallet-only login (Phantom/local), Postgres, Gemini, SolanaPortal with KPI proof module.
+
+With $200 USDG I’ll buy one month of Cursor/Claude/Codex Pro to ship a public MVP of that loop + live URL + demo.
 
 Repo: https://github.com/Laszlo23/culture-inteligent-node
 Drive package: [PASTE YOUR DRIVE FOLDER URL HERE]

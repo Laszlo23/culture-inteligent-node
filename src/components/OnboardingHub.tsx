@@ -66,65 +66,104 @@ export default function OnboardingHub({ state, setState, addLog, onEnterApp }: O
     return () => clearInterval(timer);
   }, []);
 
-  const contractAddress = "0xb890a5289f789f1346032ccc1847939e855fab07";
+  const contractAddress = "Devnet attestation + upcoming SPL mint (no EVM contract)";
 
   const handleCopyAddress = () => {
-    navigator.clipboard.writeText(contractAddress);
+    navigator.clipboard.writeText("https://github.com/Laszlo23/culture-inteligent-node");
     setCopied(true);
-    addLog("LEDGER VERIFIED: $BCC Token Contract Address copied to clipboard.", "success");
+    addLog("COPIED: Building Culture repo URL (BCC SPL mint coming — rewards are facility CP until then).", "success");
     setTimeout(() => setCopied(false), 2000);
   };
 
-  // Pre-seed some mock Proof of Attention logs if none exist
-  const proofs = state.proofOfAttentions || [
-    {
-      id: 'poa_1',
-      walletAddress: state.profile?.discordUsername ? `0x${state.profile.discordUsername.slice(0, 4)}...7777` : '0xGenesis...7777',
-      activity: 'AI Course Completed: Decoherence Shielding',
-      duration: 35,
-      verification: 'AI + Community Oracle Verified',
-      rewardEnergy: 50,
-      rewardBcc: 100,
-      timestamp: '2026-07-16 07:12',
-      minted: false
-    },
-    {
-      id: 'poa_2',
-      walletAddress: state.profile?.discordUsername ? `0x${state.profile.discordUsername.slice(0, 4)}...7777` : '0xGenesis...7777',
-      activity: 'Pomodoro Deep Work Study Session',
-      duration: 25,
-      verification: 'AI + Community Oracle Verified',
-      rewardEnergy: 30,
-      rewardBcc: 50,
-      timestamp: '2026-07-16 07:22',
-      minted: true
+  // Prefer real agent-verified proofs; placeholder only when empty
+  const proofs =
+    state.proofOfAttentions && state.proofOfAttentions.length > 0
+      ? state.proofOfAttentions
+      : [
+          {
+            id: 'poa_demo',
+            walletAddress: 'Complete Academy for real PoA',
+            activity: 'No verified sessions yet',
+            duration: 0,
+            verification: 'Finish Attention Academy + Gemini agent verify',
+            rewardEnergy: 0,
+            rewardBcc: 0,
+            timestamp: new Date().toISOString(),
+            minted: false,
+          },
+        ];
+
+  const handleMintPoa = async (id: string) => {
+    const target = (state.proofOfAttentions || []).find((p) => p.id === id);
+    if (!target) {
+      addLog(
+        'ATTEST BLOCKED: Only agent-verified PoA records can be attested. Finish Academy first.',
+        'warn'
+      );
+      return;
     }
-  ];
+    if (target.minted && target.signature) {
+      addLog(
+        `Already attested: https://solscan.io/tx/${target.signature}?cluster=devnet`,
+        'info'
+      );
+      return;
+    }
 
-  const handleMintPoa = (id: string) => {
     setMintingPoaId(id);
-    addLog(`INITIATING POA MINT: Submitting proof transaction to Solana devnet cluster...`, 'info');
-    
-    setTimeout(() => {
-      setState(prev => {
-        const updatedProofs = (prev.proofOfAttentions || proofs).map(p => {
-          if (p.id === id) {
-            return { ...p, minted: true };
-          }
-          return p;
+    try {
+      const sessionRaw = localStorage.getItem('solana_current_user_session_v1');
+      const sessionUser = sessionRaw ? JSON.parse(sessionRaw) : null;
+      if (!sessionUser?.walletAddress) throw new Error('No wallet session');
+
+      const {
+        sendPoaMemoAttestation,
+        attestAttentionProof,
+        ensureWalletApiSession,
+        getWalletToken,
+      } = await import('../lib/api.ts');
+      const { Keypair } = await import('@solana/web3.js');
+      let localKeypair: InstanceType<typeof Keypair> | null = null;
+      if (sessionUser.walletType === 'local') {
+        const secret = localStorage.getItem('solana_local_secret');
+        if (secret) {
+          localKeypair = Keypair.fromSecretKey(Uint8Array.from(JSON.parse(secret)));
+        }
+      }
+      if (!getWalletToken()) {
+        await ensureWalletApiSession({
+          walletAddress: sessionUser.walletAddress,
+          walletType: sessionUser.walletType || 'local',
+          localKeypair,
         });
-
-        return {
-          ...prev,
-          proofOfAttentions: updatedProofs,
-          credits: prev.credits + 150, // Bonus credits for minting
-          nodeExperience: (prev.nodeExperience || 0) + 120 // XP boost
-        };
+      }
+      const memo = `poa:${target.sessionId || id}:${target.score ?? 0}`;
+      addLog('ATTEST: Broadcasting Devnet memo for PoA…', 'info');
+      const signature = await sendPoaMemoAttestation({
+        walletAddress: sessionUser.walletAddress,
+        walletType: sessionUser.walletType || 'local',
+        localKeypair,
+        memo,
       });
-
+      await attestAttentionProof({
+        verificationId: id,
+        signature,
+        sessionId: target.sessionId,
+        score: target.score,
+      });
+      setState((prev) => ({
+        ...prev,
+        proofOfAttentions: (prev.proofOfAttentions || []).map((p) =>
+          p.id === id ? { ...p, minted: true, signature, attestPending: false } : p
+        ),
+        credits: prev.credits + 50,
+      }));
+      addLog(`POA ATTESTED: https://solscan.io/tx/${signature}?cluster=devnet`, 'success');
+    } catch (err: any) {
+      addLog(`POA ATTEST FAILED: ${err?.message || err}`, 'warn');
+    } finally {
       setMintingPoaId(null);
-      addLog(`SOULBOUND MINT SUCCESS: Proof of Attention minted successfully as Soulbound NFT Badge! Received +150 BCC, +120 XP.`, 'success');
-    }, 1800);
+    }
   };
 
   const otherProducts = [
@@ -483,7 +522,7 @@ export default function OnboardingHub({ state, setState, addLog, onEnterApp }: O
 
                 <div className="space-y-3 pt-2">
                   {[
-                    { label: "On-Chain Activity Proofs", desc: "No simulated operations. Every transaction and claim generates a ledger sequence signed directly by your operator wallet." },
+                    { label: "On-Chain Activity Proofs", desc: "Real Solana Devnet: KPI contribution transfer + optional PoA memo attestation after Gemini agent verify. Facility CP stays off-chain until SPL mint." },
                     { label: "Verified Learning & Study Logs", desc: "Hash rate is powered by real attention. Complete modules, verify focus timers, and solve puzzles to expand node parameters." },
                     { label: "Transparent Resource Distribution", desc: "Zero pre-mines. Developer allocations scale linearly with community growth. 100% of mining parameters are fully open-source and visible on-chain." },
                     { label: "Proof of Attention Validation", desc: "Decentralized community oracles cross-examine focus logs to prevent script exploitation or click-bot harvesting." }

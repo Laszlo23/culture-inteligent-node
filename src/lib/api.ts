@@ -1,24 +1,209 @@
+import { Keypair, PublicKey, Transaction, TransactionInstruction, Connection } from '@solana/web3.js';
+import bs58 from 'bs58';
+import nacl from 'tweetnacl';
+
+const DEVNET_RPC = 'https://api.devnet.solana.com';
+export const MEMO_PROGRAM_ID = new PublicKey('MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr');
+export const WALLET_TOKEN_KEY = 'building_culture_wallet_jwt_v1';
+
+export function getWalletToken(): string | null {
+  return localStorage.getItem(WALLET_TOKEN_KEY);
+}
+
+export function setWalletToken(token: string) {
+  localStorage.setItem(WALLET_TOKEN_KEY, token);
+}
+
+export function clearWalletToken() {
+  localStorage.removeItem(WALLET_TOKEN_KEY);
+}
+
+async function authHeaders(): Promise<HeadersInit> {
+  const token = getWalletToken();
+  const headers: HeadersInit = { 'Content-Type': 'application/json' };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+  return headers;
+}
+
+export async function ensureWalletApiSession(opts: {
+  walletAddress: string;
+  walletType: 'extension' | 'local';
+  localKeypair?: Keypair | null;
+}): Promise<string> {
+  const existing = getWalletToken();
+  if (existing) return existing;
+
+  const challengeRes = await fetch('/api/wallet/challenge', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ walletAddress: opts.walletAddress }),
+  });
+  if (!challengeRes.ok) {
+    throw new Error('Failed to get wallet challenge');
+  }
+  const { message } = await challengeRes.json();
+  const messageBytes = new TextEncoder().encode(message);
+
+  let signature: string;
+  let demoUnsigned = false;
+
+  if (opts.walletType === 'local' && opts.localKeypair) {
+    const sig = nacl.sign.detached(messageBytes, opts.localKeypair.secretKey);
+    signature = bs58.encode(sig);
+  } else {
+    const provider = (window as any).solana;
+    if (provider?.signMessage) {
+      const signed = await provider.signMessage(messageBytes, 'utf8');
+      const sigBytes = signed.signature instanceof Uint8Array
+        ? signed.signature
+        : new Uint8Array(signed.signature);
+      signature = bs58.encode(sigBytes);
+    } else {
+      // Jury / iframe fallback — server accepts demoUnsigned in non-prod
+      signature = 'demo';
+      demoUnsigned = true;
+    }
+  }
+
+  const loginRes = await fetch('/api/wallet/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      walletAddress: opts.walletAddress,
+      signature,
+      message,
+      demoUnsigned,
+    }),
+  });
+
+  if (!loginRes.ok) {
+    const err = await loginRes.json().catch(() => ({}));
+    throw new Error(err.error || 'Wallet API login failed');
+  }
+
+  const data = await loginRes.json();
+  setWalletToken(data.token);
+  return data.token as string;
+}
+
+export async function verifyAttentionSession(payload: {
+  sessionId: string;
+  title: string;
+  artifacts?: string;
+  quizScore?: number;
+  quizTotal?: number;
+  topic?: string;
+  summary?: string;
+}) {
+  const headers = await authHeaders();
+  const response = await fetch('/api/attention/verify', {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error(err.error || 'Attention verification failed');
+  }
+  return response.json();
+}
+
+export async function attestAttentionProof(payload: {
+  verificationId: string;
+  signature: string;
+  sessionId?: string;
+  score?: number;
+}) {
+  const headers = await authHeaders();
+  const response = await fetch('/api/attention/attest', {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error(err.error || 'Attest failed');
+  }
+  return response.json();
+}
+
+export async function verifyKpiOnServer(signature: string) {
+  const headers = await authHeaders();
+  const response = await fetch('/api/kpi/verify', {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ signature }),
+  });
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error(err.error || 'KPI server verify failed');
+  }
+  return response.json();
+}
+
+/** Send Devnet memo attestation for a PoA */
+export async function sendPoaMemoAttestation(opts: {
+  walletAddress: string;
+  walletType: 'extension' | 'local';
+  localKeypair?: Keypair | null;
+  memo: string;
+}): Promise<string> {
+  const connection = new Connection(DEVNET_RPC, 'confirmed');
+  const payer = new PublicKey(opts.walletAddress);
+
+  const memoIx = new TransactionInstruction({
+    keys: [{ pubkey: payer, isSigner: true, isWritable: false }],
+    programId: MEMO_PROGRAM_ID,
+    data: Buffer.from(opts.memo, 'utf8'),
+  });
+
+  const tx = new Transaction().add(memoIx);
+
+  const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash();
+  tx.recentBlockhash = blockhash;
+  tx.feePayer = payer;
+
+  let signature: string;
+  if (opts.walletType === 'local' && opts.localKeypair) {
+    tx.sign(opts.localKeypair);
+    signature = await connection.sendRawTransaction(tx.serialize(), {
+      skipPreflight: false,
+      preflightCommitment: 'confirmed',
+    });
+  } else {
+    const provider = (window as any).solana;
+    if (!provider) throw new Error('Phantom provider missing');
+    const result = await provider.signAndSendTransaction(tx);
+    signature = result.signature;
+  }
+
+  await connection.confirmTransaction({ signature, blockhash, lastValidBlockHeight }, 'confirmed');
+  return signature;
+}
+
+// Re-export legacy api surface used by Admin/Feedback (Firebase)
 import { auth } from './firebase.ts';
 
-// Helper to get authorization headers with Firebase ID Token
 async function getAuthHeaders(): Promise<HeadersInit> {
+  const walletToken = getWalletToken();
+  if (walletToken) {
+    return {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${walletToken}`,
+    };
+  }
   const currentUser = auth.currentUser;
   if (!currentUser) {
-    return {
-      'Content-Type': 'application/json'
-    };
+    return { 'Content-Type': 'application/json' };
   }
   try {
     const token = await currentUser.getIdToken(true);
     return {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`
+      Authorization: `Bearer ${token}`,
     };
-  } catch (error) {
-    console.error("Failed to retrieve Firebase ID Token:", error);
-    return {
-      'Content-Type': 'application/json'
-    };
+  } catch {
+    return { 'Content-Type': 'application/json' };
   }
 }
 
@@ -52,7 +237,6 @@ export interface ApiTicket {
 }
 
 export const api = {
-  // Synchronize authenticated user with Postgres database
   async syncUser(username: string, walletAddress?: string): Promise<ApiUser> {
     const headers = await getAuthHeaders();
     const response = await fetch('/api/auth/sync', {
@@ -60,66 +244,42 @@ export const api = {
       headers,
       body: JSON.stringify({ username, walletAddress }),
     });
-
     if (!response.ok) {
       const err = await response.json().catch(() => ({}));
       throw new Error(err.error || 'Failed to synchronize user session with the database');
     }
-
     const data = await response.json();
     return data.user;
   },
 
-  // Fetch active user profile
   async getProfile(): Promise<ApiUser> {
     const headers = await getAuthHeaders();
-    const response = await fetch('/api/profile', {
-      method: 'GET',
-      headers,
-    });
-
+    const response = await fetch('/api/profile', { method: 'GET', headers });
     if (!response.ok) {
       const err = await response.json().catch(() => ({}));
       throw new Error(err.error || 'Failed to fetch user profile');
     }
-
     return response.json();
   },
 
-  // Admin route: Fetch all registered users
   async getAllUsers(): Promise<ApiUser[]> {
     const headers = await getAuthHeaders();
-    const response = await fetch('/api/users', {
-      method: 'GET',
-      headers,
-    });
-
+    const response = await fetch('/api/users', { method: 'GET', headers });
     if (!response.ok) {
       const err = await response.json().catch(() => ({}));
       throw new Error(err.error || 'Failed to fetch registered ecosystem users');
     }
-
     return response.json();
   },
 
-  // Fetch messages/announcements
-  async getMessages(): Promise<ApiMessage[]> {
+  async getMessages() {
     const headers = await getAuthHeaders();
-    const response = await fetch('/api/messages', {
-      method: 'GET',
-      headers,
-    });
-
-    if (!response.ok) {
-      const err = await response.json().catch(() => ({}));
-      throw new Error(err.error || 'Failed to fetch messages');
-    }
-
+    const response = await fetch('/api/messages', { method: 'GET', headers });
+    if (!response.ok) throw new Error('Failed to fetch messages');
     return response.json();
   },
 
-  // Admin: Broadcast new announcement
-  async broadcastMessage(recipient: string, subject: string, content: string): Promise<ApiMessage> {
+  async broadcastMessage(recipient: string, subject: string, content: string) {
     const headers = await getAuthHeaders();
     const response = await fetch('/api/messages', {
       method: 'POST',
@@ -131,49 +291,25 @@ export const api = {
         timestamp: new Date().toLocaleString(),
       }),
     });
-
-    if (!response.ok) {
-      const err = await response.json().catch(() => ({}));
-      throw new Error(err.error || 'Failed to broadcast announcement');
-    }
-
+    if (!response.ok) throw new Error('Failed to broadcast');
     return response.json();
   },
 
-  // Mark announcement as read
-  async markMessageAsRead(id: string): Promise<ApiMessage> {
+  async markMessageAsRead(id: string) {
     const headers = await getAuthHeaders();
-    const response = await fetch(`/api/messages/${id}/read`, {
-      method: 'POST',
-      headers,
-    });
-
-    if (!response.ok) {
-      const err = await response.json().catch(() => ({}));
-      throw new Error(err.error || 'Failed to update message status');
-    }
-
+    const response = await fetch(`/api/messages/${id}/read`, { method: 'POST', headers });
+    if (!response.ok) throw new Error('Failed to update message');
     return response.json();
   },
 
-  // Fetch support / feedback tickets
-  async getTickets(): Promise<ApiTicket[]> {
+  async getTickets() {
     const headers = await getAuthHeaders();
-    const response = await fetch('/api/feedback', {
-      method: 'GET',
-      headers,
-    });
-
-    if (!response.ok) {
-      const err = await response.json().catch(() => ({}));
-      throw new Error(err.error || 'Failed to fetch tickets');
-    }
-
+    const response = await fetch('/api/feedback', { method: 'GET', headers });
+    if (!response.ok) throw new Error('Failed to fetch tickets');
     return response.json();
   },
 
-  // Submit a feedback ticket
-  async submitTicket(type: string, subject: string, message: string): Promise<ApiTicket> {
+  async submitTicket(type: string, subject: string, message: string) {
     const headers = await getAuthHeaders();
     const response = await fetch('/api/feedback', {
       method: 'POST',
@@ -185,29 +321,18 @@ export const api = {
         timestamp: new Date().toLocaleString(),
       }),
     });
-
-    if (!response.ok) {
-      const err = await response.json().catch(() => ({}));
-      throw new Error(err.error || 'Failed to submit feedback ticket');
-    }
-
+    if (!response.ok) throw new Error('Failed to submit feedback');
     return response.json();
   },
 
-  // Admin response: Resolve feedback ticket
-  async resolveTicket(id: string, reply: string): Promise<ApiTicket> {
+  async resolveTicket(id: string, reply: string) {
     const headers = await getAuthHeaders();
     const response = await fetch(`/api/feedback/${id}/resolve`, {
       method: 'POST',
       headers,
       body: JSON.stringify({ reply }),
     });
-
-    if (!response.ok) {
-      const err = await response.json().catch(() => ({}));
-      throw new Error(err.error || 'Failed to resolve feedback ticket');
-    }
-
+    if (!response.ok) throw new Error('Failed to resolve ticket');
     return response.json();
-  }
+  },
 };

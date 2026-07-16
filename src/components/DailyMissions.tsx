@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { AlertTriangle, CheckSquare, Square, Battery, Settings, Compass, Sparkles, Clock, Coins, RotateCw, Trophy, Zap } from 'lucide-react';
 import { GameState, DailyMission } from '../types';
@@ -36,6 +36,32 @@ export default function DailyMissions({ state, setState, addLog }: DailyMissions
   const [runningQuestId, setRunningQuestId] = useState<string | null>(null);
   const [questProgress, setQuestProgress] = useState(0);
 
+  // Reset practice missions once per local calendar day (keep KPI/academy completion)
+  useEffect(() => {
+    const today = new Date().toDateString();
+    const key = 'building_culture_missions_day_v1';
+    const last = localStorage.getItem(key);
+    if (last === today) return;
+    localStorage.setItem(key, today);
+    setState((prev) => ({
+      ...prev,
+      dailyMissions: prev.dailyMissions.map((m) => {
+        if (m.id === 'm_kpi') {
+          return { ...m, completed: !!prev.kpiProof?.signature };
+        }
+        if (m.id === 'm_academy') {
+          const has = (prev.proofOfAttentions || []).some(
+            (p) => p.verification?.includes('Gemini') || p.verification?.includes('agent') || (p.score != null && p.score >= 60)
+          );
+          return { ...m, completed: has };
+        }
+        // practice missions reset daily
+        return { ...m, completed: false };
+      }),
+    }));
+    addLog('DAILY RESET: Practice missions refreshed for a new day.', 'system');
+  }, []);
+
   // Wheel States
   const [isSpinning, setIsSpinning] = useState(false);
   const [spinAngle, setSpinAngle] = useState(0);
@@ -54,6 +80,34 @@ export default function DailyMissions({ state, setState, addLog }: DailyMissions
 
   const startQuestSimulation = (mission: DailyMission) => {
     if (mission.completed) return;
+
+    if (mission.id === 'm_kpi') {
+      if (!state.kpiProof?.signature) {
+        addLog(
+          'KPI LOCKED: Complete a real Devnet contribution in Ecosystem Vault → Solana Portal first (0.05 SOL confirmed).',
+          'warn'
+        );
+        return;
+      }
+      completeQuest(mission);
+      return;
+    }
+
+    if (mission.id === 'm_academy') {
+      const hasVerified = (state.proofOfAttentions || []).some(
+        (p) => p.verification?.startsWith('Gemini') || p.score != null
+      );
+      if (!hasVerified) {
+        addLog(
+          'ACADEMY MISSION LOCKED: Finish an Attention Academy session with Gemini agent verification first.',
+          'warn'
+        );
+        return;
+      }
+      completeQuest(mission);
+      return;
+    }
+
     setRunningQuestId(mission.id);
     setQuestProgress(0);
 
@@ -234,9 +288,17 @@ export default function DailyMissions({ state, setState, addLog }: DailyMissions
       </div>
 
       {/* LUCKY WHEEL OF FORTUNE SECTION */}
-      <div className="bg-[#0a0a0c] border border-white/5 rounded-2xl p-6 shadow-xl relative overflow-hidden">
+      <div id="lucky-wheel" className="bg-[#0a0a0c] border border-cyan-500/20 rounded-2xl p-6 shadow-xl relative overflow-hidden scroll-mt-24">
         <div className="absolute top-0 right-0 w-40 h-40 bg-cyan-500/5 rounded-full blur-3xl pointer-events-none" />
-        
+        <div className="flex items-center gap-2 mb-4">
+          <RotateCw className="w-4 h-4 text-cyan-400" />
+          <h3 className="font-mono text-sm font-bold text-white tracking-wider uppercase">
+            Lucky Wheel of Fortune
+          </h3>
+          <span className="text-[8px] font-mono px-2 py-0.5 rounded border border-cyan-500/30 text-cyan-400 tracking-widest">
+            DAILY SPIN
+          </span>
+        </div>
         <div className="grid grid-cols-1 md:grid-cols-12 gap-8 items-center">
           {/* Wheel column */}
           <div className="md:col-span-5 text-center relative flex flex-col items-center">
