@@ -2,8 +2,16 @@ import express from "express";
 import path from "path";
 import crypto from "crypto";
 import nacl from "tweetnacl";
-import bs58 from "bs58";
+import bs58Import from "bs58";
+import dotenv from "dotenv";
 import { createServer as createViteServer } from "vite";
+
+dotenv.config();
+
+// bs58 v6 ESM/CJS interop (Node require returns { default: { encode, decode } })
+const bs58 = (bs58Import as any)?.default?.decode
+  ? (bs58Import as any).default
+  : (bs58Import as any);
 import {
   requireAuth,
   requireWalletAuth,
@@ -11,6 +19,7 @@ import {
   createWalletChallenge,
   consumeChallenge,
   signWalletToken,
+  verifyWalletToken,
 } from "./src/middleware/auth.ts";
 import {
   getOrCreateUser,
@@ -25,12 +34,41 @@ import {
 } from "./src/db/queries.ts";
 import { verifyAttentionWithAgent } from "./src/lib/attention-agent.ts";
 import { verifyKpiTransaction, verifyMemoAttestation } from "./src/lib/solana-verify.ts";
+import { researchWeeklySession } from "./src/lib/session-research-agent.ts";
+import { CORE_ATTENTION_SESSIONS, isoWeekKey } from "./src/content/attention-intelligence.ts";
 import {
   saveAttentionVerification,
   updateAttentionAttest,
   saveKpiProof,
   getKpiBySignature,
+  saveCurriculumDraft,
+  listCurriculumDrafts,
+  getCurriculumDraft,
+  publishCurriculumDraft,
+  rejectCurriculumDraft,
+  listPublishedCurriculum,
 } from "./src/db/memory-store.ts";
+import { getMarketPulse } from "./src/lib/market-pulse.ts";
+
+function curriculumAdminWallets(): Set<string> {
+  const raw = process.env.CURRICULUM_ADMIN_WALLETS || "";
+  return new Set(
+    raw
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean)
+  );
+}
+
+function isCurriculumAdmin(walletAddress?: string): boolean {
+  if (!walletAddress) return false;
+  const allow = curriculumAdminWallets();
+  // Production must fail closed when allowlist is empty.
+  if (allow.size === 0) {
+    return process.env.NODE_ENV !== "production";
+  }
+  return allow.has(walletAddress);
+}
 
 async function startServer() {
   const app = express();
@@ -56,7 +94,8 @@ async function startServer() {
       const walletAddress = String(req.body?.walletAddress || "").trim();
       const signature = String(req.body?.signature || "").trim();
       const messageOverride = req.body?.message as string | undefined;
-      const allowDemo = req.body?.demoUnsigned === true;
+      const allowDemo =
+        req.body?.demoUnsigned === true && process.env.NODE_ENV !== "production";
 
       if (!walletAddress || (!signature && !allowDemo)) {
         return res.status(400).json({ error: "walletAddress and signature required" });
@@ -381,6 +420,94 @@ async function startServer() {
       });
     } catch (error: any) {
       res.status(500).json({ error: error.message || "KPI verify failed" });
+    }
+  });
+
+  app.get("/api/curriculum", (req, res) => {
+    let wallet: string | undefined;
+    const authHeader = req.headers.authorization;
+    if (authHeader?.startsWith("Bearer ")) {
+      const user = verifyWalletToken(authHeader.slice(7));
+      wallet = user?.walletAddress;
+    }
+    const geminiConfigured = Boolean(
+      process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY !== "MY_GEMINI_API_KEY"
+    );
+    res.json({
+      core: CORE_ATTENTION_SESSIONS,
+      published: listPublishedCurriculum(),
+      isAdmin: isCurriculumAdmin(wallet),
+      geminiConfigured,
+    });
+  });
+
+  app.get("/api/curriculum/drafts", requireWalletAuth, (req: AuthRequest, res) => {
+    if (!isCurriculumAdmin(req.walletUser!.walletAddress)) {
+      return res.status(403).json({ error: "Curriculum admin only" });
+    }
+    res.json({ drafts: listCurriculumDrafts() });
+  });
+
+  app.post("/api/curriculum/research", requireWalletAuth, async (req: AuthRequest, res) => {
+    try {
+      if (!isCurriculumAdmin(req.walletUser!.walletAddress)) {
+        return res.status(403).json({ error: "Curriculum admin only" });
+      }
+      const published = listPublishedCurriculum();
+      const drafts = listCurriculumDrafts();
+      const existingTitles = [
+        ...published.map((s) => s.title),
+        ...drafts.map((s) => s.title),
+      ];
+      const draft = await researchWeeklySession({ existingTitles });
+      const stored = saveCurriculumDraft(draft);
+      res.json({ draft: stored });
+    } catch (error: any) {
+      console.error("Curriculum research failed:", error);
+      res.status(500).json({ error: error.message || "Curriculum research failed" });
+    }
+  });
+
+  app.post("/api/curriculum/publish", requireWalletAuth, (req: AuthRequest, res) => {
+    if (!isCurriculumAdmin(req.walletUser!.walletAddress)) {
+      return res.status(403).json({ error: "Curriculum admin only" });
+    }
+    const draftId = String(req.body?.draftId || "").trim();
+    if (!draftId) return res.status(400).json({ error: "draftId required" });
+    if (!getCurriculumDraft(draftId)) {
+      return res.status(404).json({ error: "Draft not found" });
+    }
+    const published = publishCurriculumDraft(draftId, isoWeekKey());
+    res.json({ published });
+  });
+
+  app.post("/api/curriculum/reject", requireWalletAuth, (req: AuthRequest, res) => {
+    if (!isCurriculumAdmin(req.walletUser!.walletAddress)) {
+      return res.status(403).json({ error: "Curriculum admin only" });
+    }
+    const draftId = String(req.body?.draftId || "").trim();
+    if (!draftId) return res.status(400).json({ error: "draftId required" });
+    const ok = rejectCurriculumDraft(draftId);
+    if (!ok) return res.status(404).json({ error: "Draft not found" });
+    res.json({ ok: true });
+  });
+
+  // Live Solana market pulse via OKX OnchainOS CLI (read-only, cached 60s)
+  app.get("/api/market/pulse", async (_req, res) => {
+    try {
+      const pulse = await getMarketPulse();
+      if (!pulse.available) {
+        return res.status(503).json(pulse);
+      }
+      res.json(pulse);
+    } catch (err) {
+      console.error("market pulse error", err);
+      res.status(503).json({
+        available: false,
+        reason: "Market pulse failed",
+        source: "okx-onchainos",
+        fetchedAt: new Date().toISOString(),
+      });
     }
   });
 

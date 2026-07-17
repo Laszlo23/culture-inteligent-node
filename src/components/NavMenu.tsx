@@ -8,7 +8,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import {
   X, Map, Zap, Hammer, Compass, Bot, Coins, Users, Calendar,
   User, Trophy, Rocket, MessageSquare, Handshake, HelpCircle,
-  RotateCw, Wallet, Shield, FileText, Scale
+  RotateCw, Wallet, Shield, FileText, Scale, Glasses
 } from 'lucide-react';
 
 export type NavDestination =
@@ -25,6 +25,7 @@ export type NavDestination =
   | 'onboarding'
   | 'partners'
   | 'feedback'
+  | 'roadmap'
   | 'legal-privacy'
   | 'legal-terms'
   | 'legal-disclaimer';
@@ -50,6 +51,7 @@ const FACILITY: NavItem[] = [
   { id: 'reactor', label: 'Mining Reactor', hint: 'Core energy & yield', icon: <Zap className="w-4 h-4" /> },
   { id: 'workshop', label: 'Hardware Workshop', hint: 'Buy & install modules', icon: <Hammer className="w-4 h-4" /> },
   { id: 'lab', label: 'Attention Academy', hint: 'Agent-verified sessions', icon: <Compass className="w-4 h-4" /> },
+  { id: 'roadmap', label: 'Product Roadmap', hint: '2D → AR vision', icon: <Glasses className="w-4 h-4 text-emerald-400" /> },
   { id: 'ai', label: 'Automation Center', hint: 'AI worker bots', icon: <Bot className="w-4 h-4" /> },
   { id: 'treasury', label: 'Ecosystem Vault', hint: 'Solana Portal & KPI proof', icon: <Coins className="w-4 h-4" /> },
   { id: 'guild', label: 'Community Guilds', hint: 'Team bonuses', icon: <Users className="w-4 h-4" /> },

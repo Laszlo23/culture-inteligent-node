@@ -32,7 +32,7 @@ const COPY: Record<
       },
       {
         h: 'Server processing',
-        p: 'If configured, attention verification may send session artifacts to an AI provider (e.g. Gemini) or a local heuristic. Do not submit personal data you do not want processed.',
+        p: 'Confidential Proof of Attention pass/fail uses the Arcium threshold policy (encrypted score + artifact length bucket). Optional AI coaching (e.g. Gemini) may receive session artifacts for narrative feedback only — it does not gate energy grants. Do not submit personal data you do not want processed.',
       },
       {
         h: 'Contact',

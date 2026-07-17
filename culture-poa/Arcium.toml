@@ -1,0 +1,9 @@
+[localnet]
+nodes = 2
+# Must stay inside Arcium's hardcoded compose subnet 172.20.0.0/16
+nodes_ips = [
+  [172, 20, 0, 100],
+  [172, 20, 0, 101]
+]
+localnet_timeout_secs = 600
+backends = ["Cerberus"]

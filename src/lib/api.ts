@@ -141,6 +141,73 @@ export async function verifyKpiOnServer(signature: string) {
   return response.json();
 }
 
+export async function fetchCurriculum() {
+  const headers = await authHeaders();
+  const response = await fetch('/api/curriculum', { headers });
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error(err.error || 'Failed to load curriculum');
+  }
+  return response.json() as Promise<{
+    core: unknown[];
+    published: any[];
+    isAdmin: boolean;
+    geminiConfigured: boolean;
+  }>;
+}
+
+export async function fetchCurriculumDrafts() {
+  const headers = await authHeaders();
+  const response = await fetch('/api/curriculum/drafts', { headers });
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error(err.error || 'Failed to load drafts');
+  }
+  return response.json() as Promise<{ drafts: any[] }>;
+}
+
+export async function researchCurriculumDraft() {
+  const headers = await authHeaders();
+  const response = await fetch('/api/curriculum/research', {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({}),
+  });
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error(err.error || 'Curriculum research failed');
+  }
+  return response.json() as Promise<{ draft: any }>;
+}
+
+export async function publishCurriculumDraft(draftId: string) {
+  const headers = await authHeaders();
+  const response = await fetch('/api/curriculum/publish', {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ draftId }),
+  });
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error(err.error || 'Publish failed');
+  }
+  return response.json();
+}
+
+export async function rejectCurriculumDraft(draftId: string) {
+  const headers = await authHeaders();
+  const response = await fetch('/api/curriculum/reject', {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ draftId }),
+  });
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error(err.error || 'Reject failed');
+  }
+  return response.json();
+}
+
 /** Send Devnet memo attestation for a PoA */
 export async function sendPoaMemoAttestation(opts: {
   walletAddress: string;
@@ -336,3 +403,40 @@ export const api = {
     return response.json();
   },
 };
+
+export type MarketPulseHotToken = {
+  symbol: string;
+  address: string;
+  priceUsd?: number;
+  name?: string;
+};
+
+export type MarketPulseResponse =
+  | {
+      available: true;
+      sol: { priceUsd: number; change24h?: number };
+      hot: MarketPulseHotToken[];
+      source: string;
+      fetchedAt: string;
+    }
+  | {
+      available: false;
+      reason: string;
+      source: string;
+      fetchedAt: string;
+    };
+
+/** Live Solana market pulse from OKX OnchainOS (server-side CLI). */
+export async function fetchMarketPulse(): Promise<MarketPulseResponse> {
+  const response = await fetch('/api/market/pulse');
+  const body = (await response.json().catch(() => null)) as MarketPulseResponse | null;
+  if (body && typeof body === 'object' && 'available' in body) {
+    return body;
+  }
+  return {
+    available: false,
+    reason: response.ok ? 'Invalid market pulse response' : `HTTP ${response.status}`,
+    source: 'okx-onchainos',
+    fetchedAt: new Date().toISOString(),
+  };
+}

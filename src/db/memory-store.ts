@@ -1,5 +1,7 @@
 /** In-memory fallback when Postgres is unavailable — demo / jury safe */
 
+import type { AttentionSession } from '../content/attention-intelligence.ts';
+
 export type StoredAttentionVerification = {
   id: string;
   uid: string;
@@ -62,4 +64,48 @@ export function saveKpiProof(row: Omit<StoredKpiProof, 'createdAt'> & { createdA
 
 export function getKpiBySignature(signature: string) {
   return kpiStore.find((k) => k.signature === signature) || null;
+}
+
+const curriculumDrafts: AttentionSession[] = [];
+const curriculumPublished: AttentionSession[] = [];
+
+export function saveCurriculumDraft(session: AttentionSession) {
+  const row = { ...session, status: 'draft' as const };
+  curriculumDrafts.unshift(row);
+  return row;
+}
+
+export function listCurriculumDrafts() {
+  return curriculumDrafts.filter((d) => d.status === 'draft');
+}
+
+export function getCurriculumDraft(id: string) {
+  return curriculumDrafts.find((d) => d.id === id) || null;
+}
+
+export function publishCurriculumDraft(id: string, week: string) {
+  const idx = curriculumDrafts.findIndex((d) => d.id === id);
+  if (idx === -1) return null;
+  const [draft] = curriculumDrafts.splice(idx, 1);
+  const published: AttentionSession = {
+    ...draft,
+    status: 'published',
+    week,
+    seriesOrder: 200 + curriculumPublished.length,
+  };
+  // Only one published weekly drop at a time for “this week”
+  curriculumPublished.length = 0;
+  curriculumPublished.push(published);
+  return published;
+}
+
+export function rejectCurriculumDraft(id: string) {
+  const idx = curriculumDrafts.findIndex((d) => d.id === id);
+  if (idx === -1) return false;
+  curriculumDrafts.splice(idx, 1);
+  return true;
+}
+
+export function listPublishedCurriculum() {
+  return [...curriculumPublished];
 }

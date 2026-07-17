@@ -278,7 +278,7 @@ export default function AICore({ state, setState, addLog }: AICoreProps) {
             <Bot className="w-5 h-5" />
           </div>
           <div>
-            <h3 className="font-mono text-sm font-bold text-slate-100 tracking-wider">NFT MINING RIGS & AUTOMATION DESK</h3>
+            <h3 className="font-mono text-sm font-bold text-slate-100 tracking-wider">AI COMPANIONS · AUTOMATION DESK</h3>
             <p className="text-xs text-slate-400 mt-1 leading-relaxed max-w-xl">
               Physical node hardware units are fully represented as on-chain gamified NFTs. Acquire, level up, or liquidate them on secondary markets to fine-tune your cumulative mining footprint.
             </p>

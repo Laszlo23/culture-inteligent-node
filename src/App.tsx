@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   Zap, Battery, ShieldAlert, Cpu, Hammer, 
@@ -16,6 +16,7 @@ import { GameState, HardwareModule, AIWorker, FacilityRoom, Guild, DailyMission,
 import MainReactor from './components/MainReactor';
 import Workshop from './components/Workshop';
 import ResearchLab from './components/ResearchLab';
+import ProductRoadmap from './components/ProductRoadmap';
 import AICore from './components/AICore';
 import DailyMissions from './components/DailyMissions';
 import GuildHall from './components/GuildHall';
@@ -31,17 +32,25 @@ import PartnerProgram from './components/PartnerProgram';
 import OnboardingHub from './components/OnboardingHub';
 import NavMenu, { NavDestination } from './components/NavMenu';
 import LegalPages, { LegalPageId } from './components/LegalPages';
+import {
+  AmbientField,
+  AttentionBriefStrip,
+  EnergyFlow,
+  RoomEnter,
+  buildAttentionBrief,
+} from './components/fx';
+import { CORE_ATTENTION_SESSIONS } from './content/attention-intelligence';
 
 const INITIAL_NOTIFICATIONS = [
-  { id: 'n_1', title: 'Welcome to Culture Node!', message: 'Deploy your hardware modules and start mining $BCC tokens.', timestamp: '12:00:00 PM', read: false, type: 'info' as const },
-  { id: 'n_2', title: 'System Diagnostic', message: 'Main Reactor Core energy depleted to 38%. Attention required.', timestamp: '12:15:00 PM', read: false, type: 'warn' as const },
-  { id: 'n_3', title: 'Daily Wheelspin Ready!', message: 'Spin the Lucky Wheel of Fortune to get free $BCC tokens!', timestamp: '12:30:00 PM', read: false, type: 'success' as const },
+  { id: 'n_1', title: 'Welcome to Culture Node', message: 'Fuel your node with verified attention. Knowledge becomes energy.', timestamp: '12:00:00 PM', read: false, type: 'info' as const },
+  { id: 'n_2', title: 'Core reserves warning', message: 'Knowledge fuel depleted to 38%. Academy can restore energy.', timestamp: '12:15:00 PM', read: false, type: 'warn' as const },
+  { id: 'n_3', title: 'Daily fortune channel open', message: 'Spin the ops wheel for BCC and energy capsules.', timestamp: '12:30:00 PM', read: false, type: 'success' as const },
   { id: 'n_4', title: 'New Message from System Admin', message: 'Admin broadcast: "Network Optimization" is waiting in your inbox.', timestamp: '12:35:00 PM', read: false, type: 'message' as const, relatedId: 'msg_1', relatedType: 'message' as const },
   { id: 'n_5', title: 'Support Ticket Resolved!', message: 'Admin responded to your Postgres Sync ticket. Read the response.', timestamp: '12:40:00 PM', read: false, type: 'success' as const, relatedId: 'fb_1', relatedType: 'ticket' as const }
 ];
 
 const INITIAL_MESSAGES = [
-  { id: 'msg_1', sender: 'System Admin', recipient: 'All Operators', subject: 'Network Optimization', content: 'Greeting Operator! Ensure your cooling systems are functional to maximize your daily $BCC hash rate. Let me know if you run into any validation anomalies.', timestamp: '10:00:00 AM', isRead: false },
+  { id: 'msg_1', sender: 'System Admin', recipient: 'All Operators', subject: 'Network Optimization', content: 'Greeting Operator! Keep your attention channel warm to maximize daily BCC yield. Report any verification anomalies.', timestamp: '10:00:00 AM', isRead: false },
 ];
 
 const INITIAL_FEEDBACK = [
@@ -74,12 +83,12 @@ const INITIAL_WORKERS: AIWorker[] = [
 ];
 
 const INITIAL_ROOMS: FacilityRoom[] = [
-  { id: 'reactor', name: 'Mining Power Reactor', level: 1, maxLevel: 5, unlocked: true, costToUnlock: 0, costToUpgrade: 500, description: 'Generates your core mining hash power and monitors system state.', perk: '+15% Core Energy Capacity' },
-  { id: 'workshop', name: 'Hardware Marketplace', level: 1, maxLevel: 5, unlocked: true, costToUnlock: 0, costToUpgrade: 600, description: 'Purchase and install high-performance hardware upgrades.', perk: '-10% Part Purchasing Costs' },
-  { id: 'lab', name: 'Attention Academy', level: 1, maxLevel: 5, unlocked: true, costToUnlock: 0, costToUpgrade: 700, description: 'Verify focus logs and complete micro-courses to refuel system energy.', perk: '+20% Energy Refuel Multiplier' },
-  { id: 'ai', name: 'Automation Center', level: 0, maxLevel: 3, unlocked: false, costToUnlock: 800, costToUpgrade: 1200, description: 'Deploy helpful helper AI bots to passively boost mining rates.', perk: '+5% Worker Passive Speed' },
-  { id: 'treasury', name: 'Ecosystem Vault', level: 1, maxLevel: 3, unlocked: true, costToUnlock: 0, costToUpgrade: 1500, description: 'Track ticking ecosystem yield drops and claim your token balances. Includes Solana Devnet portal for wallet demo.', perk: '+12% Hourly Claim Multiplier' },
-  { id: 'guild', name: 'Community Guilds', level: 1, maxLevel: 1, unlocked: true, costToUnlock: 0, costToUpgrade: 0, description: 'Align with global Web3 builder groups to earn team rewards.', perk: '+10% Team Output Boost' },
+  { id: 'reactor', name: 'Attention Reactor', level: 1, maxLevel: 5, unlocked: true, costToUnlock: 0, costToUpgrade: 500, description: 'Converts verified attention into node energy and monitors core stability.', perk: '+15% Core Energy Capacity' },
+  { id: 'workshop', name: 'Hardware Marketplace', level: 1, maxLevel: 5, unlocked: true, costToUnlock: 0, costToUpgrade: 600, description: 'Acquire and mount modules that amplify your facility’s attention throughput.', perk: '-10% Part Purchasing Costs' },
+  { id: 'lab', name: 'Attention Academy', level: 1, maxLevel: 5, unlocked: true, costToUnlock: 0, costToUpgrade: 700, description: 'Learn, verify focus, and refuel the reactor with Proof of Attention.', perk: '+20% Energy Refuel Multiplier' },
+  { id: 'ai', name: 'Automation Center', level: 0, maxLevel: 3, unlocked: false, costToUnlock: 800, costToUpgrade: 1200, description: 'Deploy AI companions that passively boost facility output.', perk: '+5% Worker Passive Speed' },
+  { id: 'treasury', name: 'Ecosystem Vault', level: 1, maxLevel: 3, unlocked: true, costToUnlock: 0, costToUpgrade: 1500, description: 'Claim yields, attest daily streaks, and operate the Solana Devnet portal.', perk: '+12% Hourly Claim Multiplier' },
+  { id: 'guild', name: 'Community Guilds', level: 1, maxLevel: 1, unlocked: true, costToUnlock: 0, costToUpgrade: 0, description: 'Align with builder factions for shared output and seasonal competitions.', perk: '+10% Team Output Boost' },
 ];
 
 const INITIAL_GUILDS: Guild[] = [
@@ -89,11 +98,11 @@ const INITIAL_GUILDS: Guild[] = [
 ];
 
 const INITIAL_MISSIONS: DailyMission[] = [
-  { id: 'm_kpi', label: 'KPI: Prove Devnet contribution (0.05 SOL on-chain)', completed: false, energyReward: 25, powerReward: 15, category: 'build' },
-  { id: 'm_academy', label: 'Complete agent-verified Attention Academy session', completed: false, energyReward: 30, powerReward: 20, category: 'build' },
-  { id: 'm1', label: '[Practice] Review Solana Devnet checklist (simulated)', completed: false, energyReward: 15, powerReward: 8, category: 'video' },
-  { id: 'm2', label: '[Practice] Skim parallel execution notes (simulated)', completed: false, energyReward: 15, powerReward: 8, category: 'article' },
-  { id: 'm3', label: '[Practice] Warm-up focus timer (simulated)', completed: false, energyReward: 20, powerReward: 10, category: 'quest' },
+  { id: 'm_kpi', label: 'Stabilize node: prove Devnet contribution (0.05 SOL on-chain)', completed: false, energyReward: 25, powerReward: 15, category: 'build' },
+  { id: 'm_academy', label: 'Refuel reactor: complete an agent-verified Academy session', completed: false, energyReward: 30, powerReward: 20, category: 'build' },
+  { id: 'm1', label: 'Decode AI signal: review Solana Devnet checklist (practice)', completed: false, energyReward: 15, powerReward: 8, category: 'video' },
+  { id: 'm2', label: 'Analyze archive: skim parallel execution notes (practice)', completed: false, energyReward: 15, powerReward: 8, category: 'article' },
+  { id: 'm3', label: 'Recover focus: warm-up attention timer (practice)', completed: false, energyReward: 20, powerReward: 10, category: 'quest' },
 ];
 
 export default function App() {
@@ -275,6 +284,23 @@ export default function App() {
   const [showSaveToast, setShowSaveToast] = useState<boolean>(false);
   const lastUserActionStateRef = React.useRef<string>('');
 
+  const attentionBrief = useMemo(() => {
+    let completedAcademy: string[] = [];
+    try {
+      completedAcademy = JSON.parse(localStorage.getItem('kronos_academy_completed') || '[]');
+    } catch {
+      completedAcademy = [];
+    }
+    return buildAttentionBrief({
+      energy: state.energy,
+      missions: state.dailyMissions,
+      notifications: state.notifications || [],
+      completedAcademySessions: completedAcademy,
+      coreSessionCount: CORE_ATTENTION_SESSIONS.length,
+    });
+  }, [state.energy, state.dailyMissions, state.notifications]);
+
+
   // Helper log function
   const addLog = (message: string, type: 'info' | 'success' | 'warn' | 'system') => {
     const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
@@ -292,6 +318,9 @@ export default function App() {
         const parsed = JSON.parse(saved);
         const missions: DailyMission[] = parsed.dailyMissions || INITIAL_MISSIONS;
         const hasKpiMission = missions.some((m) => m.id === 'm_kpi');
+        const labelById = Object.fromEntries(INITIAL_MISSIONS.map((m) => [m.id, m.label]));
+        const withUniverseLabels = (list: DailyMission[]) =>
+          list.map((m) => (labelById[m.id] ? { ...m, label: labelById[m.id] } : m));
         let kpiProof = parsed.kpiProof;
         try {
           const rawProof = localStorage.getItem('building_culture_kpi_proof_v1');
@@ -302,24 +331,33 @@ export default function App() {
         setState({
           ...parsed,
           kpiProof,
-          dailyMissions: hasKpiMission
-            ? missions.map((m) =>
-                m.id === 'm_kpi' && kpiProof?.signature ? { ...m, completed: true } : m
-              )
-            : [
-                {
-                  id: 'm_kpi',
-                  label: 'KPI: Prove Devnet contribution (0.05 SOL on-chain)',
-                  completed: !!kpiProof?.signature,
-                  energyReward: 25,
-                  powerReward: 15,
-                  category: 'build' as const,
-                },
-                ...missions,
-              ],
-          rooms: (parsed.rooms || INITIAL_ROOMS).map((r: FacilityRoom) =>
-            r.id === 'treasury' ? { ...r, unlocked: true, level: Math.max(r.level || 0, 1) } : r
+          dailyMissions: withUniverseLabels(
+            hasKpiMission
+              ? missions.map((m) =>
+                  m.id === 'm_kpi' && kpiProof?.signature ? { ...m, completed: true } : m
+                )
+              : [
+                  {
+                    id: 'm_kpi',
+                    label: labelById.m_kpi,
+                    completed: !!kpiProof?.signature,
+                    energyReward: 25,
+                    powerReward: 15,
+                    category: 'build' as const,
+                  },
+                  ...missions,
+                ]
           ),
+          rooms: (parsed.rooms || INITIAL_ROOMS).map((r: FacilityRoom) => {
+            const seed = INITIAL_ROOMS.find((s) => s.id === r.id);
+            let next = seed
+              ? { ...r, name: seed.name, description: seed.description }
+              : r;
+            if (next.id === 'treasury') {
+              next = { ...next, unlocked: true, level: Math.max(next.level || 0, 1) };
+            }
+            return next;
+          }),
           notifications: parsed.notifications || INITIAL_NOTIFICATIONS,
           messages: parsed.messages || INITIAL_MESSAGES,
           feedback: parsed.feedback || INITIAL_FEEDBACK,
@@ -331,8 +369,8 @@ export default function App() {
     }
 
     // Add introductory greeting logs
-    addLog("Facility online. Connection stable.", "system");
-    addLog("WARNING: Main Reactor Core energy depleted to 38%. Attention required.", "warn");
+    addLog("Facility online. Attention channel stable.", "system");
+    addLog("NOTICE: Knowledge fuel at 38%. Academy can restore core reserves.", "warn");
   }, []);
 
   // Save state to localStorage whenever it modifies
@@ -387,6 +425,8 @@ export default function App() {
       roomName = "Terms of Use";
     } else if (roomId === 'legal-disclaimer') {
       roomName = "Disclaimer";
+    } else if (roomId === 'roadmap') {
+      roomName = "Product Roadmap — 2D to AR";
     } else if (roomId === 'profile') {
       roomName = "Member Profile";
     } else if (roomId === 'leaderboard') {
@@ -559,21 +599,21 @@ export default function App() {
         )}
       </AnimatePresence>
 
-      {/* Background Atmosphere */}
-      <div className="absolute inset-0 pointer-events-none z-0">
-        <div className="absolute top-[-10%] right-[-10%] w-[500px] h-[500px] bg-cyan-900/10 rounded-full blur-[120px]"></div>
-        <div className="absolute bottom-[-10%] left-[-10%] w-[500px] h-[500px] bg-orange-950/5 rounded-full blur-[120px]"></div>
+      {/* Background Atmosphere — living ambient field */}
+      <div className="absolute inset-0 pointer-events-none z-0 overflow-hidden">
+        <AmbientField />
       </div>
 
       {/* Top Main Navigation Bar */}
       <header className="border border-white/5 bg-[#0a0a0c]/90 backdrop-blur-md sticky top-2 z-40 mx-4 mt-2 px-6 py-4 rounded-2xl flex flex-wrap items-center justify-between gap-4 shadow-xl">
         {/* Left branding */}
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-cyan-500/20 border border-cyan-500/30 flex items-center justify-center">
-            <Cpu className="w-5 h-5 text-cyan-400" />
+          <div className="w-10 h-10 rounded-xl bg-cyan-500/20 border border-cyan-500/30 flex items-center justify-center relative overflow-hidden">
+            <div className="absolute inset-0 bg-cyan-400/10 animate-pulse" />
+            <Cpu className="w-5 h-5 text-cyan-400 relative z-10" />
           </div>
           <div>
-            <span className="text-[10px] font-mono tracking-widest uppercase text-slate-500">Node Network</span>
+            <span className="text-[10px] font-mono tracking-widest uppercase text-slate-500">Proof of Attention OS</span>
             <h1 className="text-sm font-bold tracking-tight text-white flex items-center gap-2">
               CULTURE NODE <span className="text-[8px] font-mono tracking-widest uppercase bg-cyan-950/60 border border-cyan-800 text-cyan-400 px-1.5 py-0.5 rounded">DEVNET</span>
             </h1>
@@ -583,31 +623,26 @@ export default function App() {
         {/* Global Facility Live Metrics */}
         <div className="flex flex-wrap items-center gap-4 lg:gap-8 font-mono text-xs">
           <div className="flex flex-col">
-            <span className="text-[9px] font-mono tracking-widest uppercase text-cyan-400">MINING RATE</span>
+            <span className="text-[9px] font-mono tracking-widest uppercase text-cyan-400">NODE OUTPUT</span>
             <span className="text-lg font-black text-white italic">
               {state.miningPower.toFixed(1)} <span className="text-[10px] text-cyan-500 font-normal not-italic">PH/s</span>
             </span>
           </div>
 
-          <div className="flex flex-col min-w-[110px]">
-            <span className="text-[9px] font-mono tracking-widest uppercase text-orange-500">CORE ENERGY</span>
+          <div className="flex flex-col min-w-[120px]">
+            <span className="text-[9px] font-mono tracking-widest uppercase text-orange-500">KNOWLEDGE FUEL</span>
             <div className="flex items-center gap-2">
               <span className={`text-lg font-black italic ${state.energy < 40 ? 'text-red-400 animate-pulse' : 'text-white'}`}>
                 {state.energy}%
               </span>
-              <div className="w-16 h-1.5 bg-white/5 rounded-full overflow-hidden">
-                <div 
-                  className={`h-full rounded-full transition-all duration-1000 ${
-                    state.energy < 40 ? 'bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]' : 'bg-orange-500 shadow-[0_0_8px_rgba(249,115,22,0.5)]'
-                  }`}
-                  style={{ width: `${state.energy}%` }}
-                />
+              <div className="w-16">
+                <EnergyFlow energy={state.energy} />
               </div>
             </div>
           </div>
 
           <div className="flex flex-col">
-            <span className="text-[9px] font-mono tracking-widest uppercase text-slate-500">MULTIPLIER</span>
+            <span className="text-[9px] font-mono tracking-widest uppercase text-slate-500">EFFICIENCY</span>
             <span className="text-base font-bold text-cyan-400">x{state.efficiency.toFixed(2)}</span>
           </div>
 
@@ -804,13 +839,13 @@ export default function App() {
 
         <AnimatePresence mode="wait">
           {activeRoom === 'map' ? (
-            <motion.div
-              key="map-view"
-              initial={{ opacity: 0, y: 15 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -15 }}
-              className="space-y-6"
-            >
+            <RoomEnter key="map-view" roomKey="map-view">
+              <div className="space-y-6">
+              <AttentionBriefStrip
+                items={attentionBrief}
+                onNavigate={(room) => changeRoom(room)}
+              />
+
               {/* Dynamic Warning Alert on blueprint map screen if Reactor Low */}
               {state.energy < 40 && (
                 <div className="bg-orange-500/5 border border-orange-500/30 p-5 rounded-2xl flex flex-col md:flex-row items-center justify-between gap-4 shadow-lg">
@@ -819,10 +854,10 @@ export default function App() {
                       <ShieldAlert className="w-5 h-5" />
                     </div>
                     <div>
-                      <span className="text-[10px] font-mono font-bold text-orange-400 block tracking-widest uppercase">⚠ LOW CORE RESERVES DETECTED</span>
-                      <h4 className="text-sm font-semibold font-mono text-slate-200 mt-0.5">Core energy level is low ({state.energy}%).</h4>
+                      <span className="text-[10px] font-mono font-bold text-orange-400 block tracking-widest uppercase">⚠ Knowledge fuel critical</span>
+                      <h4 className="text-sm font-semibold font-mono text-slate-200 mt-0.5">Core reserves at {state.energy}%.</h4>
                       <p className="text-xs text-slate-400 mt-1 max-w-2xl font-sans leading-relaxed">
-                        Refuel in the <span className="text-cyan-400 font-bold font-mono">Attention Academy</span> (agent-verified sessions) or run daily practice missions.
+                        Refuel in the <span className="text-cyan-400 font-bold font-mono">Attention Academy</span> — learning becomes energy for your node.
                       </p>
                     </div>
                   </div>
@@ -837,7 +872,7 @@ export default function App() {
                       onClick={() => changeRoom('missions')}
                       className="px-5 py-2.5 bg-orange-600 hover:bg-orange-500 text-black font-black font-mono text-xs rounded-xl tracking-wider transition-colors cursor-pointer"
                     >
-                      DAILY MISSIONS
+                      DAILY DIRECTIVES
                     </button>
                   </div>
                 </div>
@@ -849,12 +884,12 @@ export default function App() {
                 <div className="absolute top-0 right-0 w-80 h-80 bg-cyan-500/5 rounded-full blur-3xl pointer-events-none" />
 
                 <div className="relative z-10 max-w-2xl">
-                  <span className="text-[10px] font-mono text-cyan-400 tracking-[0.2em] block uppercase font-bold">BUILDING CULTURE PROTOCOL</span>
+                  <span className="text-[10px] font-mono text-cyan-400 tracking-[0.2em] block uppercase font-bold">PROOF OF ATTENTION PROTOCOL</span>
                   <h2 className="text-3xl lg:text-4xl font-black italic text-white leading-none mt-2 mb-3">
                     FUEL YOUR NODE<br />WITH KNOWLEDGE
                   </h2>
                   <p className="text-xs lg:text-sm text-slate-400 font-sans mt-3.5 leading-relaxed max-w-xl">
-                    Build a decentralized culture node powered by your real-world learning. Complete focus academy courses, buy high-efficiency hardware upgrades, and coordinate with active global builder guilds.
+                    Operate a living AI facility where focused learning generates Proof of Attention. Knowledge becomes energy. Energy powers your node.
                   </p>
 
                   <div className="flex flex-wrap gap-3 mt-6 font-mono text-xs">
@@ -862,7 +897,7 @@ export default function App() {
                       onClick={() => changeRoom('reactor')}
                       className="px-5 py-3 bg-cyan-600 hover:bg-cyan-500 text-black font-black uppercase tracking-wider rounded-xl cursor-pointer transition-all"
                     >
-                      Manage Reactor Core
+                      Enter Reactor Core
                     </button>
                     <button
                       onClick={() => changeRoom('workshop')}
@@ -878,7 +913,7 @@ export default function App() {
               <div>
                 <h3 className="font-mono text-[10px] font-bold text-slate-500 tracking-[0.2em] uppercase mb-4 flex items-center gap-2">
                   <LayoutGrid className="w-4 h-4 text-cyan-400" />
-                  FACILITY SCHEMATIC BLUEPRINT
+                  FACILITY SCHEMATIC
                 </h3>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -892,14 +927,19 @@ export default function App() {
                     const rStatus = getRoomStatus();
 
                     return (
-                      <div
+                      <motion.div
                         key={room.id}
-                        className={`bg-[#0a0a0c] border rounded-2xl p-5 shadow-xl flex flex-col justify-between overflow-hidden relative min-h-[210px] transition-all duration-300 ${
+                        whileHover={room.unlocked ? { y: -4, scale: 1.01 } : undefined}
+                        transition={{ type: 'spring', stiffness: 400, damping: 28 }}
+                        className={`bg-[#0a0a0c]/90 border rounded-2xl p-5 shadow-xl flex flex-col justify-between overflow-hidden relative min-h-[210px] backdrop-blur-sm ${
                           room.unlocked 
-                            ? 'border-white/5 hover:border-cyan-500/40' 
+                            ? 'border-white/5 hover:border-cyan-500/40 hover:shadow-[0_0_28px_rgba(34,211,238,0.08)]' 
                             : 'border-white/5 opacity-50'
                         }`}
                       >
+                        {room.unlocked && (
+                          <div className="absolute inset-0 pointer-events-none opacity-[0.08] bg-gradient-to-br from-cyan-400/10 via-transparent to-fuchsia-500/5 animate-pulse" />
+                        )}
                         {/* Blueprint grid coordinate numbers */}
                         <span className="absolute top-4 right-4 font-mono text-[9px] text-slate-600">SECTOR_0{idx + 1}</span>
 
@@ -954,7 +994,7 @@ export default function App() {
                             </button>
                           )}
                         </div>
-                      </div>
+                      </motion.div>
                     );
                   })}
 
@@ -1058,18 +1098,25 @@ export default function App() {
                   </div>
                 </div>
               </div>
-            </motion.div>
+              </div>
+            </RoomEnter>
           ) : (
             // Room viewport render
-            <motion.div
-              key="room-view"
-              initial={{ opacity: 0, y: 15 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -15 }}
-            >
+            <RoomEnter key={`room-${activeRoom}`} roomKey={`room-${activeRoom}`}>
+
               {activeRoom === 'reactor' && <MainReactor state={state} setState={setState} addLog={addLog} logs={logs} />}
               {activeRoom === 'workshop' && <Workshop state={state} setState={setState} addLog={addLog} />}
-              {activeRoom === 'lab' && <ResearchLab state={state} setState={setState} addLog={addLog} />}
+              {activeRoom === 'lab' && (
+                <ResearchLab
+                  state={state}
+                  setState={setState}
+                  addLog={addLog}
+                  onOpenRoadmap={() => changeRoom('roadmap')}
+                />
+              )}
+              {activeRoom === 'roadmap' && (
+                <ProductRoadmap onEnterAcademy={() => changeRoom('lab')} />
+              )}
               {activeRoom === 'ai' && <AICore state={state} setState={setState} addLog={addLog} />}
               {activeRoom === 'missions' && <DailyMissions state={state} setState={setState} addLog={addLog} />}
               {activeRoom === 'guild' && <GuildHall state={state} setState={setState} addLog={addLog} />}
@@ -1092,7 +1139,7 @@ export default function App() {
               {(activeRoom === 'legal-privacy' || activeRoom === 'legal-terms' || activeRoom === 'legal-disclaimer') && (
                 <LegalPages page={activeRoom as LegalPageId} onBack={() => changeRoom('map')} />
               )}
-            </motion.div>
+            </RoomEnter>
           )}
         </AnimatePresence>
 
@@ -1115,7 +1162,7 @@ export default function App() {
         <div className="flex flex-col md:flex-row justify-between items-center gap-2 font-mono text-[9px] tracking-widest">
           <div className="flex items-center gap-2">
             <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-ping"></div>
-            <span>COGNITIVE COLD STATION DEPLOYED // RIG SYNC ACTIVE</span>
+            <span>ATTENTION OS ONLINE // NODE SYNC ACTIVE</span>
           </div>
           <div className="flex flex-wrap gap-3 justify-center items-center">
             <button

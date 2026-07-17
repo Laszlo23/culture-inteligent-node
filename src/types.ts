@@ -114,6 +114,12 @@ export interface ProofOfAttention {
   score?: number;
   signature?: string;
   attestPending?: boolean;
+  /** Arcium confidential threshold metadata (no raw artifacts). */
+  arciumPassed?: boolean;
+  arciumScoreBand?: 0 | 1 | 2 | 3;
+  arciumMode?: 'circuit-mirror' | 'onchain';
+  arciumComputationOffset?: string;
+  arciumTxSignature?: string;
 }
 
 export interface AppNotification {

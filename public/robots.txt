@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://mining.buildingcultureid.space/sitemap.xml

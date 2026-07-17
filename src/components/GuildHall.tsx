@@ -59,7 +59,7 @@ export default function GuildHall({ state, setState, addLog }: GuildHallProps) {
         <div className="flex items-center justify-between border-b border-white/5 pb-4 mb-5">
           <div className="flex items-center gap-2">
             <Trophy className="w-5 h-5 text-amber-400" />
-            <h3 className="font-mono text-sm font-semibold text-slate-100 tracking-wider">GLOBAL GUILD LEADERBOARD</h3>
+            <h3 className="font-mono text-sm font-semibold text-slate-100 tracking-wider">FACTION ALIGNMENT · SHARED OUTPUT</h3>
           </div>
           <span className="font-mono text-[10px] text-amber-400 bg-amber-950/30 px-2 py-0.5 rounded-lg border border-amber-500/20 animate-pulse">
             3D 14H REMAINING

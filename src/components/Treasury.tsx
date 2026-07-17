@@ -8,10 +8,11 @@ import { motion, AnimatePresence } from 'motion/react';
 import { 
   Coins, TrendingUp, Sparkles, RefreshCw, Layers, 
   ShieldCheck, Download, Calendar, Trophy, Clock, 
-  CheckCircle, Lock, Unlock, FileText, ShieldAlert 
+  CheckCircle, Lock, Unlock, FileText, ShieldAlert, Activity
 } from 'lucide-react';
 import { GameState } from '../types';
 import SolanaPortal from './SolanaPortal';
+import { fetchMarketPulse, MarketPulseResponse } from '../lib/api';
 
 interface TreasuryProps {
   state: GameState;
@@ -44,6 +45,37 @@ export default function Treasury({ state, setState, addLog }: TreasuryProps) {
   const [swapCpAmount, setSwapCpAmount] = useState<string>('250');
   const [isSwapping, setIsSwapping] = useState<boolean>(false);
   const [swapStep, setSwapStep] = useState<string>('');
+
+  // OKX OnchainOS live Solana market pulse (mainnet context beside simulated DEX)
+  const [marketPulse, setMarketPulse] = useState<MarketPulseResponse | null>(null);
+  const [pulseLoading, setPulseLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const pulse = await fetchMarketPulse();
+        if (!cancelled) setMarketPulse(pulse);
+      } catch {
+        if (!cancelled) {
+          setMarketPulse({
+            available: false,
+            reason: 'Failed to reach market pulse',
+            source: 'okx-onchainos',
+            fetchedAt: new Date().toISOString(),
+          });
+        }
+      } finally {
+        if (!cancelled) setPulseLoading(false);
+      }
+    };
+    load();
+    const id = window.setInterval(load, 60_000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(id);
+    };
+  }, []);
 
   const executeSwap = () => {
     const cpVal = Number(swapCpAmount);
@@ -434,6 +466,79 @@ export default function Treasury({ state, setState, addLog }: TreasuryProps) {
 
         </div>
 
+      </div>
+
+      {/* Live Solana market pulse — OKX OnchainOS (mainnet); facility CP/CGT stays simulated */}
+      <div className="bg-[#0a0a0c] border border-emerald-500/15 rounded-2xl p-5 relative overflow-hidden shadow-xl">
+        <div className="absolute top-0 left-0 w-40 h-40 bg-emerald-500/5 rounded-full blur-3xl pointer-events-none" />
+        <div className="flex items-center justify-between mb-3 pb-3 border-b border-white/5 relative">
+          <div className="flex items-center gap-2">
+            <Activity className="w-4 h-4 text-emerald-400" />
+            <h3 className="font-mono text-sm font-semibold text-slate-100 tracking-wider">
+              SOLANA MARKET PULSE
+            </h3>
+          </div>
+          <span className="text-[9px] font-mono bg-emerald-950/50 border border-emerald-500/25 text-emerald-400 px-2.5 py-0.5 rounded-lg font-black tracking-widest uppercase">
+            LIVE · OKX ONCHAINOS
+          </span>
+        </div>
+        <p className="text-[11px] text-slate-500 mb-4 leading-relaxed">
+          Mainnet Solana context from OKX OnchainOS. Facility CP ↔ CGT swap below remains a{' '}
+          <span className="text-cyan-400/80 font-mono">simulated playground</span> — not an on-chain trade.
+        </p>
+        {pulseLoading && !marketPulse ? (
+          <div className="flex items-center gap-2 text-slate-500 font-mono text-[11px]">
+            <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+            Fetching pulse…
+          </div>
+        ) : marketPulse?.available ? (
+          <div className="space-y-3">
+            <div className="flex flex-wrap items-end gap-4">
+              <div className="bg-black/40 border border-white/5 rounded-xl px-4 py-3 min-w-[140px]">
+                <span className="text-[8px] text-slate-500 font-mono tracking-widest uppercase block">SOL / USD</span>
+                <span className="text-xl font-black text-emerald-400 font-mono tabular-nums">
+                  ${marketPulse.sol.priceUsd.toLocaleString(undefined, { maximumFractionDigits: 4 })}
+                </span>
+              </div>
+              <span className="text-[9px] text-slate-600 font-mono self-center">
+                updated {new Date(marketPulse.fetchedAt).toLocaleTimeString()}
+              </span>
+            </div>
+            {marketPulse.hot.length > 0 && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2">
+                {marketPulse.hot.map((t) => (
+                  <div
+                    key={t.address}
+                    className="bg-[#050506] border border-white/5 rounded-lg px-3 py-2"
+                    title={t.address}
+                  >
+                    <span className="text-[10px] font-bold text-slate-200 font-mono block truncate">
+                      {t.symbol}
+                    </span>
+                    {t.priceUsd != null ? (
+                      <span className="text-[10px] text-emerald-400/90 font-mono tabular-nums">
+                        ${t.priceUsd < 0.01 ? t.priceUsd.toExponential(2) : t.priceUsd.toLocaleString(undefined, { maximumFractionDigits: 4 })}
+                      </span>
+                    ) : (
+                      <span className="text-[9px] text-slate-600 font-mono">—</span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="bg-amber-950/20 border border-amber-500/20 rounded-xl px-3 py-2.5">
+            <span className="text-[10px] text-amber-400/90 font-mono font-bold uppercase tracking-wider block mb-1">
+              Pulse unavailable
+            </span>
+            <span className="text-[11px] text-slate-400 leading-relaxed block">
+              {marketPulse && marketPulse.available === false
+                ? marketPulse.reason
+                : 'OKX OnchainOS market data is not reachable on this host.'}
+            </span>
+          </div>
+        )}
       </div>
 
       {/* COGNITIVE SPL Token Exchange (DEX Swap) */}

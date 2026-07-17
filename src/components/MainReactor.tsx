@@ -11,6 +11,7 @@ import {
   Smartphone, User, Edit3, ShoppingBag, Trophy
 } from 'lucide-react';
 import { GameState, HardwareModule } from '../types';
+import { GlowPulse, EnergyFlow, consumeEnergySurge } from './fx';
 
 interface MainReactorProps {
   state: GameState;
@@ -26,6 +27,7 @@ export default function MainReactor({ state, setState, addLog, logs }: MainReact
   const [rgbTheme, setRgbTheme] = useState<'cyan' | 'magenta' | 'emerald' | 'amber'>('cyan');
   const [activeLeftTab, setActiveLeftTab] = useState<'living-miner' | 'schematic' | 'coresync' | 'academy'>('living-miner');
   const [showMobileDashboard, setShowMobileDashboard] = useState(false);
+  const [energySurge, setEnergySurge] = useState(false);
 
   // Zen Breathing Game States
   const [showBreathGame, setShowBreathGame] = useState(false);
@@ -395,6 +397,26 @@ export default function MainReactor({ state, setState, addLog, logs }: MainReact
     ? (state.miningPower * 1.5).toFixed(1) 
     : state.miningPower.toFixed(1);
 
+  const reactorLevel = state.rooms.find((r) => r.id === 'reactor')?.level ?? 1;
+  const energyNorm = Math.max(0, Math.min(100, state.energy)) / 100;
+  // Presentation-only telemetry derived from existing energy (no new economy)
+  const coolantPressure = Math.round(40 + energyNorm * 55);
+  const coreHeatIndex = Math.round(
+    temperature * (isOverclocked ? 1.15 : 1) * (1.1 - energyNorm * 0.25)
+  );
+  const pulseDuration = state.energy < 25 ? 3.4 : isOverclocked ? 0.55 : state.energy > 70 ? 1.3 : 2.4;
+  const coreScale = 1 + reactorLevel * 0.04 + (isOverclocked ? 0.08 : 0);
+  const ringCount = Math.min(5, 1 + reactorLevel);
+
+  useEffect(() => {
+    if (consumeEnergySurge()) {
+      setEnergySurge(true);
+      addLog('ENERGY SURGE: Knowledge fuel routed into the reactor core.', 'success');
+      const t = window.setTimeout(() => setEnergySurge(false), 3200);
+      return () => window.clearTimeout(t);
+    }
+  }, []);
+
   const energyStatusText = () => {
     if (state.energy < 20) return { text: "CRITICAL LOW", color: "text-red-500 animate-pulse" };
     if (state.energy < 50) return { text: "REACTOR LOW", color: "text-amber-500" };
@@ -423,7 +445,34 @@ export default function MainReactor({ state, setState, addLog, logs }: MainReact
   }[rgbTheme];
 
   return (
-    <div id="reactor-room" className="space-y-4">
+    <div id="reactor-room" className={`space-y-4 relative ${energySurge ? 'reactor-surge' : ''}`}>
+      {energySurge && (
+        <div className="pointer-events-none absolute inset-0 z-20 rounded-3xl border-2 border-emerald-400/40 shadow-[0_0_60px_rgba(52,211,153,0.35)] animate-pulse" />
+      )}
+      {/* Knowledge fuel + heat presentation strip */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+        <div className="bg-[#0a0a0c]/90 border border-white/5 rounded-xl px-3 py-2 relative overflow-hidden">
+          <GlowPulse energy={state.energy} className="absolute -right-4 -top-4 w-16 h-16" color={state.energy < 30 ? 'orange' : 'cyan'} />
+          <span className="text-[8px] text-slate-500 font-mono tracking-widest uppercase relative">Knowledge fuel</span>
+          <div className="flex items-baseline gap-2 relative mt-0.5">
+            <span className={`text-lg font-black font-mono ${state.energy < 40 ? 'text-orange-400' : 'text-cyan-300'}`}>{state.energy}%</span>
+          </div>
+          <EnergyFlow energy={state.energy} className="mt-1.5 relative" />
+        </div>
+        <div className="bg-[#0a0a0c]/90 border border-white/5 rounded-xl px-3 py-2">
+          <span className="text-[8px] text-slate-500 font-mono tracking-widest uppercase">Coolant pressure</span>
+          <p className="text-lg font-black font-mono text-emerald-300 mt-0.5">{coolantPressure}<span className="text-[10px] text-slate-500 font-normal"> PSI</span></p>
+        </div>
+        <div className="bg-[#0a0a0c]/90 border border-white/5 rounded-xl px-3 py-2">
+          <span className="text-[8px] text-slate-500 font-mono tracking-widest uppercase">Core heat index</span>
+          <p className={`text-lg font-black font-mono mt-0.5 ${coreHeatIndex > 70 ? 'text-orange-400' : 'text-slate-200'}`}>{coreHeatIndex}°</p>
+        </div>
+        <div className="bg-[#0a0a0c]/90 border border-white/5 rounded-xl px-3 py-2">
+          <span className="text-[8px] text-slate-500 font-mono tracking-widest uppercase">Reactor tier</span>
+          <p className="text-lg font-black font-mono text-fuchsia-300 mt-0.5">L{reactorLevel}<span className="text-[10px] text-slate-500 font-normal"> / 5</span></p>
+        </div>
+      </div>
+
       {/* Mobile Operator Console Switcher */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-[#0a0a0c] border border-white/5 p-4 rounded-2xl gap-3">
         <div className="flex items-center gap-2.5">
@@ -862,20 +911,53 @@ export default function MainReactor({ state, setState, addLog, logs }: MainReact
 
               {/* Core Plasma Chamber Reactor (The Center Fusion Node) */}
               <g transform="translate(155, 125)">
+                {/* Warning rim when fuel critical */}
+                {state.energy < 30 && (
+                  <motion.circle
+                    cx="45"
+                    cy="45"
+                    r={48}
+                    fill="none"
+                    stroke="rgba(249,115,22,0.55)"
+                    strokeWidth="2"
+                    animate={{ opacity: [0.3, 0.9, 0.3], scale: [1, 1.04, 1] }}
+                    transition={{ duration: 1.2, repeat: Infinity }}
+                  />
+                )}
+                {/* Extra rings at higher reactor levels */}
+                {Array.from({ length: ringCount }).map((_, i) => (
+                  <motion.circle
+                    key={`ring-${i}`}
+                    cx="45"
+                    cy="45"
+                    r={38 + i * 5}
+                    fill="none"
+                    stroke={state.energy < 30 ? 'rgba(249,115,22,0.25)' : 'rgba(34,211,238,0.2)'}
+                    strokeWidth="0.8"
+                    strokeDasharray={`${4 + i * 2} ${6 + i}`}
+                    animate={{ rotate: i % 2 === 0 ? 360 : -360 }}
+                    transition={{ duration: pulseDuration * (3 + i) * (state.energy < 25 ? 1.4 : 1), repeat: Infinity, ease: 'linear' }}
+                    style={{ transformOrigin: '45px 45px', opacity: 0.35 + energyNorm * 0.4 }}
+                  />
+                ))}
                 <circle cx="45" cy="45" r="35" fill="#050506" stroke="rgba(255,255,255,0.1)" strokeWidth="1.5" />
                 
                 {/* Glowing core graphics inside reactor */}
                 <motion.circle 
                   cx="45" 
                   cy="45" 
-                  r="26" 
-                  className={`fill-none stroke-2 ${activeColorClass}`}
+                  r={26 * coreScale} 
+                  className={`fill-none stroke-2 ${state.energy < 30 ? 'stroke-orange-500' : activeColorClass}`}
                   animate={{ 
-                    scale: isOverclocked ? [1, 1.15, 1] : [1, 1.05, 1],
-                    opacity: isOverclocked ? [0.8, 1, 0.8] : [0.5, 0.8, 0.5]
+                    scale: isOverclocked ? [1, 1.15, 1] : [1, 1.05 + energyNorm * 0.06, 1],
+                    opacity: state.energy < 25
+                      ? [0.25, 0.5, 0.25]
+                      : isOverclocked
+                        ? [0.8, 1, 0.8]
+                        : [0.4 + energyNorm * 0.3, 0.75 + energyNorm * 0.2, 0.4 + energyNorm * 0.3]
                   }} 
                   transition={{ 
-                    duration: isOverclocked ? 0.6 : 2.5, 
+                    duration: pulseDuration, 
                     repeat: Infinity, 
                     ease: "easeInOut" 
                   }} 
@@ -885,15 +967,22 @@ export default function MainReactor({ state, setState, addLog, logs }: MainReact
                 <motion.circle 
                   cx="45" 
                   cy="45" 
-                  r={isOverclocked ? "14" : "10"} 
-                  className={`${activeFillClass} stroke-1 ${activeColorClass}`}
+                  r={isOverclocked ? 14 : 8 + energyNorm * 6} 
+                  className={`${activeFillClass} stroke-1 ${state.energy < 30 ? 'stroke-orange-400' : activeColorClass}`}
                   animate={{ rotate: 360 }}
-                  transition={{ duration: isOverclocked ? 1.5 : 5, repeat: Infinity, ease: "linear" }}
+                  transition={{ duration: isOverclocked ? 1.5 : pulseDuration * 2, repeat: Infinity, ease: "linear" }}
                   strokeDasharray="12,4"
                 />
 
                 {/* Core fusion particle center */}
-                <circle cx="45" cy="45" r="5" fill="#ffffff" className="shadow-lg shadow-white/50 animate-ping" />
+                <circle
+                  cx="45"
+                  cy="45"
+                  r={4 + energyNorm * 3}
+                  fill={state.energy < 30 ? '#fb923c' : '#ffffff'}
+                  className="shadow-lg shadow-white/50 animate-ping"
+                  style={{ opacity: 0.4 + energyNorm * 0.5 }}
+                />
                 <circle cx="45" cy="45" r="3" fill="#ffffff" />
               </g>
 

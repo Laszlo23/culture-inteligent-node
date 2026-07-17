@@ -7,6 +7,7 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { AlertTriangle, CheckSquare, Square, Battery, Settings, Compass, Sparkles, Clock, Coins, RotateCw, Trophy, Zap } from 'lucide-react';
 import { GameState, DailyMission } from '../types';
+import { ClaimBurst, markEnergySurge } from './fx';
 
 interface DailyMissionsProps {
   state: GameState;
@@ -35,6 +36,7 @@ const WHEEL_PRIZES: WheelPrize[] = [
 export default function DailyMissions({ state, setState, addLog }: DailyMissionsProps) {
   const [runningQuestId, setRunningQuestId] = useState<string | null>(null);
   const [questProgress, setQuestProgress] = useState(0);
+  const [claimBurst, setClaimBurst] = useState<{ show: boolean; label: string }>({ show: false, label: '' });
 
   // Reset practice missions once per local calendar day (keep KPI/academy completion)
   useEffect(() => {
@@ -156,7 +158,12 @@ export default function DailyMissions({ state, setState, addLog }: DailyMissions
       };
     });
 
-    addLog(`MAINTENANCE APPROVED: "${mission.label}" complete. +${mission.energyReward}% energy refueled. Grid online.`, 'success');
+    markEnergySurge();
+    setClaimBurst({
+      show: true,
+      label: `+${mission.energyReward}% FUEL · +250 BCC`,
+    });
+    addLog(`DIRECTIVE COMPLETE: "${mission.label}" — +${mission.energyReward}% knowledge fuel routed to reactor.`, 'success');
   };
 
   const triggerEmergencyReboot = () => {
@@ -225,6 +232,10 @@ export default function DailyMissions({ state, setState, addLog }: DailyMissions
       });
 
       addLog(prize.logMessage, 'success');
+      if (prize.label.includes('Energy')) {
+        markEnergySurge();
+      }
+      setClaimBurst({ show: true, label: `CLAIMED · ${prize.label}` });
     }, 3200);
   };
 
@@ -239,6 +250,11 @@ export default function DailyMissions({ state, setState, addLog }: DailyMissions
 
   return (
     <div id="missions-room" className="space-y-6">
+      <ClaimBurst
+        show={claimBurst.show}
+        label={claimBurst.label}
+        onDone={() => setClaimBurst((c) => ({ ...c, show: false }))}
+      />
       
       {/* Dynamic Reactor Low Banner */}
       <div className={`p-5 rounded-2xl border-2 backdrop-blur-md relative overflow-hidden flex flex-col md:flex-row items-center justify-between gap-4 transition-all ${
@@ -464,7 +480,7 @@ export default function DailyMissions({ state, setState, addLog }: DailyMissions
                     )}
                   </div>
                   <div>
-                    <span className="text-[10px] text-slate-500 block uppercase font-bold tracking-widest">{mission.category} PORT</span>
+                    <span className="text-[10px] text-slate-500 block uppercase font-bold tracking-widest">{mission.category} OPS</span>
                     <span className={`text-slate-200 ${mission.completed ? 'line-through text-slate-400' : ''}`}>
                       {mission.label}
                     </span>

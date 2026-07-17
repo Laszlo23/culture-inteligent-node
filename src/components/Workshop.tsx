@@ -151,12 +151,15 @@ export default function Workshop({ state, setState, addLog }: WorkshopProps) {
 
   return (
     <div id="workshop-room" className="space-y-6">
+      <div className="rounded-xl border border-fuchsia-500/15 bg-fuchsia-500/5 px-4 py-2.5">
+        <p className="text-[10px] font-mono text-fuchsia-300 tracking-widest uppercase">Mount modules to amplify attention throughput · changes appear in the Reactor</p>
+      </div>
       
       {/* Filters and Header */}
       <div className="flex flex-wrap items-center justify-between gap-4 bg-[#0a0a0c] border border-white/5 p-4 rounded-2xl shadow-xl">
         <div className="flex items-center gap-2">
           <Hammer className="w-5 h-5 text-cyan-400" />
-          <h3 className="font-mono text-sm font-semibold text-slate-100 tracking-wider">HARDWARE MARKETPLACE & ASSEMBLY</h3>
+          <h3 className="font-mono text-sm font-semibold text-slate-100 tracking-wider">HARDWARE BAY · MODULE ASSEMBLY</h3>
         </div>
         
         {/* Filters */}
