@@ -18,6 +18,12 @@ import {
 import { Keypair } from '@solana/web3.js';
 import { Buffer } from 'buffer';
 import { ensureWalletApiSession } from '../lib/api.ts';
+import {
+  connectPhantomWallet,
+  getPhantomProvider,
+  isLikelyMobile,
+  phantomInstallUrl,
+} from '../lib/phantom';
 import { CinematicBackdrop } from './fx';
 
 if (typeof window !== 'undefined' && !window.Buffer) {
@@ -153,25 +159,31 @@ export default function AuthPortal({ onLoginSuccess, autoStart = null }: AuthPor
     setSuccessMsg('');
     setLoading(true);
 
-    const provider = (window as any).solana;
-    if (!provider?.isPhantom) {
-      setErrorMsg(
-        'Phantom not detected. Use Enter with local Devnet wallet — works without an extension.'
-      );
-      setLoading(false);
-      return;
-    }
-
     try {
-      const response = await provider.connect();
-      const address = response.publicKey.toString();
+      const result = await connectPhantomWallet();
+      if (result.status === 'redirected') {
+        setSuccessMsg('Opening in Phantom… approve there, then you’re in.');
+        // Stay loading briefly — page will leave for the deeplink
+        return;
+      }
+      if (result.status === 'unavailable') {
+        setErrorMsg(
+          `${result.reason} Or continue with a local Devnet demo wallet below.`
+        );
+        setLoading(false);
+        return;
+      }
       setSuccessMsg('Phantom connected. Opening Culture Node…');
-      await completeLogin(address, 'extension');
-    } catch (err: any) {
+      await completeLogin(result.address, 'extension');
+    } catch (err: unknown) {
       console.error('Phantom connect failed:', err);
-      setErrorMsg(err?.message || 'Phantom connection was rejected.');
-    } finally {
+      const message = err instanceof Error ? err.message : 'Phantom connection was rejected.';
+      setErrorMsg(message);
       setLoading(false);
+    } finally {
+      if (getPhantomProvider()) {
+        setLoading(false);
+      }
     }
   };
 
@@ -253,8 +265,8 @@ export default function AuthPortal({ onLoginSuccess, autoStart = null }: AuthPor
             {autoStart === 'local' ? 'Entering — attention next…' : "We're here for attention"}
           </h2>
           <p className="text-xs text-slate-400 font-sans mt-2 leading-relaxed">
-            Connect once. Next you prove focused attention in Academy — not empty hashes. Demo
-            wallet · Solana Devnet · nothing of value.
+            Phantom + Solana Devnet. Connect once, then prove attention in Academy — not empty
+            hashes. Mobile? We open Culture Node inside Phantom for you.
           </p>
         </div>
 
@@ -335,42 +347,60 @@ export default function AuthPortal({ onLoginSuccess, autoStart = null }: AuthPor
             <div className="space-y-3">
               <button
                 type="button"
-                onClick={() => createOrUseLocalWallet(Boolean(savedLocalAddress))}
+                onClick={() => void connectPhantom()}
                 disabled={loading}
-                className="w-full py-3.5 rounded-xl font-mono text-xs font-black tracking-wider uppercase flex items-center justify-center gap-2 bg-cyan-500 hover:bg-cyan-400 text-black cursor-pointer disabled:opacity-60"
+                className="w-full py-3.5 rounded-xl font-mono text-xs font-black tracking-wider uppercase flex items-center justify-center gap-2 bg-[#AB9FF2] hover:bg-[#c4baf7] text-black cursor-pointer disabled:opacity-60 shadow-[0_0_28px_rgba(171,159,242,0.35)]"
               >
-                {loading ? (
+                {loading && autoStart === 'phantom' ? (
                   <RefreshCw className="w-4 h-4 animate-spin" />
-                ) : savedLocalAddress ? (
-                  <>
-                    <Key className="w-4 h-4" />
-                    Continue demo wallet ({shortAddr(savedLocalAddress)})
-                  </>
                 ) : (
-                  <>
-                    <Sparkles className="w-4 h-4" />
-                    Continue with a demo wallet
-                  </>
+                  <Link2 className="w-4 h-4" />
                 )}
+                {isLikelyMobile() && !getPhantomProvider()
+                  ? 'Open in Phantom'
+                  : 'Connect Phantom'}
               </button>
               <p className="text-[10px] text-slate-500 font-sans text-center -mt-1">
-                This browser · Devnet · logout clears session keys
+                Solana Devnet ·{' '}
+                <a
+                  href={phantomInstallUrl()}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-violet-300/90 underline-offset-2 hover:underline"
+                >
+                  Get Phantom
+                </a>
+                {isLikelyMobile() ? ' · opens in-app browser' : ' · browser extension'}
               </p>
 
               <button
                 type="button"
-                onClick={connectPhantom}
+                onClick={() => void createOrUseLocalWallet(Boolean(savedLocalAddress))}
                 disabled={loading}
-                className="w-full py-3 rounded-xl bg-white/5 border border-white/10 hover:border-violet-500/40 text-slate-200 font-mono text-xs font-black tracking-wider uppercase flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
+                className="w-full py-3 rounded-xl bg-white/5 border border-white/10 hover:border-cyan-500/40 text-slate-200 font-mono text-xs font-black tracking-wider uppercase flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
               >
-                <Link2 className="w-4 h-4 text-violet-400" />
-                Connect Phantom
+                {loading && autoStart === 'local' ? (
+                  <RefreshCw className="w-4 h-4 animate-spin" />
+                ) : savedLocalAddress ? (
+                  <>
+                    <Key className="w-4 h-4 text-cyan-400" />
+                    Continue demo wallet ({shortAddr(savedLocalAddress)})
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="w-4 h-4 text-cyan-400" />
+                    Demo wallet (no extension)
+                  </>
+                )}
               </button>
+              <p className="text-[10px] text-slate-500 font-sans text-center -mt-1">
+                This browser only · Devnet · logout clears keys
+              </p>
 
               {savedLocalAddress && (
                 <button
                   type="button"
-                  onClick={() => createOrUseLocalWallet(false)}
+                  onClick={() => void createOrUseLocalWallet(false)}
                   disabled={loading}
                   className="w-full py-2 text-[10px] font-mono text-slate-500 hover:text-slate-300 uppercase tracking-wider cursor-pointer"
                 >

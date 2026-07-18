@@ -30,6 +30,7 @@ import {
   ArrowRight,
   EyeOff,
   Layers,
+  Share2,
 } from 'lucide-react';
 
 export type NavDestination =
@@ -50,6 +51,7 @@ export type NavDestination =
   | 'void'
   | 'roadmap'
   | 'field-deck'
+  | 'hook-loop'
   | 'legal-privacy'
   | 'legal-terms'
   | 'legal-disclaimer';
@@ -168,6 +170,12 @@ const ALL: Record<string, NavItem> = {
     label: 'Field Deck',
     hint: 'Physical cards · hunt & claim',
     icon: <Layers className="w-4 h-4" />,
+  },
+  'hook-loop': {
+    id: 'hook-loop',
+    label: 'Hook Loop',
+    hint: 'Meme truths · share to unlock',
+    icon: <Share2 className="w-4 h-4" />,
   },
 };
 
@@ -301,8 +309,8 @@ export default function NavMenu({
 
   const accountIds: NavDestination[] =
     phase === 'ritual'
-      ? ['field-deck']
-      : ['field-deck', 'onboarding', 'partners', 'feedback', 'void'];
+      ? ['hook-loop', 'field-deck']
+      : ['hook-loop', 'field-deck', 'onboarding', 'partners', 'feedback', 'void'];
 
   return (
     <AnimatePresence>

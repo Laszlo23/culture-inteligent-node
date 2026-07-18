@@ -25,6 +25,7 @@ import {
   KPI_ENERGY_PERCENT,
   KPI_EFFICIENCY_BOOST,
 } from '../lib/economy-rewards';
+import { connectPhantomWallet, getPhantomProvider } from '../lib/phantom';
 
 // Ensure Buffer is polyfilled globally for @solana/web3.js
 if (typeof window !== 'undefined' && !window.Buffer) {
@@ -192,27 +193,32 @@ export default function SolanaPortal({ state, setState, addLog }: SolanaPortalPr
     });
   };
 
-  // Connect Phantom/Solflare extension wallet
+  // Connect Phantom — extension, in-app browser, or mobile browse deeplink
   const connectExtension = async () => {
     setIsConnecting(true);
-    const solanaProvider = (window as any).solana;
-
-    if (!solanaProvider || !solanaProvider.isPhantom) {
-      addLog('SOLANA DETECTED STATUS: Phantom Extension is missing or blocked by frame constraints.', 'warn');
-      alert('Phantom Wallet extension not detected on this page. If you have it installed, please open this app in a New Tab to bypass iframe restrictions, or use our fallback "Local Devnet Wallet" which works perfectly right here!');
-      setIsConnecting(false);
-      return;
-    }
-
     try {
-      const response = await solanaProvider.connect();
-      const pubKeyStr = response.publicKey.toString();
-      setWalletAddress(pubKeyStr);
+      const result = await connectPhantomWallet();
+      if (result.status === 'redirected') {
+        addLog('SOLANA: Opening Culture Node inside Phantom…', 'info');
+        return;
+      }
+      if (result.status === 'unavailable') {
+        addLog(`SOLANA: ${result.reason}`, 'warn');
+        alert(
+          `${result.reason}\n\nOr use Local Devnet Wallet below — works in any browser.`
+        );
+        return;
+      }
+      setWalletAddress(result.address);
       setWalletType('extension');
       setLocalKeypair(null);
-      addLog(`SOLANA WALLET CONNECTED: successfully connected to Phantom (${pubKeyStr.slice(0, 8)}...)`, 'success');
-    } catch (err: any) {
-      addLog(`SOLANA WALLET ERROR: Connection refused: ${err.message || err}`, 'warn');
+      addLog(
+        `SOLANA WALLET CONNECTED: Phantom (${result.address.slice(0, 8)}…)`,
+        'success'
+      );
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      addLog(`SOLANA WALLET ERROR: Connection refused: ${message}`, 'warn');
     } finally {
       setIsConnecting(false);
     }
@@ -238,10 +244,12 @@ export default function SolanaPortal({ state, setState, addLog }: SolanaPortalPr
   };
 
   const disconnectWallet = () => {
-    if (walletType === 'extension' && (window as any).solana) {
+    if (walletType === 'extension') {
       try {
-        (window as any).solana.disconnect();
-      } catch (e) {}
+        void getPhantomProvider()?.disconnect();
+      } catch {
+        // ignore
+      }
     }
     setWalletAddress('');
     setWalletType(null);

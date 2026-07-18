@@ -28,7 +28,10 @@ export type AttentionEventName =
   | 'neural_snap_fail'
   | 'hook_mirror_complete'
   | 'field_card_claim'
-  | 'field_card_trade_intent';
+  | 'field_card_trade_intent'
+  | 'hook_loop_view'
+  | 'hook_loop_share'
+  | 'hook_loop_copy';
 
 export type AttentionEvent = {
   name: AttentionEventName;
@@ -54,6 +57,8 @@ export type AttentionSnapshot = {
   hookMirrors: number;
   fieldCardClaims: number;
   fieldCardTradeIntents: number;
+  hookLoopViews: number;
+  hookLoopShares: number;
   eventsLast7d: number;
   uniqueDaysActive: number;
 };
@@ -199,6 +204,8 @@ export function buildAttentionSnapshot(days = 7): AttentionSnapshot {
     hookMirrors: count('hook_mirror_complete'),
     fieldCardClaims: count('field_card_claim'),
     fieldCardTradeIntents: count('field_card_trade_intent'),
+    hookLoopViews: count('hook_loop_view'),
+    hookLoopShares: count('hook_loop_share'),
     eventsLast7d: events.length,
     uniqueDaysActive: dayKeys.size,
   };
@@ -219,6 +226,7 @@ export function formatWeeklySnapshot(
     `Neural Snap pass/fail: ${s.neuralSnapPasses}/${s.neuralSnapFails}`,
     `Hook Mirrors (Proof of Hook Awareness): ${s.hookMirrors}`,
     `Field Deck claims: ${s.fieldCardClaims} · trade intents: ${s.fieldCardTradeIntents}`,
+    `Hook Loop views/shares: ${s.hookLoopViews}/${s.hookLoopShares}`,
     `Spreads: ${s.spreads} · Broadcast shares: ${s.broadcastShares}`,
     `Focus enters: ${s.focusEnters} · ~${s.focusMinutesApprox} focus minutes`,
     `Events logged: ${s.eventsLast7d}`,

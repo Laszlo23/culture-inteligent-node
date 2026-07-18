@@ -16,6 +16,11 @@
   --color-node-amber: #f59e0b;
 }
 
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
 body {
   background-color: var(--color-node-ink);
   background-image:
@@ -24,6 +29,15 @@ body {
   color: #cbd5e1;
   font-family: var(--font-sans);
   overflow-x: hidden;
+  min-height: 100dvh;
+  min-height: 100vh;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+#root {
+  min-height: 100dvh;
+  min-height: 100vh;
 }
 
 h1, h2, .font-display {

@@ -25,7 +25,11 @@ export const CULTURE_BROADCAST = {
     'Not empty hashes. Focused attention → knowledge fuel.',
     'First Spark. Hook Mirror. Zen decide. Then the node.',
     '',
-    'NEW: Hearing Mode — prove attention without looking.',
+    'NEW: Hook Loop — how they hook you into doomscrolling.',
+    'Share a meme-truth. Unlock the next. Perfect loop.',
+    `${BRAND.url}?room=hook-loop`,
+    '',
+    'Also: Hearing Mode — prove attention without looking.',
     `Open: ${HEARING_MODE_URL}`,
     '',
     `${BRAND.product} — ${BRAND.parent}`,
@@ -79,11 +83,12 @@ export function markCultureBroadcastSeen(): void {
 /** Web Share when available; otherwise clipboard. Returns how it was shared. */
 export async function shareCultureText(
   text: string,
-  title = `${BRAND.product} — ${BRAND.parent}`
+  title = `${BRAND.product} — ${BRAND.parent}`,
+  url: string = HEARING_MODE_URL
 ): Promise<'share' | 'clipboard'> {
   if (typeof navigator !== 'undefined' && typeof navigator.share === 'function') {
     try {
-      await navigator.share({ title, text, url: HEARING_MODE_URL });
+      await navigator.share({ title, text, url });
       return 'share';
     } catch (err) {
       // User cancel — fall through only if not AbortError
@@ -92,6 +97,32 @@ export async function shareCultureText(
       }
     }
   }
-  await navigator.clipboard?.writeText(text);
+  await copyTextFallback(text);
   return 'clipboard';
+}
+
+/** Clipboard that works on older Safari / in-app browsers. */
+export async function copyTextFallback(text: string): Promise<void> {
+  if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+    try {
+      await navigator.clipboard.writeText(text);
+      return;
+    } catch {
+      // fall through
+    }
+  }
+  const ta = document.createElement('textarea');
+  ta.value = text;
+  ta.setAttribute('readonly', '');
+  ta.style.position = 'fixed';
+  ta.style.left = '-9999px';
+  ta.style.top = '0';
+  document.body.appendChild(ta);
+  ta.select();
+  ta.setSelectionRange(0, text.length);
+  const ok = document.execCommand('copy');
+  document.body.removeChild(ta);
+  if (!ok) {
+    throw new Error('Clipboard unavailable');
+  }
 }

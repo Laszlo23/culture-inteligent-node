@@ -2,11 +2,11 @@
   "id": "/",
   "name": "Building Culture — Culture Node",
   "short_name": "Culture Node",
-  "description": "Proof of Attention OS — fuel your Solana Devnet node with verified learning. Mind ↔ Machine.",
+  "description": "Proof of Attention OS on Solana — Phantom wallet, First Spark, Hook Loop. Mind ↔ Machine.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
-  "orientation": "portrait-primary",
+  "orientation": "any",
   "background_color": "#020617",
   "theme_color": "#020617",
   "lang": "en",
@@ -54,6 +54,19 @@
       "short_name": "Hear",
       "description": "Ears-first Culture Node — screenless Proof of Attention",
       "url": "/?hear=1",
+      "icons": [
+        {
+          "src": "/icon-192.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
+    },
+    {
+      "name": "Hook Loop",
+      "short_name": "Hook",
+      "description": "Share a hooking truth — unlock the next meme",
+      "url": "/?room=hook-loop",
       "icons": [
         {
           "src": "/icon-192.png",

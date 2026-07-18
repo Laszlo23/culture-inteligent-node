@@ -8,7 +8,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { 
   Zap, Battery, ShieldAlert, Cpu, Hammer, 
   Compass, Bot, Coins, Users, Calendar, 
-  Map, LogIn, LayoutGrid, Award, Ear, Focus, Activity, RefreshCw, User, Trophy, HelpCircle, Bell, Rocket, Menu, Images, X, EyeOff
+  Map, LogIn, LayoutGrid, Award, Ear, Focus, Activity, RefreshCw, User, Trophy, HelpCircle, Bell, Rocket, Menu, Images, X, EyeOff, Share2
 } from 'lucide-react';
 
 import { clearWalletToken, ensureWalletApiSession, getWalletToken } from './lib/api';
@@ -50,10 +50,13 @@ import {
 import FacilitySectorCard from './components/FacilitySectorCard';
 import PersonalHomeHero from './components/PersonalHomeHero';
 import FieldDeckClaim from './components/FieldDeckClaim';
+import HookLoopCampaign from './components/HookLoopCampaign';
 import SoundControls from './components/SoundControls';
 import { useSound } from './lib/sound/SoundContext';
 import { CORE_ATTENTION_SESSIONS } from './content/attention-intelligence';
 import { normalizeCardCode } from './lib/field-deck';
+import { getTruthById } from './lib/hook-loop-campaign';
+import { getPhantomProvider } from './lib/phantom';
 import {
   dismissStory,
   ensureFirstRitualPending,
@@ -333,11 +336,22 @@ export default function App() {
     }
   });
 
+  const [pendingTruthId, setPendingTruthId] = useState<string | null>(() => {
+    if (typeof window === 'undefined') return null;
+    try {
+      const id = new URLSearchParams(window.location.search).get('truth');
+      return getTruthById(id)?.id ?? null;
+    } catch {
+      return null;
+    }
+  });
+
   const [activeRoom, setActiveRoom] = useState<string>(() => {
     if (typeof window === 'undefined') return 'map';
     try {
       const params = new URLSearchParams(window.location.search);
       if (normalizeCardCode(params.get('card'))) return 'field-deck';
+      if (getTruthById(params.get('truth'))) return 'hook-loop';
       const room = params.get('room');
       if (
         room === 'legal-privacy' ||
@@ -346,7 +360,8 @@ export default function App() {
         room === 'treasury' ||
         room === 'lab' ||
         room === 'map' ||
-        room === 'field-deck'
+        room === 'field-deck' ||
+        room === 'hook-loop'
       ) {
         return room;
       }
@@ -636,9 +651,9 @@ export default function App() {
       localStorage.removeItem('solana_local_secret');
       localStorage.removeItem('building_culture_admin');
       clearWalletToken();
-      if (currentUser.walletType === 'extension' && (window as any).solana) {
+      if (currentUser.walletType === 'extension') {
         try {
-          (window as any).solana.disconnect();
+          void getPhantomProvider()?.disconnect();
         } catch {
           // ignore
         }
@@ -985,6 +1000,8 @@ export default function App() {
       roomName = 'Apex Summit — Monthly Top Circle';
     } else if (roomId === 'field-deck') {
       roomName = 'Field Deck — Hunt & Claim';
+    } else if (roomId === 'hook-loop') {
+      roomName = 'Hook Loop — Meme Truths';
     } else {
       roomName = state.rooms.find(r => r.id === roomId)?.name || "Facility Schematic";
     }
@@ -1314,6 +1331,8 @@ export default function App() {
       const allowed: NavDestination[] = [
         'lab',
         'map',
+        'hook-loop',
+        'field-deck',
         'legal-privacy',
         'legal-terms',
         'legal-disclaimer',
@@ -2000,6 +2019,7 @@ export default function App() {
                   leaderboard: 'SECTOR_ARENA',
                   void: 'SECTOR_VOID',
                   'field-deck': 'SECTOR_FIELD',
+                  'hook-loop': 'SECTOR_HOOK',
                   roadmap: 'SECTOR_PATH',
                   onboarding: 'SECTOR_HUB',
                   partners: 'SECTOR_ALLY',
@@ -2076,6 +2096,41 @@ export default function App() {
                   nextStep={navNextStep}
                   onNavigate={(room) => handleNavNavigate(room)}
                 />
+              )}
+
+              {!focusMode && (
+                <motion.div
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="relative overflow-hidden rounded-2xl border border-rose-500/30 bg-gradient-to-r from-rose-950/50 via-[#0a080c]/90 to-amber-950/30 px-4 py-3.5 flex flex-wrap items-center justify-between gap-3"
+                >
+                  <div className="min-w-0 flex items-start gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-rose-500/15 border border-rose-400/40 flex items-center justify-center shrink-0">
+                      <Share2 className="w-4 h-4 text-rose-300" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="font-mono text-[9px] font-black tracking-[0.22em] uppercase text-rose-300/90">
+                        Campaign · Hook Loop
+                      </p>
+                      <p className="mt-0.5 text-sm font-semibold text-white leading-snug">
+                        {SLOGANS.hookLoop}
+                      </p>
+                      <p className="mt-0.5 text-[11px] text-slate-400 leading-relaxed">
+                        {SLOGANS.hookLoopShare}
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPendingTruthId(null);
+                      changeRoom('hook-loop');
+                    }}
+                    className="px-3.5 py-2 rounded-lg bg-rose-500 hover:bg-rose-400 text-black font-mono text-[10px] font-black uppercase tracking-wider cursor-pointer shrink-0"
+                  >
+                    Enter loop
+                  </button>
+                </motion.div>
               )}
 
               {firstRitualPending ? (
@@ -2617,6 +2672,37 @@ export default function App() {
                     </div>
                   </div>
 
+                  {/* Hook Loop — social meme campaign */}
+                  <div className="bg-gradient-to-br from-[#16080e] to-[#080508] border border-rose-500/35 hover:border-rose-400/55 rounded-2xl p-5 shadow-xl flex flex-col justify-between overflow-hidden relative min-h-[210px] transition-all duration-300">
+                    <span className="absolute top-4 right-4 font-mono text-[9px] text-rose-500/60">SECTOR_HOOK</span>
+                    <div>
+                      <div className="flex items-center gap-2 mb-3">
+                        <Share2 className="w-4 h-4 text-rose-300" />
+                        <h4 className="font-sans text-sm font-bold text-white tracking-tight">
+                          Hook Loop
+                        </h4>
+                      </div>
+                      <p className="text-xs text-slate-400 font-sans leading-relaxed">
+                        How they hook you into doomscrolling — fun memes, packed truths. Share one, unlock the next.
+                      </p>
+                    </div>
+                    <div className="mt-5 pt-3.5 border-t border-white/5 flex items-center justify-between gap-3 font-mono text-[11px]">
+                      <span className="border border-rose-500/25 px-2 py-0.5 rounded-lg text-[9px] font-bold tracking-widest uppercase bg-rose-950/30 text-rose-200">
+                        SHARE TO UNLOCK
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setPendingTruthId(null);
+                          changeRoom('hook-loop');
+                        }}
+                        className="px-3.5 py-1.5 bg-rose-500 hover:bg-rose-400 text-black font-black rounded-lg text-[10px] cursor-pointer tracking-wider"
+                      >
+                        OPEN LOOP
+                      </button>
+                    </div>
+                  </div>
+
                   {/* Field Deck — physical cards */}
                   <div className="bg-gradient-to-br from-[#120c08] to-[#080605] border border-amber-500/30 hover:border-amber-400/50 rounded-2xl p-5 shadow-xl flex flex-col justify-between overflow-hidden relative min-h-[210px] transition-all duration-300">
                     <span className="absolute top-4 right-4 font-mono text-[9px] text-amber-500/60">SECTOR_FIELD</span>
@@ -2810,6 +2896,14 @@ export default function App() {
                   }}
                 />
               )}
+              {activeRoom === 'hook-loop' && (
+                <HookLoopCampaign
+                  initialTruthId={pendingTruthId}
+                  addLog={addLog}
+                  onOpenAcademy={() => changeRoom('lab')}
+                  onOpenMap={() => changeRoom('map')}
+                />
+              )}
               {activeRoom === 'partners' && <PartnerProgram state={state} setState={setState} addLog={addLog} />}
               {activeRoom === 'onboarding' && (
                 <OnboardingHub
@@ -2838,6 +2932,7 @@ export default function App() {
                 'feedback',
                 'void',
                 'field-deck',
+                'hook-loop',
                 'partners',
                 'onboarding',
                 'legal-privacy',

@@ -106,6 +106,8 @@ export default function AttentionMetricsPanel({
           <Stat label="Hook Mirrors" value={snap.hookMirrors} />
           <Stat label="Field Deck claims" value={snap.fieldCardClaims} />
           <Stat label="Card trade intents" value={snap.fieldCardTradeIntents} />
+          <Stat label="Hook Loop views" value={snap.hookLoopViews} />
+          <Stat label="Hook Loop shares" value={snap.hookLoopShares} />
           <Stat label="Spreads" value={snap.spreads} />
           <Stat label="Broadcast shares" value={snap.broadcastShares} />
           <Stat label="Events (7d)" value={snap.eventsLast7d} />

@@ -42,6 +42,9 @@ export const SLOGANS = {
   /** Cold-start killer hook */
   thumbBait: 'Name the bait that owns your thumb.',
   thumbBaitSub: 'Two minutes. Then you own the scroll.',
+  /** Social Hook Loop campaign */
+  hookLoop: 'How they hook you into doomscrolling.',
+  hookLoopShare: 'Share a truth. Unlock the next. Perfect loop.',
 } as const;
 
 export type SloganKey = keyof typeof SLOGANS;

@@ -87,22 +87,22 @@ export default function OnboardingModal({
             <>
               <button
                 type="button"
-                onClick={() => (onEnterLocal ? onEnterLocal() : onClose())}
-                className="w-full py-3.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-black font-mono text-xs font-black uppercase tracking-wider inline-flex items-center justify-center gap-2 cursor-pointer shadow-[0_0_32px_rgba(34,211,238,0.35)]"
+                onClick={() => (onEnterPhantom ? onEnterPhantom() : onClose())}
+                className="w-full py-3.5 rounded-xl bg-[#AB9FF2] hover:bg-[#c4baf7] text-black font-mono text-xs font-black uppercase tracking-wider inline-flex items-center justify-center gap-2 cursor-pointer shadow-[0_0_32px_rgba(171,159,242,0.4)]"
               >
-                <Sparkles className="w-4 h-4" />
-                Start First Spark — 2 min
+                <Link2 className="w-4 h-4" />
+                Enter with Phantom — Solana
               </button>
               <p className="text-[10px] text-slate-500 font-sans -mt-1">
-                Free · Devnet practice wallet · logout wipes session keys from this browser
+                Desktop extension or mobile in-app browser · Devnet · then First Spark
               </p>
               <button
                 type="button"
-                onClick={() => (onEnterPhantom ? onEnterPhantom() : onClose())}
-                className="w-full py-2.5 rounded-xl border border-white/12 bg-white/[0.03] hover:border-cyan-400/35 text-slate-300 font-mono text-[11px] font-bold uppercase tracking-wider inline-flex items-center justify-center gap-2 cursor-pointer"
+                onClick={() => (onEnterLocal ? onEnterLocal() : onClose())}
+                className="w-full py-2.5 rounded-xl border border-cyan-400/35 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-100 font-mono text-[11px] font-bold uppercase tracking-wider inline-flex items-center justify-center gap-2 cursor-pointer"
               >
-                <Link2 className="w-3.5 h-3.5 text-violet-400" />
-                Continue with Phantom
+                <Sparkles className="w-3.5 h-3.5" />
+                Demo wallet · First Spark in 2 min
               </button>
               <button
                 type="button"
@@ -110,7 +110,7 @@ export default function OnboardingModal({
                 className="w-full py-2 rounded-xl text-slate-500 hover:text-slate-300 font-mono text-[10px] uppercase tracking-wider inline-flex items-center justify-center gap-1.5 cursor-pointer"
               >
                 <Key className="w-3 h-3" />
-                Demo wallet only
+                Local Devnet wallet only
               </button>
             </>
           )}
