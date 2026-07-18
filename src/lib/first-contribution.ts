@@ -30,6 +30,10 @@ export type FirstContributionRecord = {
   at: string;
   guestId?: string;
   walletAddress?: string;
+  /** Scoring model id (gemini-… or heuristic-…) */
+  model?: string;
+  /** True when Gemini scored via server */
+  liveFeedback?: boolean;
 };
 
 function storage(): Storage | null {

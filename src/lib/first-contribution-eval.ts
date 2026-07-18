@@ -8,8 +8,11 @@ import type { ContributionDims } from './first-contribution';
 
 export type FirstContributionEvalResult = {
   dims: ContributionDims;
+  /** Personalized feedback — should reference something specific they wrote */
   coachLine: string;
   model: string;
+  /** true when Gemini (or server) scored; false for local heuristic */
+  live: boolean;
 };
 
 function clamp(n: number): number {
@@ -45,9 +48,11 @@ export function heuristicFirstContributionEval(answer: string): FirstContributio
         ? 'Clear signal — your curiosity shows. Keep proving what you learn.'
         : 'A start. Say more next time — depth raises your Human Value.',
     model: 'heuristic-v1',
+    live: false,
   };
 }
 
+/** Server-side Gemini score (Node only — never ship the key to the browser). */
 export async function evaluateFirstContribution(input: {
   prompt: string;
   answer: string;
@@ -58,6 +63,7 @@ export async function evaluateFirstContribution(input: {
       dims: { curiosity: 6, creativity: 4, reflection: 3 },
       coachLine: 'Write a bit more — we need a real contribution to measure.',
       model: 'heuristic-short',
+      live: false,
     };
   }
 
@@ -68,18 +74,26 @@ export async function evaluateFirstContribution(input: {
 
   try {
     const ai = new GoogleGenAI({ apiKey });
-    const prompt = `You score a Human Passport first contribution for Building Culture.
+    const prompt = `You are the Building Culture Human Passport coach.
+A person answered a first-contribution prompt. Score honestly and give SPECIFIC feedback.
+
 Prompt: ${input.prompt}
 Answer:
 ${answer.slice(0, 3000)}
 
 Score 0-100 for:
 - curiosity: genuine desire to understand / learn
-- creativity: original framing or making
-- reflection: self-awareness and depth
+- creativity: original framing, making, or novel connection
+- reflection: self-awareness and depth about what changed
+
+coachLine rules:
+- 1–2 sentences, under 220 characters
+- Quote or paraphrase one concrete detail from THEIR answer (not generic praise)
+- Name what to strengthen next (curiosity, creativity, or reflection)
+- Warm, direct, no emojis, no crypto jargon
 
 Respond ONLY JSON:
-{"curiosity":0-100,"creativity":0-100,"reflection":0-100,"coachLine":"one encouraging sentence under 120 chars"}`;
+{"curiosity":0-100,"creativity":0-100,"reflection":0-100,"coachLine":"..."}`;
 
     const response = await ai.models.generateContent({
       model: 'gemini-2.0-flash',
@@ -94,19 +108,63 @@ Respond ONLY JSON:
       reflection?: number;
       coachLine?: string;
     };
+    const coach =
+      typeof parsed.coachLine === 'string' && parsed.coachLine.trim()
+        ? parsed.coachLine.trim().slice(0, 240)
+        : 'Measured. Your Human Passport is starting.';
     return {
       dims: {
         curiosity: clamp(Number(parsed.curiosity) || 0),
         creativity: clamp(Number(parsed.creativity) || 0),
         reflection: clamp(Number(parsed.reflection) || 0),
       },
-      coachLine:
-        typeof parsed.coachLine === 'string' && parsed.coachLine.trim()
-          ? parsed.coachLine.trim().slice(0, 160)
-          : 'Measured. Your Human Passport is starting.',
+      coachLine: coach,
       model: 'gemini-2.0-flash',
+      live: true,
     };
   } catch {
     return heuristicFirstContributionEval(answer);
+  }
+}
+
+/** Browser-safe: call server so Gemini key stays on the host. */
+export async function evaluateFirstContributionViaApi(input: {
+  prompt: string;
+  answer: string;
+}): Promise<FirstContributionEvalResult> {
+  try {
+    const response = await fetch('/api/passport/first-contribution', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        prompt: input.prompt,
+        answer: input.answer,
+      }),
+    });
+    if (!response.ok) {
+      return heuristicFirstContributionEval(input.answer);
+    }
+    const data = (await response.json()) as Partial<FirstContributionEvalResult> & {
+      error?: string;
+    };
+    if (
+      !data.dims ||
+      typeof data.dims.curiosity !== 'number' ||
+      typeof data.coachLine !== 'string'
+    ) {
+      return heuristicFirstContributionEval(input.answer);
+    }
+    return {
+      dims: {
+        curiosity: clamp(data.dims.curiosity),
+        creativity: clamp(data.dims.creativity),
+        reflection: clamp(data.dims.reflection),
+      },
+      coachLine: data.coachLine.slice(0, 240),
+      model: typeof data.model === 'string' ? data.model : 'server',
+      live: data.live !== false && !String(data.model || '').startsWith('heuristic'),
+    };
+  } catch {
+    return heuristicFirstContributionEval(input.answer);
   }
 }

@@ -906,6 +906,31 @@ async function startServer() {
     }
   });
 
+  /**
+   * First Contribution — Gemini scores curiosity / creativity / reflection.
+   * Public (guest cold-start). Key stays server-side; browser must call this.
+   */
+  app.post("/api/passport/first-contribution", async (req, res) => {
+    try {
+      const prompt = String(req.body?.prompt || "").trim();
+      const answer = String(req.body?.answer || "").trim();
+      if (!prompt || !answer) {
+        return res.status(400).json({ error: "prompt and answer required" });
+      }
+      if (answer.length > 4000) {
+        return res.status(400).json({ error: "answer too long" });
+      }
+      const { evaluateFirstContribution } = await import(
+        "./src/lib/first-contribution-eval.ts"
+      );
+      const result = await evaluateFirstContribution({ prompt, answer });
+      return res.json(result);
+    } catch (error: any) {
+      console.error("[passport.first-contribution]", error?.message || error);
+      return res.status(500).json({ error: "first_contribution_failed" });
+    }
+  });
+
   /** Hearing Mode — neural Gemini TTS status */
   app.get("/api/hearing/voice", async (_req, res) => {
     const { neuralTtsReady, HEARING_VOICES } = await import("./src/lib/hearing/gemini-tts.ts");

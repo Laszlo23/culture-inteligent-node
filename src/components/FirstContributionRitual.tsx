@@ -13,7 +13,7 @@ import {
   seedFromFirstContribution,
   type FirstContributionRecord,
 } from '../lib/first-contribution';
-import { evaluateFirstContribution } from '../lib/first-contribution-eval';
+import { evaluateFirstContributionViaApi } from '../lib/first-contribution-eval';
 import { track } from '../lib/attention-metrics';
 import PassportShareCard from './PassportShareCard';
 import { CinematicBackdrop, GlowPulse } from './fx';
@@ -58,7 +58,11 @@ export default function FirstContributionRitual({
     setBusy(true);
     setError(null);
     try {
-      const evalResult = await evaluateFirstContribution({ prompt, answer: trimmed });
+      // Server-side Gemini — browser never sees GEMINI_API_KEY
+      const evalResult = await evaluateFirstContributionViaApi({
+        prompt,
+        answer: trimmed,
+      });
       const scores = seedFromFirstContribution(evalResult.dims);
       const next: FirstContributionRecord = {
         prompt,
@@ -69,6 +73,8 @@ export default function FirstContributionRitual({
         at: new Date().toISOString(),
         guestId: walletAddress ? undefined : ensureGuestId(),
         walletAddress: walletAddress || undefined,
+        model: evalResult.model,
+        liveFeedback: evalResult.live,
       };
       saveFirstContribution(next);
       setRecord(next);
@@ -77,6 +83,8 @@ export default function FirstContributionRitual({
         creativity: scores.creativity,
         contribution: scores.contribution,
         humanValue: scores.humanValue,
+        live: evalResult.live,
+        model: evalResult.model,
       });
       setPhase('reveal');
       onComplete(next);
@@ -192,9 +200,16 @@ export default function FirstContributionRitual({
                 <h2 className="mt-2 font-display text-3xl font-extrabold italic text-white">
                   Human Value: {record.scores.humanValue}
                 </h2>
-                <p className="mt-2 text-sm text-slate-400">{record.coachLine}</p>
-                <p className="mt-1 text-sm text-slate-300">
-                  Interesting. I want to improve this.
+                <div className="mt-4 rounded-xl border border-cyan-400/30 bg-cyan-500/10 px-4 py-3.5">
+                  <p className="font-mono text-[9px] uppercase tracking-widest text-cyan-300/90">
+                    {record.liveFeedback ? 'Coach feedback' : 'Coach feedback · offline'}
+                  </p>
+                  <p className="mt-1.5 text-sm text-slate-100 leading-relaxed">
+                    {record.coachLine}
+                  </p>
+                </div>
+                <p className="mt-3 text-sm text-slate-300">
+                  Interesting. Improve this with the next Proof of Attention.
                 </p>
               </div>
 
@@ -221,6 +236,10 @@ export default function FirstContributionRitual({
                   </div>
                 ))}
               </div>
+              <p className="text-[10px] font-mono text-slate-500 uppercase tracking-wider">
+                AI read · curiosity {record.dims.curiosity} · creativity {record.dims.creativity}{' '}
+                · reflection {record.dims.reflection}
+              </p>
 
               <PassportShareCard name={name} scores={record.scores} />
 

@@ -33,13 +33,14 @@ describe('seedFromFirstContribution', () => {
 });
 
 describe('heuristicFirstContributionEval', () => {
-  it('rewards reflective language', () => {
+  it('rewards reflective language and marks offline', () => {
     const thin = heuristicFirstContributionEval('I learned stuff yesterday at work.');
     const rich = heuristicFirstContributionEval(
       'I learned why attention residues after task-switching matter. I used to wonder why focus felt broken. Reflecting on that changed my perspective — I batch deep work now because I finally understood the cost.'
     );
     assert.ok(rich.dims.curiosity >= thin.dims.curiosity);
     assert.ok(rich.dims.reflection >= thin.dims.reflection);
+    assert.equal(rich.live, false);
   });
 });
 
