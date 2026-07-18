@@ -106,14 +106,17 @@ export function buildMemberInvitePost(opts: {
   const who = opts.displayName?.trim() || `Builder_${opts.walletAddress.slice(0, 4)}`;
   const code = opts.walletAddress.slice(0, 6);
   return [
-    `${who} invited me to the Human Economy.`,
+    `${who} invited you to the Human Economy.`,
     '',
     SLOGANS.hero,
     SLOGANS.equation,
     '',
     'Build a Human Passport — reputation from learning, creating, contributing.',
     '',
-    `${BRAND.url}?invite=${code}`,
+    `${BRAND.url}?invite=${code}&fc=1`,
+    '',
+    'Telegram · https://t.me/+4zFH7-2tyW0yOTBk',
+    'Discord · https://discord.gg/geUpHt3eSb',
   ].join('\n');
 }
 

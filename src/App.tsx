@@ -90,6 +90,11 @@ import {
   hasSpreadLove,
   markSpreadLove,
 } from './lib/human-passport';
+import {
+  captureInviteFromUrl,
+  inviteWelcomeLine,
+  markInviteClaimed,
+} from './lib/community-invite';
 import { sendAttentionProofMemo } from './lib/poa-chain';
 import { BRAND, SLOGANS } from './lib/brand-slogans';
 import {
@@ -345,6 +350,11 @@ export default function App() {
     } catch {
       return null;
     }
+  });
+
+  const [inviteCode, setInviteCode] = useState<string | null>(() => {
+    if (typeof window === 'undefined') return null;
+    return captureInviteFromUrl().record?.code ?? null;
   });
 
   const [activeRoom, setActiveRoom] = useState<string>(() => {
@@ -789,6 +799,15 @@ export default function App() {
   };
 
   // Helper log — warns once-forever; success can re-toast after cooldown; meta + momentum tick here
+  useEffect(() => {
+    const { record, fresh } = captureInviteFromUrl();
+    if (!record?.code) return;
+    setInviteCode(record.code);
+    if (fresh) {
+      track('invite_land', { code: record.code });
+    }
+  }, []);
+
   const addLog = (message: string, type: 'info' | 'success' | 'warn' | 'system') => {
     const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
     setLogs((prev) => [...prev, { timestamp: timeStr, message, type }]);
@@ -1540,8 +1559,13 @@ export default function App() {
             walletAddress={currentUser.walletAddress}
             walletType={currentUser.walletType === 'extension' ? 'extension' : 'local'}
             displayName={currentUser.username}
+            inviteCode={inviteCode}
             addLog={addLog}
             onClaimed={({ invited }) => {
+              if (inviteCode) {
+                markInviteClaimed();
+                track('invite_claim', { code: inviteCode });
+              }
               setPassportPending(false);
               setState((prev) => ({
                 ...prev,
@@ -1551,7 +1575,9 @@ export default function App() {
                     title: 'Human Passport',
                     message: invited
                       ? 'Passport ready — you invited a builder. Start Proof of Attention when ready.'
-                      : 'Passport ready. Prove attention to grow your Knowledge Score.',
+                      : inviteCode
+                        ? `Passport ready — welcome from builder ${inviteCode}. Prove attention next.`
+                        : 'Passport ready. Prove attention to grow your Knowledge Score.',
                     timestamp: new Date().toLocaleTimeString([], {
                       hour: '2-digit',
                       minute: '2-digit',
@@ -1563,7 +1589,9 @@ export default function App() {
                 ],
               }));
               addLog(
-                'PASSPORT: Workspace open. Own your digital reputation — prove attention next.',
+                inviteCode
+                  ? `PASSPORT: Welcome via invite ${inviteCode}. Prove attention, then pass the light on.`
+                  : 'PASSPORT: Workspace open. Own your digital reputation — prove attention next.',
                 'system'
               );
             }}

@@ -4,7 +4,7 @@
 **Product:** Human Economy / Human Passport · **Company:** Building Culture  
 **Workspace:** Culture Node · **Live:** https://mining.buildingcultureid.space/  
 
-Related: [HUMAN_ECONOMY.md](./HUMAN_ECONOMY.md) · [INVESTOR_PARTNER_BRIEF.md](./INVESTOR_PARTNER_BRIEF.md) · [PARTNER_ATTENTION_SESSION.md](./PARTNER_ATTENTION_SESSION.md)
+Related: [HUMAN_ECONOMY.md](./HUMAN_ECONOMY.md) · [COMMUNITY.md](./COMMUNITY.md) · [FARCASTER_GROWTH.md](./FARCASTER_GROWTH.md) · [INVESTOR_PARTNER_BRIEF.md](./INVESTOR_PARTNER_BRIEF.md) · [PARTNER_ATTENTION_SESSION.md](./PARTNER_ATTENTION_SESSION.md)
 
 ---
 

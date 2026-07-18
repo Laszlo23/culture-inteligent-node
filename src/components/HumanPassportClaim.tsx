@@ -14,15 +14,23 @@ import {
   hasSpreadLove,
   markSpreadLove,
 } from '../lib/human-passport';
+import {
+  buildCommunityInviteCast,
+  COMMUNITY_LINKS,
+  inviteWelcomeLine,
+} from '../lib/community-invite';
 import { copyTextFallback } from '../lib/culture-broadcast';
 import { sendAttentionProofMemo } from '../lib/poa-chain';
+import { track } from '../lib/attention-metrics';
 import { CinematicBackdrop } from './fx';
 import { useSound } from '../lib/sound/SoundContext';
+import FarcasterCastButton from './FarcasterCastButton';
 
 type Props = {
   walletAddress: string;
   walletType: 'extension' | 'local';
   displayName?: string;
+  inviteCode?: string | null;
   addLog: (message: string, type: 'info' | 'success' | 'warn' | 'system') => void;
   onClaimed: (opts: { invited: boolean }) => void;
   onStartProof: () => void;
@@ -32,6 +40,7 @@ export default function HumanPassportClaim({
   walletAddress,
   walletType,
   displayName,
+  inviteCode,
   addLog,
   onClaimed,
   onStartProof,
@@ -43,6 +52,8 @@ export default function HumanPassportClaim({
   const [invited, setInvited] = useState(() => hasSpreadLove(walletAddress));
 
   const short = `${walletAddress.slice(0, 4)}…${walletAddress.slice(-4)}`;
+  const welcome = inviteWelcomeLine(inviteCode);
+  const castPack = buildCommunityInviteCast({ displayName, walletAddress });
 
   const claim = async () => {
     setBusy(true);
@@ -87,6 +98,7 @@ export default function HumanPassportClaim({
       const first = !hasSpreadLove(walletAddress);
       markSpreadLove(walletAddress);
       setInvited(true);
+      track('invite_spread', { how: 'clipboard', first });
       play('soft');
       addLog(
         first
@@ -110,6 +122,12 @@ export default function HumanPassportClaim({
         <p className="font-mono text-[9px] font-black tracking-[0.28em] uppercase text-cyan-400">
           {BRAND.passport}
         </p>
+
+        {welcome && phase === 'claim' && (
+          <p className="mt-3 rounded-xl border border-amber-400/25 bg-amber-950/30 px-3 py-2.5 text-[12px] text-amber-100/90 leading-relaxed">
+            {welcome}
+          </p>
+        )}
 
         {phase === 'claim' ? (
           <>
@@ -156,8 +174,7 @@ export default function HumanPassportClaim({
               Passport ready
             </h1>
             <p className="mt-2 text-sm text-slate-400 leading-relaxed">
-              {SLOGANS.ownership} Next: prove attention — a short challenge that updates your
-              Knowledge Score.
+              {SLOGANS.ownership} Next: prove attention — then invite one builder so the community grows.
             </p>
             <button
               type="button"
@@ -170,14 +187,50 @@ export default function HumanPassportClaim({
               Start Proof of Attention
               <ArrowRight className="w-4 h-4" />
             </button>
-            <button
-              type="button"
-              onClick={() => void invite()}
-              className="mt-3 w-full py-2.5 rounded-xl border border-white/12 text-slate-300 font-mono text-[10px] font-bold uppercase tracking-wider cursor-pointer inline-flex items-center justify-center gap-2"
-            >
-              <Share2 className="w-3.5 h-3.5" />
-              {invited ? 'Copy invite again' : 'Invite a builder'}
-            </button>
+            <div className="mt-3 grid gap-2 sm:grid-cols-2">
+              <FarcasterCastButton
+                text={castPack.text}
+                embedUrl={castPack.embedUrl}
+                label="Cast invite"
+                variant="primary"
+                onCast={() => {
+                  const first = !hasSpreadLove(walletAddress);
+                  markSpreadLove(walletAddress);
+                  setInvited(true);
+                  track('invite_spread', { how: 'farcaster', first });
+                  addLog('PASSPORT: Invite cast opened — rain on Farcaster.', 'success');
+                }}
+                className="w-full"
+              />
+              <button
+                type="button"
+                onClick={() => void invite()}
+                className="w-full py-3 rounded-xl border border-white/12 text-slate-300 font-mono text-[10px] font-bold uppercase tracking-wider cursor-pointer inline-flex items-center justify-center gap-2"
+              >
+                <Share2 className="w-3.5 h-3.5" />
+                {invited ? 'Copy again' : 'Copy invite'}
+              </button>
+            </div>
+            <p className="mt-3 text-[11px] text-slate-500 text-center leading-relaxed">
+              Community homes:{' '}
+              <a
+                href={COMMUNITY_LINKS.telegram}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-sky-400/90 hover:text-sky-300 underline-offset-2 hover:underline"
+              >
+                Telegram
+              </a>
+              {' · '}
+              <a
+                href={COMMUNITY_LINKS.discord}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-indigo-300/90 hover:text-indigo-200 underline-offset-2 hover:underline"
+              >
+                Discord
+              </a>
+            </p>
             <button
               type="button"
               onClick={() => onClaimed({ invited })}

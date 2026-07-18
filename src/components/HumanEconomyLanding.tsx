@@ -2,7 +2,7 @@
  * Public landing — Human Economy mission, loop, pricing.
  */
 
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { motion } from 'motion/react';
 import { ArrowRight, Sparkles } from 'lucide-react';
 import { BRAND, SLOGANS } from '../lib/brand-slogans';
@@ -13,6 +13,11 @@ import {
   joinWaitlist,
   type PricingTierId,
 } from '../lib/human-economy';
+import {
+  COMMUNITY_LINKS,
+  captureInviteFromUrl,
+  inviteWelcomeLine,
+} from '../lib/community-invite';
 import { CinematicBackdrop } from './fx';
 import FarcasterCastButton, { FarcasterCastDeck } from './FarcasterCastButton';
 
@@ -24,6 +29,12 @@ type Props = {
 export default function HumanEconomyLanding({ onBuildPassport, onContinueSecure }: Props) {
   const economyRef = useRef<HTMLElement | null>(null);
   const [waitlistMsg, setWaitlistMsg] = useState<string | null>(null);
+  const [inviteLine, setInviteLine] = useState<string | null>(null);
+
+  useEffect(() => {
+    const { record } = captureInviteFromUrl();
+    setInviteLine(inviteWelcomeLine(record?.code) );
+  }, []);
 
   const scrollExplore = () => {
     economyRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -57,6 +68,15 @@ export default function HumanEconomyLanding({ onBuildPassport, onContinueSecure 
           >
             {BRAND.parent} · {BRAND.product}
           </motion.p>
+          {inviteLine && (
+            <motion.p
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="mt-4 max-w-xl rounded-xl border border-amber-400/25 bg-amber-950/35 px-4 py-3 text-sm text-amber-50/95 leading-relaxed"
+            >
+              {inviteLine}
+            </motion.p>
+          )}
           <motion.h1
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
@@ -251,6 +271,36 @@ export default function HumanEconomyLanding({ onBuildPassport, onContinueSecure 
         <footer className="px-5 md:px-10 py-12 border-t border-white/5 max-w-4xl mx-auto text-center">
           <p className="font-display text-lg italic text-white">{BRAND.parent}</p>
           <p className="mt-2 text-sm text-slate-500">{SLOGANS.ownership}</p>
+          <p className="mt-4 flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-[11px] font-mono text-slate-500">
+            <a
+              href={COMMUNITY_LINKS.telegram}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hover:text-sky-300 transition-colors"
+            >
+              Telegram
+            </a>
+            <a
+              href={COMMUNITY_LINKS.discord}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hover:text-indigo-300 transition-colors"
+            >
+              Discord
+            </a>
+            <a
+              href={COMMUNITY_LINKS.hookLoop}
+              className="hover:text-rose-300 transition-colors"
+            >
+              Hook Loop
+            </a>
+            <a
+              href={COMMUNITY_LINKS.hearing}
+              className="hover:text-cyan-300 transition-colors"
+            >
+              Hearing Mode
+            </a>
+          </p>
           <button
             type="button"
             onClick={onContinueSecure || onBuildPassport}

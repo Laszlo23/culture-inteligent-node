@@ -32,7 +32,10 @@ export type AttentionEventName =
   | 'hook_loop_view'
   | 'hook_loop_share'
   | 'hook_loop_copy'
-  | 'farcaster_cast';
+  | 'farcaster_cast'
+  | 'invite_land'
+  | 'invite_claim'
+  | 'invite_spread';
 
 export type AttentionEvent = {
   name: AttentionEventName;
