@@ -68,3 +68,38 @@ export const tollPayments = pgTable('toll_payments', {
   slot: text('slot'),
   createdAt: timestamp('created_at').defaultNow(),
 });
+
+/**
+ * The Void — anonymous asks. Intentionally NO user_id / wallet / IP columns.
+ * Anonymity proof: schema + /api/void/* rejects Authorization headers.
+ */
+export const voidAsks = pgTable('void_asks', {
+  id: text('id').primaryKey(),
+  body: text('body').notNull(),
+  contentHash: text('content_hash').notNull(),
+  createdAt: timestamp('created_at').defaultNow(),
+  replyCount: integer('reply_count').default(0).notNull(),
+});
+
+export const voidReplies = pgTable('void_replies', {
+  id: text('id').primaryKey(),
+  askId: text('ask_id').notNull(),
+  body: text('body').notNull(),
+  contentHash: text('content_hash').notNull(),
+  createdAt: timestamp('created_at').defaultNow(),
+});
+
+/**
+ * ZKPassport-bound soulbound reputation — nullifier hash only (no PII).
+ */
+export const zkBindings = pgTable('zk_bindings', {
+  nullifierHash: text('nullifier_hash').primaryKey(),
+  walletAddress: text('wallet_address').notNull().unique(),
+  zkProvider: text('zk_provider').notNull(),
+  verifiedAt: timestamp('verified_at').notNull(),
+  boundAt: timestamp('bound_at').defaultNow().notNull(),
+  mintAddress: text('mint_address'),
+  mintSignature: text('mint_signature'),
+  badgePda: text('badge_pda'),
+  soulboundMinted: boolean('soulbound_minted').default(false).notNull(),
+});

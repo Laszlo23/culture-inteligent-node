@@ -177,6 +177,27 @@ export default function Leaderboard({ state, setState, addLog }: LeaderboardProp
 
   return (
     <div id="leaderboard-room" className="space-y-6">
+      <div className="relative overflow-hidden rounded-2xl border border-amber-400/20 min-h-[150px] sm:min-h-[180px]">
+        <img
+          src="/atmosphere/arena-hero.png"
+          alt=""
+          className="absolute inset-0 w-full h-full object-cover brightness-[0.42]"
+          draggable={false}
+        />
+        <div className="absolute inset-0 bg-gradient-to-r from-black via-black/70 to-transparent" />
+        <div className="relative z-10 p-5 sm:p-6 max-w-xl">
+          <span className="text-[9px] font-mono tracking-[0.22em] uppercase text-amber-300/90">
+            Attention Arena · AI Judge
+          </span>
+          <h2 className="mt-1 text-xl sm:text-2xl font-semibold text-white tracking-tight font-sans">
+            Call the shot. Own the receipt.
+          </h2>
+          <p className="mt-1.5 text-xs text-slate-300/95 font-sans leading-relaxed">
+            Season rankings run on Proof of Attention. Link your handle — if someone tags you, you can get caught.
+          </p>
+        </div>
+      </div>
+
 
       {/* Rhythmic Banner with Season and Live Countdown */}
       <div className="bg-gradient-to-br from-[#120e0a] to-[#0a0705] border border-amber-500/20 rounded-2xl p-6 shadow-xl relative overflow-hidden">

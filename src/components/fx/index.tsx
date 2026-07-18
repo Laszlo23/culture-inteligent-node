@@ -1,5 +1,5 @@
 /**
- * Living OS FX primitives — cinematic video atmosphere + motion helpers.
+ * Living OS FX primitives — quiet cinematic atmosphere + motion helpers.
  */
 
 import React, { useEffect, useState } from 'react';
@@ -9,7 +9,7 @@ import { CinematicBackdrop, type AtmosphereVariant } from './CinematicBackdrop';
 export { CinematicBackdrop } from './CinematicBackdrop';
 export type { AtmosphereVariant } from './CinematicBackdrop';
 
-/** Facility-wide atmosphere (video + CSS field). */
+/** Facility-wide atmosphere (single video plate + soft CSS field). */
 export function AmbientField({
   className = '',
   variant = 'facility',

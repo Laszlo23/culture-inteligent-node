@@ -11,7 +11,9 @@ import {
   Settings2, Rocket, ArrowRight, Share2, Network, Compass,
   Flame, BookOpen, ShieldAlert, Terminal, CheckSquare, Globe, Coins
 } from 'lucide-react';
-import { GameState, ProofOfAttention } from '../types';
+import { GameState, SoulboundReputation } from '../types';
+import SoulboundRitualOverlay from './SoulboundRitualOverlay';
+import { Keypair } from '@solana/web3.js';
 
 interface OnboardingHubProps {
   state: GameState;
@@ -27,6 +29,12 @@ export default function OnboardingHub({ state, setState, addLog, onEnterApp }: O
   const [partnerTokenType, setPartnerTokenType] = useState<'meme' | 'utility' | 'nft'>('utility');
   const [subTab, setSubTab] = useState<'economy' | 'proofs' | 'fairness' | 'partners'>('economy');
   const [mintingPoaId, setMintingPoaId] = useState<string | null>(null);
+  const [showSoulboundRitual, setShowSoulboundRitual] = useState(false);
+  const [ritualWallet, setRitualWallet] = useState<{
+    address: string;
+    walletType: 'extension' | 'local';
+    localKeypair: Keypair | null;
+  } | null>(null);
 
   // Live Oracle Feed State for Transparency Page
   const [oracleLogs, setOracleLogs] = useState<Array<{ id: string; node: string; action: string; reward: string; time: string }>>([
@@ -66,13 +74,57 @@ export default function OnboardingHub({ state, setState, addLog, onEnterApp }: O
     return () => clearInterval(timer);
   }, []);
 
-  const contractAddress = "Devnet attestation + upcoming SPL mint (no EVM contract)";
+  const contractAddress =
+    'ZKPassport-gated soulbound · Token-2022 NonTransferable (Devnet)';
 
   const handleCopyAddress = () => {
     navigator.clipboard.writeText("https://github.com/Laszlo23/culture-inteligent-node");
     setCopied(true);
     addLog("COPIED: Building Culture repo URL (BCC SPL mint coming — rewards are facility CP until then).", "success");
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const openSoulboundRitual = () => {
+    try {
+      const sessionRaw = localStorage.getItem('solana_current_user_session_v1');
+      const sessionUser = sessionRaw ? JSON.parse(sessionRaw) : null;
+      if (!sessionUser?.walletAddress) {
+        addLog('SOULBOUND: Connect a wallet first.', 'warn');
+        return;
+      }
+      let localKeypair: Keypair | null = null;
+      if (sessionUser.walletType === 'local') {
+        const secret = localStorage.getItem('solana_local_secret');
+        if (secret) {
+          localKeypair = Keypair.fromSecretKey(Uint8Array.from(JSON.parse(secret)));
+        }
+      }
+      setRitualWallet({
+        address: sessionUser.walletAddress,
+        walletType: sessionUser.walletType === 'extension' ? 'extension' : 'local',
+        localKeypair,
+      });
+      setShowSoulboundRitual(true);
+    } catch {
+      addLog('SOULBOUND: Could not read wallet session.', 'warn');
+    }
+  };
+
+  const onSoulboundComplete = (rep: SoulboundReputation) => {
+    setState((prev) => ({
+      ...prev,
+      soulboundReputation: rep,
+      proofOfAttentions: (prev.proofOfAttentions || []).map((p) =>
+        p.walletAddress === rep.boundWallet ||
+        (ritualWallet && p.walletAddress.includes(ritualWallet.address.slice(0, 8)))
+          ? {
+              ...p,
+              soulboundMinted: true,
+              soulbound: rep,
+            }
+          : p
+      ),
+    }));
   };
 
   // Prefer real agent-verified proofs; placeholder only when empty
@@ -93,7 +145,8 @@ export default function OnboardingHub({ state, setState, addLog, onEnterApp }: O
           },
         ];
 
-  const handleMintPoa = async (id: string) => {
+  /** Memo attest = PoA activity receipt (not soulbound). */
+  const handleAttestPoa = async (id: string) => {
     const target = (state.proofOfAttentions || []).find((p) => p.id === id);
     if (!target) {
       addLog(
@@ -102,7 +155,7 @@ export default function OnboardingHub({ state, setState, addLog, onEnterApp }: O
       );
       return;
     }
-    if (target.minted && target.signature) {
+    if ((target.attested || target.minted) && target.signature) {
       addLog(
         `Already attested: https://solscan.io/tx/${target.signature}?cluster=devnet`,
         'info'
@@ -122,8 +175,7 @@ export default function OnboardingHub({ state, setState, addLog, onEnterApp }: O
         ensureWalletApiSession,
         getWalletToken,
       } = await import('../lib/api.ts');
-      const { Keypair } = await import('@solana/web3.js');
-      let localKeypair: InstanceType<typeof Keypair> | null = null;
+      let localKeypair: Keypair | null = null;
       if (sessionUser.walletType === 'local') {
         const secret = localStorage.getItem('solana_local_secret');
         if (secret) {
@@ -138,7 +190,7 @@ export default function OnboardingHub({ state, setState, addLog, onEnterApp }: O
         });
       }
       const memo = `poa:${target.sessionId || id}:${target.score ?? 0}`;
-      addLog('ATTEST: Broadcasting Devnet memo for PoA…', 'info');
+      addLog('ATTEST: Broadcasting Devnet memo for PoA (not soulbound)…', 'info');
       const signature = await sendPoaMemoAttestation({
         walletAddress: sessionUser.walletAddress,
         walletType: sessionUser.walletType || 'local',
@@ -154,11 +206,13 @@ export default function OnboardingHub({ state, setState, addLog, onEnterApp }: O
       setState((prev) => ({
         ...prev,
         proofOfAttentions: (prev.proofOfAttentions || []).map((p) =>
-          p.id === id ? { ...p, minted: true, signature, attestPending: false } : p
+          p.id === id
+            ? { ...p, minted: true, attested: true, signature, attestPending: false }
+            : p
         ),
         credits: prev.credits + 50,
       }));
-      addLog(`POA ATTESTED: https://solscan.io/tx/${signature}?cluster=devnet`, 'success');
+      addLog(`POA ATTESTED (memo): https://solscan.io/tx/${signature}?cluster=devnet`, 'success');
     } catch (err: any) {
       addLog(`POA ATTEST FAILED: ${err?.message || err}`, 'warn');
     } finally {
@@ -452,9 +506,17 @@ export default function OnboardingHub({ state, setState, addLog, onEnterApp }: O
                       <div className="flex justify-between items-start">
                         <span className="text-[9px] text-slate-500 font-bold uppercase block">POA ID: #{p.id.toUpperCase()}</span>
                         <span className={`text-[8px] font-bold border px-1.5 py-0.5 rounded tracking-widest uppercase ${
-                          p.minted ? 'bg-emerald-950/40 border-emerald-500/40 text-emerald-400' : 'bg-cyan-950/40 border-cyan-500/40 text-cyan-400'
+                          p.soulboundMinted || state.soulboundReputation?.soulboundMinted
+                            ? 'bg-emerald-950/40 border-emerald-500/40 text-emerald-400'
+                            : p.attested || p.minted
+                              ? 'bg-amber-950/40 border-amber-500/40 text-amber-300'
+                              : 'bg-cyan-950/40 border-cyan-500/40 text-cyan-400'
                         }`}>
-                          {p.minted ? '✓ SOULBOUND MINTED' : 'READY TO MINT'}
+                          {p.soulboundMinted || state.soulboundReputation?.soulboundMinted
+                            ? '✓ SOULBOUND · ZK'
+                            : p.attested || p.minted
+                              ? 'ATTESTED (MEMO)'
+                              : 'ZK GATE'}
                         </span>
                       </div>
 
@@ -485,19 +547,31 @@ export default function OnboardingHub({ state, setState, addLog, onEnterApp }: O
                     <div className="mt-5 pt-3 border-t border-white/5 flex justify-between items-center text-[10px]">
                       <span className="text-slate-500">{p.timestamp}</span>
                       
-                      {p.minted ? (
-                        <div className="text-emerald-400 font-bold flex items-center gap-1">
-                          <Check className="w-4 h-4" /> SBT MINTED
-                        </div>
-                      ) : (
-                        <button
-                          onClick={() => handleMintPoa(p.id)}
-                          disabled={mintingPoaId === p.id}
-                          className="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-black font-black uppercase text-[10px] tracking-wider rounded-lg transition-colors cursor-pointer"
-                        >
-                          {mintingPoaId === p.id ? 'MINTING SBT...' : 'MINT SOULBOUND NFT'}
-                        </button>
-                      )}
+                      <div className="flex flex-wrap gap-2 justify-end">
+                        {!(p.attested || p.minted) && p.id !== 'poa_demo' && (
+                          <button
+                            type="button"
+                            onClick={() => void handleAttestPoa(p.id)}
+                            disabled={mintingPoaId === p.id}
+                            className="px-3 py-2 border border-white/15 text-slate-300 font-bold uppercase text-[10px] tracking-wider rounded-lg cursor-pointer hover:border-amber-400/40"
+                          >
+                            {mintingPoaId === p.id ? 'ATTESTING…' : 'ATTEST MEMO'}
+                          </button>
+                        )}
+                        {p.soulboundMinted || state.soulboundReputation?.soulboundMinted ? (
+                          <div className="text-emerald-400 font-bold flex items-center gap-1 px-2">
+                            <Check className="w-4 h-4" /> SOULBOUND SEALED
+                          </div>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={openSoulboundRitual}
+                            className="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-black font-black uppercase text-[10px] tracking-wider rounded-lg transition-colors cursor-pointer"
+                          >
+                            SEAL SOULBOUND · ZK
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -759,6 +833,17 @@ export default function OnboardingHub({ state, setState, addLog, onEnterApp }: O
         </motion.div>
       </AnimatePresence>
 
+      {ritualWallet && (
+        <SoulboundRitualOverlay
+          open={showSoulboundRitual}
+          onClose={() => setShowSoulboundRitual(false)}
+          walletAddress={ritualWallet.address}
+          walletType={ritualWallet.walletType}
+          localKeypair={ritualWallet.localKeypair}
+          addLog={addLog}
+          onComplete={onSoulboundComplete}
+        />
+      )}
     </div>
   );
 }

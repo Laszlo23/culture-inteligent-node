@@ -87,7 +87,7 @@ export default function InstallPrompt() {
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: 12 }}
-          className="fixed bottom-[max(4.5rem,env(safe-area-inset-bottom))] left-3 right-3 sm:left-auto sm:right-4 sm:w-80 z-[85] pointer-events-auto"
+          className="fixed bottom-[max(8.5rem,env(safe-area-inset-bottom))] md:bottom-[max(4.5rem,env(safe-area-inset-bottom))] left-3 right-3 sm:left-auto sm:right-4 sm:w-80 z-[85] pointer-events-auto"
         >
           <div className="rounded-2xl border border-cyan-500/30 bg-[#0a0a0c]/96 backdrop-blur-md shadow-xl p-4">
             <div className="flex items-start gap-3">

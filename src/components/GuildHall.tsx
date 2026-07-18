@@ -1,167 +1,494 @@
 /**
- * @license
- * SPDX-License-Identifier: Apache-2.0
+ * Community · Apex Summit — monthly chamber for the top of the top + faction houses.
  */
 
-import React from 'react';
-import { motion } from 'motion/react';
-import { Shield, Users, Trophy, ChevronRight, Sparkles, Activity, Check } from 'lucide-react';
-import { GameState, Guild } from '../types';
+import React, { useEffect, useMemo, useState } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
+import {
+  Shield,
+  Users,
+  Trophy,
+  Crown,
+  Sparkles,
+  Check,
+  Timer,
+  Star,
+  Lock,
+  ChevronRight,
+  Radio,
+} from 'lucide-react';
+import { GameState } from '../types';
+import {
+  buildApexCircle,
+  currentApexMonth,
+  msUntil,
+  qualifyForApex,
+  readApexClaim,
+  writeApexClaim,
+} from '../lib/apex-summit';
 
 interface GuildHallProps {
   state: GameState;
   setState: React.Dispatch<React.SetStateAction<GameState>>;
   addLog: (message: string, type: 'info' | 'success' | 'warn' | 'system') => void;
+  currentUser?: { username: string } | null;
+  onOpenAcademy?: () => void;
+  onOpenLeaderboard?: () => void;
 }
 
-export default function GuildHall({ state, setState, addLog }: GuildHallProps) {
+export default function GuildHall({
+  state,
+  setState,
+  addLog,
+  currentUser,
+  onOpenAcademy,
+  onOpenLeaderboard,
+}: GuildHallProps) {
+  const month = useMemo(() => currentApexMonth(), []);
+  const [countdown, setCountdown] = useState(() => msUntil(month.closesAt));
+  const [seated, setSeated] = useState(() => readApexClaim(month.id));
+  const [showHouses, setShowHouses] = useState(false);
+
+  const academyCompleted = useMemo(() => {
+    try {
+      return (JSON.parse(localStorage.getItem('kronos_academy_completed') || '[]') as string[])
+        .length;
+    } catch {
+      return 0;
+    }
+  }, [state.energy]);
+
+  const outerSealed = useMemo(() => {
+    try {
+      const raw = localStorage.getItem('culture_outer_circuit_v1');
+      if (!raw) return false;
+      return !!(JSON.parse(raw) as { sealed?: boolean }).sealed;
+    } catch {
+      return false;
+    }
+  }, []);
+
+  const qual = useMemo(
+    () =>
+      qualifyForApex({
+        energy: state.energy,
+        miningPower: state.miningPower,
+        efficiency: state.efficiency,
+        academyCompleted,
+        guildSelected: state.guilds.some((g) => g.selected),
+        outerSealed,
+      }),
+    [
+      state.energy,
+      state.miningPower,
+      state.efficiency,
+      academyCompleted,
+      state.guilds,
+      outerSealed,
+    ]
+  );
+
+  const activeGuild = state.guilds.find((g) => g.selected);
+  const handle = currentUser?.username || 'You';
+
+  const circle = useMemo(
+    () =>
+      buildApexCircle(month.id, {
+        handle,
+        score: qual.score,
+        faction: activeGuild?.name || 'Independent',
+        seated: seated && qual.tier === 'apex',
+      }),
+    [month.id, handle, qual.score, qual.tier, activeGuild?.name, seated]
+  );
+
+  useEffect(() => {
+    const t = setInterval(() => setCountdown(msUntil(month.closesAt)), 1000);
+    return () => clearInterval(t);
+  }, [month.closesAt]);
 
   const selectGuild = (guildId: string) => {
-    setState(prev => {
-      const updatedGuilds = prev.guilds.map(g => ({
+    setState((prev) => {
+      const updatedGuilds = prev.guilds.map((g) => ({
         ...g,
-        selected: g.id === guildId
+        selected: g.id === guildId,
       }));
-
-      // Give a 10% boost to mining power if guild is active
       const currentHardwarePower = prev.hardware
-        .filter(h => h.installed && h.unlocked)
+        .filter((h) => h.installed && h.unlocked)
         .reduce((sum, h) => sum + h.bonusPower, 0);
-      
       const currentWorkerPower = prev.workers
-        .filter(w => w.unlocked)
+        .filter((w) => w.unlocked)
         .reduce((sum, w) => sum + w.powerBonus, 0);
-
-      // Base rate
       const baseCombined = 4.8 + currentHardwarePower + currentWorkerPower;
-      const finalPower = baseCombined * 1.10; // apply 10% guild war bonus
-
       return {
         ...prev,
         guilds: updatedGuilds,
-        miningPower: parseFloat(finalPower.toFixed(1))
+        miningPower: parseFloat((baseCombined * 1.1).toFixed(1)),
       };
     });
-
-    const newlyJoined = state.guilds.find(g => g.id === guildId);
+    const newlyJoined = state.guilds.find((g) => g.id === guildId);
     if (newlyJoined) {
-      addLog(`GUILD ALIGNMENT SECURED: Enlisted with Faction: "${newlyJoined.name}". +10% Mining Power Bonus activated.`, 'success');
+      addLog(
+        `FACTION HOUSE: enlisted with "${newlyJoined.name}". +10% facility power · feeds Apex score.`,
+        'success'
+      );
     }
   };
 
-  const getActiveGuild = () => state.guilds.find(g => g.selected);
+  const claimSeat = () => {
+    if (qual.tier !== 'apex') {
+      addLog('APEX DENIED: Score below Summit threshold. Keep proving attention.', 'warn');
+      return;
+    }
+    if (!activeGuild) {
+      addLog('APEX DENIED: Enlist a faction house before claiming a Summit seat.', 'warn');
+      setShowHouses(true);
+      return;
+    }
+    writeApexClaim(month.id);
+    setSeated(true);
+    setState((prev) => ({
+      ...prev,
+      efficiency: parseFloat((prev.efficiency + 0.03).toFixed(3)),
+      credits: prev.credits + 150,
+      notifications: [
+        {
+          id: `apex_${month.id}_${Date.now()}`,
+          title: 'Apex Summit seat',
+          message: `${month.theme} — you hold a seat among the top of the top.`,
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          read: false,
+          type: 'success' as const,
+        },
+        ...(prev.notifications || []),
+      ],
+    }));
+    addLog(
+      `APEX SUMMIT: Seat claimed for ${month.label}. +150 BCC · +0.03 efficiency. Welcome to the chamber.`,
+      'success'
+    );
+  };
+
+  const tierLabel =
+    qual.tier === 'apex' ? 'APEX CLEAR' : qual.tier === 'contender' ? 'CONTENDER' : 'SPECTATOR';
+  const tierColor =
+    qual.tier === 'apex'
+      ? 'text-amber-300 border-amber-400/40 bg-amber-950/30'
+      : qual.tier === 'contender'
+        ? 'text-cyan-300 border-cyan-400/35 bg-cyan-950/25'
+        : 'text-slate-400 border-white/10 bg-white/5';
 
   return (
-    <div id="guild-hall-room" className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-      
-      {/* Competitions leaderboard */}
-      <div className="lg:col-span-2 bg-[#0a0a0c] border border-white/5 rounded-2xl p-6 shadow-xl">
-        <div className="flex items-center justify-between border-b border-white/5 pb-4 mb-5">
-          <div className="flex items-center gap-2">
-            <Trophy className="w-5 h-5 text-amber-400" />
-            <h3 className="font-mono text-sm font-semibold text-slate-100 tracking-wider">FACTION ALIGNMENT · SHARED OUTPUT</h3>
-          </div>
-          <span className="font-mono text-[10px] text-amber-400 bg-amber-950/30 px-2 py-0.5 rounded-lg border border-amber-500/20 animate-pulse">
-            3D 14H REMAINING
-          </span>
-        </div>
+    <div id="guild-hall-room" className="space-y-6">
+      {/* Apex Summit hero */}
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="relative overflow-hidden rounded-2xl border border-amber-400/30 bg-[#08060a] min-h-[220px]"
+      >
+        <img
+          src="/atmosphere/arena-hero.png"
+          alt=""
+          className="absolute inset-0 w-full h-full object-cover brightness-[0.35]"
+          draggable={false}
+        />
+        <div className="absolute inset-0 bg-gradient-to-r from-black via-black/85 to-amber-950/40" />
+        <div className="absolute inset-0 opacity-30 bg-[radial-gradient(ellipse_at_30%_20%,_rgba(251,191,36,0.25),_transparent_50%)]" />
 
-        {/* List of Guilds */}
-        <div className="space-y-3 font-mono text-xs">
-          {state.guilds.map((g, index) => (
-            <div
-              key={g.id}
-              className={`p-3.5 border rounded-2xl flex flex-wrap items-center justify-between gap-4 transition-all ${
-                g.selected
-                  ? 'bg-cyan-950/20 border-cyan-500/40 shadow-md shadow-cyan-950/10'
-                  : 'bg-[#050506] hover:bg-white/[0.02] border-white/5'
-              }`}
-            >
-              <div className="flex items-center gap-4">
-                {/* Ranking */}
-                <span className="text-slate-500 font-bold text-sm w-4">#{index + 1}</span>
-                <div className="w-8 h-8 rounded-lg bg-[#050506] border border-white/10 flex items-center justify-center">
-                  <Shield className={`w-4.5 h-4.5 ${g.selected ? 'text-cyan-400' : 'text-slate-400'}`} />
-                </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-slate-200 font-bold">{g.name} Faction</span>
-                    {g.selected && (
-                      <span className="bg-cyan-950/40 text-cyan-300 border border-cyan-500/20 text-[9px] px-1.5 py-0.5 rounded uppercase font-bold">
-                        My Guild
-                      </span>
-                    )}
-                  </div>
-                  <span className="text-[10px] text-slate-500">Region: {g.region} • Members: {g.members}</span>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-6">
-                <div className="text-right">
-                  <span className="text-[9px] text-slate-500 block">WEEKLY HASH</span>
-                  <span className="text-slate-100 font-bold">{g.output} EH/s</span>
-                </div>
-                
-                {g.selected ? (
-                  <div className="w-24 py-2 bg-emerald-950/40 border border-emerald-500/30 text-emerald-400 rounded-xl text-center text-[10px] font-bold flex items-center justify-center gap-1">
-                    <Check className="w-3.5 h-3.5" />
-                    ENLISTED
-                  </div>
-                ) : (
-                  <button
-                    onClick={() => selectGuild(g.id)}
-                    className="w-24 py-2 bg-[#050506] hover:bg-white/[0.03] border border-white/10 text-slate-300 hover:text-slate-100 rounded-xl text-center text-[10px] font-bold cursor-pointer transition-all"
-                  >
-                    JOIN FACTION
-                  </button>
-                )}
-              </div>
+        <div className="relative z-10 p-5 md:p-7 flex flex-col md:flex-row md:items-end justify-between gap-6">
+          <div className="max-w-xl">
+            <div className="flex items-center gap-2 mb-2">
+              <Crown className="w-4 h-4 text-amber-300" />
+              <span className="text-[10px] font-mono font-black tracking-[0.22em] uppercase text-amber-300/90">
+                Apex Summit · monthly chamber
+              </span>
             </div>
-          ))}
+            <h2 className="font-display text-2xl md:text-3xl font-extrabold italic text-white tracking-tight">
+              {month.theme}
+            </h2>
+            <p className="text-sm text-slate-300 mt-2 font-sans leading-relaxed">{month.tagline}</p>
+            <p className="text-[11px] text-amber-200/70 font-mono mt-3">{month.prizeLine}</p>
+          </div>
+
+          <div className="shrink-0 rounded-2xl border border-amber-400/25 bg-black/50 backdrop-blur-md px-4 py-3 min-w-[200px]">
+            <span className="text-[8px] font-mono font-black tracking-widest uppercase text-slate-500 flex items-center gap-1.5">
+              <Timer className="w-3 h-3 text-amber-400" />
+              Seating closes
+            </span>
+            <div className="mt-2 flex gap-2 font-mono">
+              {[
+                ['D', countdown.days],
+                ['H', countdown.hours],
+                ['M', countdown.mins],
+                ['S', countdown.secs],
+              ].map(([k, v]) => (
+                <div key={k as string} className="text-center">
+                  <div className="text-lg font-black text-amber-200 tabular-nums">
+                    {String(v).padStart(2, '0')}
+                  </div>
+                  <div className="text-[8px] text-slate-600">{k}</div>
+                </div>
+              ))}
+            </div>
+            <p className="text-[9px] text-slate-500 font-mono mt-2">{month.label}</p>
+          </div>
         </div>
-      </div>
+      </motion.div>
 
-      {/* Guild Perks Detail */}
-      <div className="bg-[#0a0a0c] border border-white/5 rounded-2xl p-5 shadow-xl flex flex-col justify-between">
-        <div>
-          <h4 className="text-xs font-mono font-bold tracking-widest text-slate-400 mb-4 flex items-center gap-1.5">
-            <Users className="w-4 h-4 text-cyan-400" />
-            GUILD MEMBERSHIP & PERKS
-          </h4>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Your status + claim */}
+        <div className="rounded-2xl border border-white/10 bg-[#0a0a0c]/95 p-5 space-y-4">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[9px] font-mono font-black tracking-widest uppercase text-slate-500">
+              Your Summit status
+            </span>
+            <span
+              className={`text-[8px] font-mono font-black tracking-wider uppercase px-2 py-0.5 rounded-lg border ${tierColor}`}
+            >
+              {tierLabel}
+            </span>
+          </div>
 
-          {getActiveGuild() ? (
-            <div className="space-y-4 font-mono text-xs">
-              <div className="bg-[#050506] p-4 border border-white/5 rounded-2xl text-center">
-                <Shield className="w-8 h-8 text-cyan-400 mx-auto mb-2" />
-                <h5 className="font-bold text-slate-100 text-sm">Active Enlistment: {getActiveGuild()?.name}</h5>
-                <p className="text-[10px] text-slate-500 mt-1">Active Faction Team Participant</p>
-              </div>
+          <div>
+            <div className="flex justify-between text-[10px] font-mono mb-1.5">
+              <span className="text-slate-400">Apex score</span>
+              <span className="text-white font-black">{qual.score}/100</span>
+            </div>
+            <div className="h-2 rounded-full bg-black/60 border border-white/5 overflow-hidden">
+              <motion.div
+                className={`h-full ${
+                  qual.tier === 'apex'
+                    ? 'bg-gradient-to-r from-amber-500 to-yellow-300'
+                    : qual.tier === 'contender'
+                      ? 'bg-gradient-to-r from-cyan-500 to-teal-300'
+                      : 'bg-slate-600'
+                }`}
+                animate={{ width: `${qual.score}%` }}
+                transition={{ type: 'spring', stiffness: 100, damping: 20 }}
+              />
+            </div>
+            <p className="text-[10px] text-slate-500 font-sans mt-2 leading-relaxed">
+              {qual.nextHint}
+            </p>
+          </div>
 
-              <div className="space-y-3">
-                <div className="bg-[#050506] p-3 rounded-xl border border-white/5">
-                  <span className="text-[9px] text-slate-500 block uppercase">Alliance Bonus</span>
-                  <span className="text-emerald-400 font-bold">{getActiveGuild()?.bonus}</span>
-                </div>
+          {qual.reasons.length > 0 && (
+            <ul className="space-y-1">
+              {qual.reasons.map((r) => (
+                <li
+                  key={r}
+                  className="text-[10px] font-mono text-emerald-300/90 flex items-center gap-1.5"
+                >
+                  <Check className="w-3 h-3 shrink-0" />
+                  {r}
+                </li>
+              ))}
+            </ul>
+          )}
 
-                <div className="bg-[#050506] p-3 rounded-xl border border-white/5">
-                  <span className="text-[9px] text-slate-500 block uppercase">Faction Active Perk</span>
-                  <span className="text-cyan-400 font-bold">+10% GLOBAL FACILITY POWER</span>
-                </div>
+          {seated && qual.tier === 'apex' ? (
+            <div className="rounded-xl border border-amber-400/35 bg-amber-500/10 px-3.5 py-3 flex items-center gap-3">
+              <Crown className="w-5 h-5 text-amber-300" />
+              <div>
+                <span className="text-[10px] font-mono font-black text-amber-200 uppercase tracking-wider block">
+                  Seat held
+                </span>
+                <span className="text-[11px] text-slate-400 font-sans">
+                  You are in this month&apos;s Apex circle.
+                </span>
               </div>
             </div>
           ) : (
-            <div className="text-center py-8 font-mono text-xs text-slate-500 space-y-3">
-              <Shield className="w-8 h-8 text-slate-700 mx-auto animate-pulse" />
-              <span>No active Faction alignment detected. Select a guild on the left to gain immediate system buffs.</span>
-            </div>
+            <button
+              type="button"
+              onClick={claimSeat}
+              disabled={qual.tier !== 'apex'}
+              className="w-full px-4 py-3 rounded-xl bg-amber-500 hover:bg-amber-400 disabled:opacity-40 disabled:hover:bg-amber-500 text-black font-mono text-[10px] font-black uppercase tracking-wider cursor-pointer inline-flex items-center justify-center gap-2"
+            >
+              {qual.tier === 'apex' ? (
+                <>
+                  <Sparkles className="w-3.5 h-3.5" />
+                  Claim Apex seat
+                </>
+              ) : (
+                <>
+                  <Lock className="w-3.5 h-3.5" />
+                  Summit locked · score 72+
+                </>
+              )}
+            </button>
           )}
+
+          <div className="flex flex-col gap-2 pt-1">
+            {onOpenAcademy && (
+              <button
+                type="button"
+                onClick={onOpenAcademy}
+                className="text-[10px] font-mono text-cyan-400 hover:text-cyan-300 inline-flex items-center gap-1 cursor-pointer"
+              >
+                Train for Summit in Academy <ChevronRight className="w-3 h-3" />
+              </button>
+            )}
+            {onOpenLeaderboard && (
+              <button
+                type="button"
+                onClick={onOpenLeaderboard}
+                className="text-[10px] font-mono text-slate-500 hover:text-amber-300 inline-flex items-center gap-1 cursor-pointer"
+              >
+                Full season arena <ChevronRight className="w-3 h-3" />
+              </button>
+            )}
+          </div>
         </div>
 
-        <div className="border-t border-white/5 pt-3 mt-4 text-[9px] text-slate-500 font-mono text-center">
-          * Guild performance updates globally in real-time.
+        {/* The circle — top 12 */}
+        <div className="lg:col-span-2 rounded-2xl border border-amber-400/15 bg-[#0a0a0c]/95 p-5 md:p-6">
+          <div className="flex items-center justify-between gap-3 mb-4 border-b border-white/5 pb-3">
+            <div className="flex items-center gap-2">
+              <Trophy className="w-4 h-4 text-amber-400" />
+              <h3 className="font-mono text-xs font-bold tracking-wider text-slate-100 uppercase">
+                The Circle · top of the top
+              </h3>
+            </div>
+            <span className="text-[8px] font-mono text-amber-400/80 uppercase tracking-widest">
+              12 seats · {month.label}
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+            {circle.map((seat, i) => (
+              <motion.div
+                key={`${seat.handle}-${seat.rank}`}
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: i * 0.03 }}
+                className={`rounded-xl border px-3.5 py-3 flex items-center gap-3 ${
+                  seat.isYou
+                    ? 'border-amber-400/50 bg-amber-500/10 shadow-[0_0_24px_rgba(251,191,36,0.12)]'
+                    : seat.rank <= 3
+                      ? 'border-white/10 bg-gradient-to-r from-amber-950/20 to-transparent'
+                      : 'border-white/5 bg-[#050506]'
+                }`}
+              >
+                <div
+                  className={`w-8 h-8 rounded-lg flex items-center justify-center font-mono text-[11px] font-black shrink-0 ${
+                    seat.rank === 1
+                      ? 'bg-amber-500 text-black'
+                      : seat.rank === 2
+                        ? 'bg-slate-300 text-black'
+                        : seat.rank === 3
+                          ? 'bg-amber-800 text-amber-100'
+                          : 'bg-white/5 text-slate-500 border border-white/10'
+                  }`}
+                >
+                  {seat.rank}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[12px] font-bold text-white truncate font-sans">
+                      {seat.handle}
+                    </span>
+                    {seat.isYou && (
+                      <span className="text-[7px] font-mono font-black uppercase tracking-wider text-amber-300 border border-amber-400/40 px-1 rounded">
+                        You
+                      </span>
+                    )}
+                    {seat.rank <= 3 && !seat.isYou && (
+                      <Star className="w-3 h-3 text-amber-400 shrink-0" />
+                    )}
+                  </div>
+                  <span className="text-[9px] font-mono text-slate-500 block truncate">
+                    {seat.title} · {seat.faction}
+                  </span>
+                </div>
+                <span className="text-[10px] font-mono font-black text-amber-200/80 tabular-nums shrink-0">
+                  {seat.score}
+                </span>
+              </motion.div>
+            ))}
+          </div>
         </div>
       </div>
 
+      {/* Faction houses */}
+      <div className="rounded-2xl border border-white/8 bg-[#0a0a0c]/90 overflow-hidden">
+        <button
+          type="button"
+          onClick={() => setShowHouses((v) => !v)}
+          className="w-full flex items-center justify-between gap-3 px-5 py-4 text-left cursor-pointer hover:bg-white/[0.02]"
+        >
+          <div className="flex items-center gap-2">
+            <Users className="w-4 h-4 text-cyan-400" />
+            <div>
+              <span className="text-[10px] font-mono font-black tracking-widest uppercase text-slate-200 block">
+                Faction houses
+              </span>
+              <span className="text-[11px] text-slate-500 font-sans">
+                Enlist to feed Apex score · shared output bonus
+                {activeGuild ? ` · ${activeGuild.name}` : ''}
+              </span>
+            </div>
+          </div>
+          <ChevronRight
+            className={`w-4 h-4 text-slate-600 transition-transform ${showHouses ? 'rotate-90' : ''}`}
+          />
+        </button>
+
+        <AnimatePresence>
+          {showHouses && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              className="overflow-hidden"
+            >
+              <div className="px-5 pb-5 space-y-2.5 border-t border-white/5 pt-3">
+                {state.guilds.map((g, index) => (
+                  <div
+                    key={g.id}
+                    className={`p-3.5 border rounded-2xl flex flex-wrap items-center justify-between gap-4 transition-all ${
+                      g.selected
+                        ? 'bg-cyan-950/20 border-cyan-500/40'
+                        : 'bg-[#050506] border-white/5'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className="text-slate-600 font-mono text-xs w-4">#{index + 1}</span>
+                      <Shield
+                        className={`w-4 h-4 ${g.selected ? 'text-cyan-400' : 'text-slate-500'}`}
+                      />
+                      <div>
+                        <span className="text-sm font-bold text-slate-100 font-sans">{g.name}</span>
+                        <span className="text-[10px] text-slate-500 font-mono block">
+                          {g.region} · {g.members.toLocaleString()} members · {g.output} EH/s
+                        </span>
+                      </div>
+                    </div>
+                    {g.selected ? (
+                      <span className="px-3 py-1.5 rounded-xl border border-emerald-500/30 bg-emerald-950/40 text-emerald-400 text-[10px] font-mono font-bold inline-flex items-center gap-1">
+                        <Check className="w-3.5 h-3.5" />
+                        Your house
+                      </span>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => selectGuild(g.id)}
+                        className="px-3 py-1.5 rounded-xl border border-white/10 hover:border-cyan-400/40 text-slate-300 text-[10px] font-mono font-bold cursor-pointer"
+                      >
+                        Enlist
+                      </button>
+                    )}
+                  </div>
+                ))}
+                <p className="text-[9px] text-slate-600 font-mono flex items-center gap-1.5 pt-1">
+                  <Radio className="w-3 h-3" />
+                  Houses compete all month — Apex Circle is the monthly crown above them.
+                </p>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
     </div>
   );
 }

@@ -12,6 +12,7 @@
     "lint": "tsc --noEmit",
     "test:arcium-mirror": "tsx --test src/lib/arcium-poa.test.ts",
     "test:economy": "tsx --test src/lib/solana-economy.test.ts",
+    "test:zk": "tsx --test src/lib/zk-id/nullifier.test.ts",
     "economy:bootstrap": "tsx scripts/devnet-bootstrap.ts"
   },
   "dependencies": {

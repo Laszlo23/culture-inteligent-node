@@ -310,6 +310,22 @@ pub mod culture_economy {
         player.energy_bps = player.energy_bps.saturating_sub(energy_bps);
         Ok(())
     }
+
+    /// Soulbound reputation badge PDA — one per ZKPassport nullifier hash.
+    /// Token-2022 NonTransferable mint is created off-program; this account
+    /// records owner + mint and has no transfer instruction (soulbound by design).
+    pub fn mint_soulbound_badge(
+        ctx: Context<MintSoulboundBadge>,
+        nullifier: [u8; 32],
+    ) -> Result<()> {
+        let badge = &mut ctx.accounts.badge;
+        badge.owner = ctx.accounts.owner.key();
+        badge.nullifier = nullifier;
+        badge.mint = ctx.accounts.mint_key.key();
+        badge.minted_at = Clock::get()?.unix_timestamp;
+        badge.bump = ctx.bumps.badge;
+        Ok(())
+    }
 }
 
 #[account]
@@ -372,6 +388,20 @@ pub struct Listing {
 
 impl Listing {
     pub const LEN: usize = 8 + 32 + 32 + 8 + 1;
+}
+
+/// ZKPassport-bound reputation — non-transferable by absence of transfer ix.
+#[account]
+pub struct SoulboundBadge {
+    pub owner: Pubkey,
+    pub nullifier: [u8; 32],
+    pub mint: Pubkey,
+    pub minted_at: i64,
+    pub bump: u8,
+}
+
+impl SoulboundBadge {
+    pub const LEN: usize = 8 + 32 + 32 + 32 + 8 + 1;
 }
 
 #[derive(Accounts)]
@@ -696,6 +726,24 @@ pub struct DrainEnergy<'info> {
     pub player: Account<'info, Player>,
 }
 
+#[derive(Accounts)]
+#[instruction(nullifier: [u8; 32])]
+pub struct MintSoulboundBadge<'info> {
+    #[account(mut)]
+    pub owner: Signer<'info>,
+    /// CHECK: Token-2022 mint address recorded on the badge (created client/server-side).
+    pub mint_key: UncheckedAccount<'info>,
+    #[account(
+        init,
+        payer = owner,
+        space = SoulboundBadge::LEN,
+        seeds = [b"sbt", nullifier.as_ref()],
+        bump
+    )]
+    pub badge: Account<'info, SoulboundBadge>,
+    pub system_program: Program<'info, System>,
+}
+
 #[error_code]
 pub enum EconomyError {
     #[msg("Amount must be > 0")]
@@ -722,4 +770,6 @@ pub enum EconomyError {
     BadAssetId,
     #[msg("Fee treasury ATA owner mismatch")]
     BadFeeTreasury,
+    #[msg("Soulbound badge already minted for this nullifier")]
+    SoulboundExists,
 }

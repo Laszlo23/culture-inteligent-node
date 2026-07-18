@@ -572,7 +572,7 @@ export default function MemberProfile({
         await syncMinersToState(setState);
         setMintInlineError('');
         addLog(
-          `MINT ON-CHAIN: ${rarity} miner #${assetId}. https://solscan.io/tx/${signature}?cluster=devnet`,
+          `Miner minted + PoA memo on-chain — ${rarity} #${assetId}. https://solscan.io/tx/${signature}?cluster=devnet`,
           'success'
         );
       } else {

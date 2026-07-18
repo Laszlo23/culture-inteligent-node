@@ -247,14 +247,14 @@ export default function AuthPortal({ onLoginSuccess, autoStart = null }: AuthPor
             <Wallet className="w-5 h-5" />
           </div>
           <span className="font-mono text-[9px] font-black tracking-[0.25em] text-cyan-400 uppercase block">
-            Solana Devnet
+            Proof of Attention
           </span>
           <h2 className="text-xl font-extrabold text-white tracking-tight mt-1 font-display italic">
-            {autoStart === 'local' ? 'Entering your node…' : 'One step — then prove it'}
+            {autoStart === 'local' ? 'Entering — attention next…' : "We're here for attention"}
           </h2>
           <p className="text-xs text-slate-400 font-sans mt-2 leading-relaxed">
-            Demo wallet in this browser · Devnet · nothing of value. One Academy session next — then
-            you decide if the loop is real.
+            Connect once. Next you prove focused attention in Academy — not empty hashes. Demo
+            wallet · Solana Devnet · nothing of value.
           </p>
         </div>
 
@@ -354,7 +354,7 @@ export default function AuthPortal({ onLoginSuccess, autoStart = null }: AuthPor
                 )}
               </button>
               <p className="text-[10px] text-slate-500 font-sans text-center -mt-1">
-                This browser · Devnet · wipe anytime
+                This browser · Devnet · logout clears session keys
               </p>
 
               <button
@@ -395,8 +395,8 @@ export default function AuthPortal({ onLoginSuccess, autoStart = null }: AuthPor
         <div className="mt-5 pt-4 border-t border-white/5 flex items-start gap-2 text-[10px] text-slate-500 font-sans leading-relaxed">
           <Info className="w-3.5 h-3.5 text-cyan-500 flex-shrink-0 mt-0.5" />
           <span>
-            Next: <strong className="text-slate-400">First Spark</strong> in Attention Academy (~2 min).
-            Pass the snap — watch fuel move.
+            Next: <strong className="text-slate-400">First Spark</strong> — prove attention (~2 min).
+            Pass → knowledge fuel. Then Hook Mirror: see why you scroll.
           </span>
         </div>
       </motion.div>

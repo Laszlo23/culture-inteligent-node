@@ -192,3 +192,64 @@ export function getTollStats() {
     note: 'Extrapolated annual is a model from the last 24h rate — not a guarantee.',
   };
 }
+
+/** ZKPassport nullifier ↔ wallet bindings for soulbound reputation. */
+export type StoredZkBinding = {
+  nullifierHash: string;
+  walletAddress: string;
+  zkProvider: 'zkpassport' | 'world_id';
+  verifiedAt: string;
+  boundAt: string;
+  mintAddress?: string;
+  mintSignature?: string;
+  badgePda?: string;
+  soulboundMinted: boolean;
+};
+
+const zkBindingStore: StoredZkBinding[] = [];
+
+export function getZkBindingByNullifier(nullifierHash: string) {
+  return zkBindingStore.find((b) => b.nullifierHash === nullifierHash) || null;
+}
+
+export function getZkBindingByWallet(walletAddress: string) {
+  return (
+    zkBindingStore.find(
+      (b) => b.walletAddress.toLowerCase() === walletAddress.toLowerCase()
+    ) || null
+  );
+}
+
+export function upsertZkBinding(row: StoredZkBinding) {
+  const byN = zkBindingStore.findIndex((b) => b.nullifierHash === row.nullifierHash);
+  if (byN >= 0) {
+    zkBindingStore[byN] = { ...zkBindingStore[byN], ...row };
+    return zkBindingStore[byN];
+  }
+  const byW = zkBindingStore.findIndex(
+    (b) => b.walletAddress.toLowerCase() === row.walletAddress.toLowerCase()
+  );
+  if (byW >= 0) {
+    zkBindingStore[byW] = { ...zkBindingStore[byW], ...row };
+    return zkBindingStore[byW];
+  }
+  zkBindingStore.unshift(row);
+  return row;
+}
+
+export function markZkMinted(
+  nullifierHash: string,
+  patch: {
+    mintAddress: string;
+    mintSignature?: string;
+    badgePda?: string;
+  }
+) {
+  const row = getZkBindingByNullifier(nullifierHash);
+  if (!row) return null;
+  row.mintAddress = patch.mintAddress;
+  row.mintSignature = patch.mintSignature;
+  row.badgePda = patch.badgePda;
+  row.soulboundMinted = true;
+  return row;
+}

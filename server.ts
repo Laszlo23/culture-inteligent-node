@@ -31,7 +31,30 @@ import {
   getFeedbackTickets,
   createFeedbackTicket,
   resolveFeedbackTicket,
+  listVoidAsks,
+  listVoidReplies,
+  createVoidAsk,
+  createVoidReply,
+  VOID_STORED_FIELDS,
+  VOID_FORBIDDEN_FIELDS,
+  ensureVoidTables,
+  getZkBindingByNullifier,
+  getZkBindingByWallet,
+  upsertZkBinding,
+  markZkMinted,
 } from "./src/db/queries.ts";
+import {
+  verifyZkPassportPayload,
+  serverZkDevMode,
+  serverZkScope,
+} from "./src/lib/zk-id/server-verify.ts";
+import {
+  mintSoulboundToken2022,
+  recordSoulboundPlaceholder,
+  getSoulboundBadgePda,
+} from "./src/lib/zk-id/soulbound-mint.ts";
+import { loadEconomyAuthorityFromEnv } from "./src/lib/solana-economy.ts";
+import { Connection, PublicKey } from "@solana/web3.js";
 import { verifyAttentionWithAgent } from "./src/lib/attention-agent.ts";
 import { verifyKpiTransaction, verifyMemoAttestation } from "./src/lib/solana-verify.ts";
 import { researchWeeklySession } from "./src/lib/session-research-agent.ts";
@@ -82,9 +105,9 @@ function curriculumAdminWallets(): Set<string> {
 function isCurriculumAdmin(walletAddress?: string): boolean {
   if (!walletAddress) return false;
   const allow = curriculumAdminWallets();
-  // Production must fail closed when allowlist is empty.
+  // Fail closed unless explicitly opened for local labs.
   if (allow.size === 0) {
-    return process.env.NODE_ENV !== "production";
+    return process.env.DEV_OPEN_ADMIN === "1" && process.env.NODE_ENV !== "production";
   }
   return allow.has(walletAddress);
 }
@@ -114,13 +137,20 @@ async function startServer() {
       const signature = String(req.body?.signature || "").trim();
       const messageOverride = req.body?.message as string | undefined;
       const allowDemo =
-        req.body?.demoUnsigned === true && process.env.NODE_ENV !== "production";
+        req.body?.demoUnsigned === true &&
+        process.env.NODE_ENV !== "production" &&
+        process.env.ALLOW_DEMO_UNSIGNED === "1";
 
       if (!walletAddress || (!signature && !allowDemo)) {
         return res.status(400).json({ error: "walletAddress and signature required" });
       }
 
-      const expectedMessage = consumeChallenge(walletAddress) || messageOverride;
+      // Always consume server challenge — never trust client message alone in real login.
+      const expectedMessage = consumeChallenge(walletAddress);
+      if (!allowDemo && !expectedMessage) {
+        return res.status(400).json({ error: "Challenge expired — request a new one" });
+      }
+      void messageOverride;
 
       if (!allowDemo) {
         if (!expectedMessage) {
@@ -313,6 +343,139 @@ async function startServer() {
       res.json(await resolveFeedbackTicket(req.params.id, reply));
     } catch (error: any) {
       res.status(500).json({ error: error.message || "Failed to resolve ticket" });
+    }
+  });
+
+  /**
+   * The Void — completely anonymous asks.
+   * Proof: these routes REJECT Authorization; DB has no identity columns.
+   */
+  const rejectVoidAuth = (req: express.Request, res: express.Response): boolean => {
+    if (req.headers.authorization || req.headers['x-wallet-token']) {
+      res.status(400).json({
+        error:
+          'Void refuses identity. Remove Authorization / wallet token — anonymity is enforced, not optional.',
+        proof: {
+          authPolicy: 'reject-if-authorization-present',
+          forbiddenFields: VOID_FORBIDDEN_FIELDS,
+        },
+      });
+      return true;
+    }
+    return false;
+  };
+
+  const verifyVoidPow = (body: string, nonce: string, contentHash: string): boolean => {
+    const expected = crypto.createHash('sha256').update(body.trim()).digest('hex');
+    if (expected !== contentHash) return false;
+    const work = crypto.createHash('sha256').update(`${body.trim()}:${nonce}`).digest('hex');
+    return work.startsWith('000') || work.startsWith('00'); // accept light difficulty
+  };
+
+  app.get('/api/void/manifest', async (_req, res) => {
+    res.json({
+      name: 'The Void',
+      claim:
+        'Posts are accepted only without Authorization. Schema stores no user_id, wallet, email, or IP.',
+      endpoint: '/api/void/asks',
+      storedFields: VOID_STORED_FIELDS,
+      forbiddenFields: VOID_FORBIDDEN_FIELDS,
+      authPolicy: 'reject-if-authorization-present',
+      howToVerify: [
+        'Inspect this manifest',
+        'POST with Authorization → must get HTTP 400',
+        'POST without Authorization → stored fields only',
+        'Check src/db/schema.ts voidAsks — no identity columns',
+      ],
+    });
+  });
+
+  app.get('/api/void/asks', async (req, res) => {
+    if (rejectVoidAuth(req, res)) return;
+    try {
+      await ensureVoidTables();
+      res.json(await listVoidAsks(50));
+    } catch (error: any) {
+      res.status(500).json({ error: error.message || 'Void unavailable' });
+    }
+  });
+
+  app.post('/api/void/asks', async (req, res) => {
+    if (rejectVoidAuth(req, res)) return;
+    try {
+      const { body, contentHash, powNonce } = req.body || {};
+      if (!body || typeof body !== 'string') {
+        return res.status(400).json({ error: 'body required' });
+      }
+      const trimmed = body.trim();
+      if (trimmed.length < 8 || trimmed.length > 2000) {
+        return res.status(400).json({ error: 'body must be 8–2000 characters' });
+      }
+      if (!contentHash || !powNonce || !verifyVoidPow(trimmed, String(powNonce), contentHash)) {
+        return res.status(400).json({ error: 'Invalid content hash or proof-of-work' });
+      }
+      const id = `void_${Date.now()}_${crypto.randomBytes(4).toString('hex')}`;
+      const row = await createVoidAsk(id, trimmed, contentHash);
+      res.json({
+        ...row,
+        receipt: {
+          postId: id,
+          contentHash,
+          powNonce: String(powNonce),
+          authHeaderSent: false,
+          walletTokenSent: false,
+          storedFields: VOID_STORED_FIELDS,
+          forbiddenFieldsAbsent: VOID_FORBIDDEN_FIELDS,
+          serverMode: 'live',
+          issuedAt: new Date().toISOString(),
+        },
+      });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message || 'Void ask failed' });
+    }
+  });
+
+  app.get('/api/void/asks/:id/replies', async (req, res) => {
+    if (rejectVoidAuth(req, res)) return;
+    try {
+      res.json(await listVoidReplies(req.params.id));
+    } catch (error: any) {
+      res.status(500).json({ error: error.message || 'Void replies unavailable' });
+    }
+  });
+
+  app.post('/api/void/asks/:id/replies', async (req, res) => {
+    if (rejectVoidAuth(req, res)) return;
+    try {
+      const { body, contentHash, powNonce } = req.body || {};
+      if (!body || typeof body !== 'string') {
+        return res.status(400).json({ error: 'body required' });
+      }
+      const trimmed = body.trim();
+      if (trimmed.length < 2 || trimmed.length > 1500) {
+        return res.status(400).json({ error: 'reply must be 2–1500 characters' });
+      }
+      if (!contentHash || !powNonce || !verifyVoidPow(trimmed, String(powNonce), contentHash)) {
+        return res.status(400).json({ error: 'Invalid content hash or proof-of-work' });
+      }
+      const id = `void_r_${Date.now()}_${crypto.randomBytes(4).toString('hex')}`;
+      const row = await createVoidReply(id, req.params.id, trimmed, contentHash);
+      res.json({
+        ...row,
+        receipt: {
+          postId: id,
+          contentHash,
+          powNonce: String(powNonce),
+          authHeaderSent: false,
+          walletTokenSent: false,
+          storedFields: ['id', 'ask_id', 'body', 'content_hash', 'created_at'],
+          forbiddenFieldsAbsent: VOID_FORBIDDEN_FIELDS,
+          serverMode: 'live',
+          issuedAt: new Date().toISOString(),
+        },
+      });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message || 'Void reply failed' });
     }
   });
 
@@ -646,6 +809,212 @@ async function startServer() {
     res.json(body);
   });
 
+  /** Short-lived ZK verify sessions: wallet → nullifierHash */
+  const zkPendingVerify = new Map<
+    string,
+    { nullifierHash: string; mode: string; expiresAt: number }
+  >();
+
+  /** ZKPassport uniqueness verify — returns scoped nullifier hash (no PII). */
+  app.post("/api/zk/verify", requireWalletAuth, async (req: AuthRequest, res) => {
+    try {
+      const wallet = req.walletUser!.walletAddress;
+      const result = await verifyZkPassportPayload({
+        walletAddress: wallet,
+        uniqueIdentifier: req.body?.uniqueIdentifier,
+        verified: req.body?.verified !== false,
+        mode: req.body?.mode,
+        proofs: req.body?.proofs,
+        originalQuery: req.body?.originalQuery,
+        queryResult: req.body?.queryResult,
+      });
+      if (!result.ok || !result.nullifierHash) {
+        return res.status(400).json({ error: result.error || "ZK verify failed" });
+      }
+      const existing = await getZkBindingByNullifier(result.nullifierHash);
+      if (existing && existing.walletAddress.toLowerCase() !== wallet.toLowerCase()) {
+        return res.status(409).json({
+          error: "This identity is already bound to another wallet",
+          boundWallet: `${existing.walletAddress.slice(0, 4)}…${existing.walletAddress.slice(-4)}`,
+        });
+      }
+      zkPendingVerify.set(wallet, {
+        nullifierHash: result.nullifierHash,
+        mode: result.mode,
+        expiresAt: Date.now() + 15 * 60 * 1000,
+      });
+      res.json({
+        verified: true,
+        nullifierHash: result.nullifierHash,
+        mode: result.mode,
+        scope: serverZkScope(),
+        alreadyBound: Boolean(existing),
+      });
+    } catch (err: any) {
+      console.error("zk verify", err);
+      res.status(500).json({ error: err?.message || "ZK verify error" });
+    }
+  });
+
+  /** Bind verified nullifier → wallet (once). */
+  app.post("/api/zk/bind", requireWalletAuth, async (req: AuthRequest, res) => {
+    try {
+      const wallet = req.walletUser!.walletAddress;
+      const pending = zkPendingVerify.get(wallet);
+      const nullifierHash =
+        (req.body?.nullifierHash as string) || pending?.nullifierHash;
+      if (!nullifierHash) {
+        return res.status(400).json({
+          error: "No verified nullifier — complete /api/zk/verify first",
+        });
+      }
+      if (pending && pending.expiresAt < Date.now()) {
+        zkPendingVerify.delete(wallet);
+        return res.status(400).json({ error: "ZK verify expired — prove again" });
+      }
+      if (pending && pending.nullifierHash !== nullifierHash) {
+        return res.status(400).json({ error: "Nullifier mismatch with verify session" });
+      }
+
+      const byN = await getZkBindingByNullifier(nullifierHash);
+      if (byN && byN.walletAddress.toLowerCase() !== wallet.toLowerCase()) {
+        return res.status(409).json({
+          error: "Nullifier already bound to another wallet",
+        });
+      }
+      const byW = await getZkBindingByWallet(wallet);
+      if (byW && byW.nullifierHash !== nullifierHash) {
+        return res.status(409).json({
+          error: "Wallet already bound to a different identity",
+        });
+      }
+
+      const now = new Date().toISOString();
+      const [badgePda] = getSoulboundBadgePda(nullifierHash);
+      const row = await upsertZkBinding({
+        nullifierHash,
+        walletAddress: wallet,
+        zkProvider: "zkpassport",
+        verifiedAt: byN?.verifiedAt || now,
+        boundAt: byN?.boundAt || now,
+        mintAddress: byN?.mintAddress,
+        mintSignature: byN?.mintSignature,
+        badgePda: byN?.badgePda || badgePda.toBase58(),
+        soulboundMinted: byN?.soulboundMinted || false,
+      });
+      zkPendingVerify.delete(wallet);
+      res.json({
+        bound: true,
+        nullifierHash: row.nullifierHash,
+        mintable: !row.soulboundMinted,
+        soulboundMinted: row.soulboundMinted,
+        badgePda: row.badgePda,
+        zkProvider: row.zkProvider,
+      });
+    } catch (err: any) {
+      console.error("zk bind", err);
+      res.status(500).json({ error: err?.message || "ZK bind error" });
+    }
+  });
+
+  app.get("/api/zk/status", requireWalletAuth, async (req: AuthRequest, res) => {
+    try {
+      const wallet = req.walletUser!.walletAddress;
+      const row = await getZkBindingByWallet(wallet);
+      const pending = zkPendingVerify.get(wallet);
+      res.json({
+        bound: Boolean(row),
+        mintable: Boolean(row && !row.soulboundMinted),
+        soulboundMinted: Boolean(row?.soulboundMinted),
+        nullifierHash: row?.nullifierHash,
+        mintAddress: row?.mintAddress,
+        mintSignature: row?.mintSignature,
+        badgePda: row?.badgePda,
+        verifiedAt: row?.verifiedAt,
+        zkProvider: row?.zkProvider,
+        pendingVerify: Boolean(pending && pending.expiresAt > Date.now()),
+        devMode: serverZkDevMode(),
+        scope: serverZkScope(),
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: err?.message || "ZK status error" });
+    }
+  });
+
+  /** Mint Token-2022 NonTransferable soulbound badge (authority-assisted when configured). */
+  app.post("/api/zk/mint", requireWalletAuth, async (req: AuthRequest, res) => {
+    try {
+      const wallet = req.walletUser!.walletAddress;
+      const row = await getZkBindingByWallet(wallet);
+      if (!row) {
+        return res.status(400).json({
+          error: "Bind ZKPassport identity before minting soulbound reputation",
+        });
+      }
+      if (row.soulboundMinted && row.mintAddress) {
+        return res.json({
+          alreadyMinted: true,
+          mintAddress: row.mintAddress,
+          mintSignature: row.mintSignature,
+          badgePda: row.badgePda,
+          mode: "existing",
+        });
+      }
+
+      const owner = new PublicKey(wallet);
+      const authority = loadEconomyAuthorityFromEnv();
+      let mintResult;
+      let mode: string;
+
+      if (authority) {
+        try {
+          const connection = new Connection(
+            process.env.SOLANA_RPC_URL || "https://api.devnet.solana.com",
+            "confirmed"
+          );
+          mintResult = await mintSoulboundToken2022({
+            connection,
+            payer: authority,
+            owner,
+            nullifierHash: row.nullifierHash,
+          });
+          mode = "token2022";
+        } catch (mintErr: any) {
+          console.warn("Token-2022 mint failed, recording placeholder", mintErr?.message);
+          mintResult = recordSoulboundPlaceholder(row.nullifierHash, wallet);
+          mode = "recorded";
+        }
+      } else {
+        mintResult = recordSoulboundPlaceholder(row.nullifierHash, wallet);
+        mode = "recorded";
+      }
+
+      const updated = await markZkMinted(row.nullifierHash, {
+        mintAddress: mintResult.mintAddress,
+        mintSignature: mintResult.mintSignature,
+        badgePda: mintResult.badgePda,
+      });
+
+      res.json({
+        soulboundMinted: true,
+        mintAddress: mintResult.mintAddress,
+        mintSignature: mintResult.mintSignature,
+        badgePda: mintResult.badgePda,
+        ownerAta: mintResult.ownerAta,
+        mode,
+        nonTransferable: mode === "token2022",
+        note:
+          mode === "token2022"
+            ? "Soulbound · ZKPassport-bound · Token-2022 NonTransferable"
+            : "Soulbound record gated by ZKPassport — Token-2022 mint pending ECONOMY_AUTHORITY_SECRET / SOL",
+        binding: updated,
+      });
+    } catch (err: any) {
+      console.error("zk mint", err);
+      res.status(500).json({ error: err?.message || "ZK mint error" });
+    }
+  });
+
   /** Status of on-chain economy authority + mints */
   app.get("/api/economy/status", (_req, res) => {
     const bccMint = process.env.VITE_BCC_MINT || process.env.BCC_MINT || null;
@@ -684,8 +1053,9 @@ async function startServer() {
     try {
       const wallet = req.walletUser!.walletAddress;
       const uid = req.walletUser!.uid;
-      const energyBps = Math.min(10000, Math.max(1, Number(req.body?.energyBps) || 2000));
-      const bccReward = Math.max(0, Number(req.body?.bccReward) || 0);
+      const energyBps = Math.min(5000, Math.max(1, Number(req.body?.energyBps) || 2000));
+      // Cap BCC per grant — sessions never need uncapped client-chosen mints
+      const bccReward = Math.min(500, Math.max(0, Number(req.body?.bccReward) || 0));
       const verificationId = req.body?.verificationId as string | undefined;
 
       const recent = listAttentionForUid(uid).filter((r) => r.passed);
@@ -738,6 +1108,12 @@ async function startServer() {
 
       const recent = listAttentionForUid(uid).filter((r) => r.passed);
       const kpiOk = getKpiByWallet(wallet).length > 0;
+      if (reason === "bootstrap" && process.env.NODE_ENV === "production") {
+        return res.status(400).json({
+          ok: false,
+          error: "bootstrap rewards disabled in production",
+        });
+      }
       if (recent.length === 0 && !kpiOk && reason !== "bootstrap") {
         return res.status(400).json({
           ok: false,
@@ -746,7 +1122,7 @@ async function startServer() {
       }
 
       // Cap per-call to limit abuse
-      if (bcc > 2000 || cgt > 500 || energyBps > 5000) {
+      if (bcc > 500 || cgt > 200 || energyBps > 3000) {
         return res.status(400).json({ ok: false, error: "Reward exceeds per-call cap" });
       }
 
@@ -803,7 +1179,17 @@ async function startServer() {
         ...published.map((s) => s.title),
         ...drafts.map((s) => s.title),
       ];
-      const draft = await researchWeeklySession({ existingTitles });
+      let scienceContext = '';
+      try {
+        const { getScienceSignalDesk, signalDeskAsContext } = await import(
+          './src/lib/science-signal.ts'
+        );
+        const desk = await getScienceSignalDesk();
+        scienceContext = signalDeskAsContext(desk);
+      } catch {
+        // optional
+      }
+      const draft = await researchWeeklySession({ existingTitles, scienceContext });
       const stored = saveCurriculumDraft(draft);
       res.json({ draft: stored });
     } catch (error: any) {
@@ -837,6 +1223,23 @@ async function startServer() {
   });
 
   // Live Solana market pulse via OKX OnchainOS CLI (read-only, cached 60s)
+  app.get("/api/signal/desk", async (_req, res) => {
+    try {
+      const { getScienceSignalDesk } = await import("./src/lib/science-signal.ts");
+      const desk = await getScienceSignalDesk();
+      res.json(desk);
+    } catch (err: any) {
+      console.error("signal desk error", err);
+      res.status(503).json({
+        available: false,
+        fetchedAt: new Date().toISOString(),
+        mode: "seeded-pulse",
+        signals: [],
+        note: err?.message || "Signal desk failed",
+      });
+    }
+  });
+
   app.get("/api/market/pulse", async (_req, res) => {
     try {
       const pulse = await getMarketPulse();

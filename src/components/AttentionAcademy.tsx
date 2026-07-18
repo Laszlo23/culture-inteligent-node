@@ -16,10 +16,12 @@ import {
   Sparkles,
   AlertCircle,
 } from 'lucide-react';
-import { GameState, ProofOfAttention } from '../types';
+import { GameState, ProofOfAttention, SoulboundReputation } from '../types';
+import SoulboundRitualOverlay from './SoulboundRitualOverlay';
 import {
   CORE_ATTENTION_SESSIONS,
   FIRST_SPARK_SESSION,
+  HOOK_MIRROR_SESSION,
   AttentionSession,
   SessionQuizItem,
   mergeCatalog,
@@ -28,13 +30,13 @@ import AttentionSessionPlayer from './AttentionSessionPlayer';
 import CurriculumLabPanel from './CurriculumLabPanel';
 import {
   verifyAttentionSession,
-  sendPoaMemoAttestation,
   ensureWalletApiSession,
   getWalletToken,
   fetchCurriculum,
   attestAttentionProof,
 } from '../lib/api.ts';
 import { Keypair } from '@solana/web3.js';
+import { sendAttentionProofMemo, type AttentionProofKind } from '../lib/poa-chain';
 import { markEnergySurge, CinematicBackdrop } from './fx';
 import {
   verifyAttentionWithArcium,
@@ -45,6 +47,19 @@ import {
   isFirstRitualPending,
 } from '../lib/first-run';
 import { spendSparkCredit } from './AttentionTollShop';
+import ZenDecisionGate from './ZenDecisionGate';
+import {
+  getZenDecision,
+  isZenMode,
+  saveZenDecision,
+  zenDecisionPrompt,
+  zenMachineChosenScript,
+  zenMindChosenScript,
+  type LearningDecision,
+} from '../lib/zen-duality';
+import { setZenDecisionHandler } from '../lib/hearing/zen-bridge';
+import { useHearing } from '../lib/hearing/context';
+import { track } from '../lib/attention-metrics';
 
 interface AttentionAcademyProps {
   state: GameState;
@@ -54,6 +69,8 @@ interface AttentionAcademyProps {
   onFirstRitualComplete?: (detail?: { from: number; to: number }) => void;
   /** Open Treasury Attention Toll shop (e.g. academy_retake) */
   onOpenTollShop?: (sku?: 'academy_retake' | 'spark_refill') => void;
+  /** Request facility Focus Mode (dim chrome) */
+  onRequestFocus?: (on: boolean) => void;
 }
 
 export default function AttentionAcademy({
@@ -63,6 +80,7 @@ export default function AttentionAcademy({
   onOpenRoadmap,
   onFirstRitualComplete,
   onOpenTollShop,
+  onRequestFocus,
 }: AttentionAcademyProps) {
   const [published, setPublished] = useState<AttentionSession[]>([]);
   const [isAdmin, setIsAdmin] = useState(false);
@@ -108,10 +126,38 @@ export default function AttentionAcademy({
     mode?: ArciumThresholdResult['mode'];
   }>({ state: 'idle' });
   const [pendingAttestId, setPendingAttestId] = useState<string | null>(null);
+  const [showSoulboundRitual, setShowSoulboundRitual] = useState(false);
+  const [ritualWallet, setRitualWallet] = useState<{
+    address: string;
+    walletType: 'extension' | 'local';
+    localKeypair: Keypair | null;
+  } | null>(null);
   const [pendingSessionIdx, setPendingSessionIdx] = useState<number | null>(null);
   const [ritualPending, setRitualPending] = useState(() => isFirstRitualPending());
+  const hearing = useHearing();
+  const [zenModeOn, setZenModeOn] = useState(() => isZenMode());
+  const [learningDecision, setLearningDecision] = useState<LearningDecision | null>(null);
+  const zenPromptedRef = React.useRef<string | null>(null);
 
   const catalog = useMemo(() => mergeCatalog(published), [published]);
+
+  /** Soft gate: Hook Mirror is recommended after First Spark but does not hard-lock the core series. */
+  const isSessionLocked = useCallback(
+    (idx: number) => {
+      if (idx <= 0) return false;
+      const session = catalog[idx];
+      const prev = catalog[idx - 1];
+      if (!session || !prev) return false;
+      if (session.id === HOOK_MIRROR_SESSION.id) {
+        return !completedSessions.includes(FIRST_SPARK_SESSION.id);
+      }
+      if (prev.id === HOOK_MIRROR_SESSION.id) {
+        return !completedSessions.includes(FIRST_SPARK_SESSION.id);
+      }
+      return !completedSessions.includes(prev.id);
+    },
+    [catalog, completedSessions]
+  );
 
   const refreshCurriculum = useCallback(async () => {
     try {
@@ -145,12 +191,11 @@ export default function AttentionAcademy({
       setActiveSessionIdx(nextIncompleteIdx);
       return;
     }
-    const isCurrentLocked =
-      activeSessionIdx > 0 && !completedSessions.includes(catalog[activeSessionIdx - 1]?.id);
+    const isCurrentLocked = isSessionLocked(activeSessionIdx);
     if (isCurrentLocked || activeSessionIdx >= catalog.length) {
       setActiveSessionIdx(nextIncompleteIdx);
     }
-  }, [completedSessions, catalog, ritualPending, activeSessionIdx]);
+  }, [completedSessions, catalog, ritualPending, activeSessionIdx, isSessionLocked]);
 
   const onReadyChange = useCallback((ready: boolean, art: string) => {
     setExerciseReady(ready);
@@ -161,6 +206,92 @@ export default function AttentionAcademy({
   const isMaster = CORE_ATTENTION_SESSIONS.every((s) => completedSessions.includes(s.id));
   const weekly = catalog.filter((s) => s.status === 'published');
 
+  // Sync Zen decision with active session (duality break is per session)
+  useEffect(() => {
+    if (!activeSession) {
+      setLearningDecision(null);
+      return;
+    }
+    setLearningDecision(getZenDecision(activeSession.id));
+    zenPromptedRef.current = null;
+    setZenModeOn(isZenMode());
+  }, [activeSession?.id]);
+
+  const applyLearningDecision = useCallback(
+    async (decision: LearningDecision) => {
+      if (!activeSession) return;
+      saveZenDecision(activeSession.id, decision);
+      setLearningDecision(decision);
+      track('zen_decision', { sessionId: activeSession.id, decision });
+      if (decision === 'hold_knowledge') {
+        addLog('Mind · knowledge held. Sit with it — fuel can wait.', 'system');
+        if (hearing?.active && hearing.speakLine) {
+          await hearing.speakLine(zenMindChosenScript());
+        }
+      } else {
+        addLog('Machine · convert when ready. Neural Snap is unlocked for you.', 'success');
+        if (hearing?.active && hearing.speakLine) {
+          await hearing.speakLine(zenMachineChosenScript());
+        }
+        // On-chain intent receipt — you chose Machine (attention → fuel)
+        void sendAttentionProofMemo({
+          kind: 'zen_machine',
+          parts: { session: activeSession.id },
+        }).then((res) => {
+          if ('signature' in res) {
+            addLog(`Zen Machine choice on Devnet — ${res.solscan}`, 'success');
+          }
+        });
+      }
+    },
+    [activeSession, addLog, hearing]
+  );
+
+  const academyStartedRef = React.useRef<string | null>(null);
+
+  // Full focus while an incomplete session is on screen
+  useEffect(() => {
+    if (!activeSession || completedSessions.includes(activeSession.id)) {
+      onRequestFocus?.(false);
+      return;
+    }
+    onRequestFocus?.(true);
+    if (academyStartedRef.current !== activeSession.id) {
+      academyStartedRef.current = activeSession.id;
+      track('academy_start', { sessionId: activeSession.id, title: activeSession.title });
+    }
+    return () => onRequestFocus?.(false);
+  }, [activeSession?.id, completedSessions, onRequestFocus, activeSession]);
+
+  // Hearing Mode: announce Zen break when exercise becomes ready
+  useEffect(() => {
+    if (!exerciseReady || !activeSession || completedSessions.includes(activeSession.id)) return;
+    if (!hearing?.active || !hearing.speakLine) return;
+    if (learningDecision === 'convert_fuel') return;
+    if (zenPromptedRef.current === activeSession.id) return;
+    zenPromptedRef.current = activeSession.id;
+    void hearing.speakLine(zenDecisionPrompt(activeSession.title));
+  }, [
+    exerciseReady,
+    activeSession,
+    completedSessions,
+    hearing,
+    learningDecision,
+  ]);
+
+  // Voice: Mind / Machine at the Zen gate
+  useEffect(() => {
+    if (!exerciseReady || !activeSession || completedSessions.includes(activeSession.id)) {
+      setZenDecisionHandler(null);
+      return;
+    }
+    setZenDecisionHandler(async (decision) => {
+      await applyLearningDecision(decision);
+      return true;
+    });
+    return () => setZenDecisionHandler(null);
+  }, [exerciseReady, activeSession, completedSessions, applyLearningDecision]);
+
   const recommendedIdx = useMemo(() => {
     if (ritualPending) {
       const sparkIdx = catalog.findIndex(
@@ -168,12 +299,23 @@ export default function AttentionAcademy({
       );
       if (sparkIdx >= 0) return sparkIdx;
     }
+    // Soft gate: Hook Mirror next after First Spark
+    const sparkDone = completedSessions.includes(FIRST_SPARK_SESSION.id);
+    const mirrorDone = completedSessions.includes(HOOK_MIRROR_SESSION.id);
+    if (sparkDone && !mirrorDone) {
+      const mirrorIdx = catalog.findIndex((s) => s.id === HOOK_MIRROR_SESSION.id);
+      if (mirrorIdx >= 0) return mirrorIdx;
+    }
     const next = catalog.findIndex((s) => !completedSessions.includes(s.id));
     return next === -1 ? null : next;
   }, [catalog, completedSessions, ritualPending]);
   const recommendedSession = recommendedIdx != null ? catalog[recommendedIdx] : null;
+  const hookMirrorPending =
+    completedSessions.includes(FIRST_SPARK_SESSION.id) &&
+    !completedSessions.includes(HOOK_MIRROR_SESSION.id);
   const showMentor =
     ritualPending ||
+    hookMirrorPending ||
     (!!recommendedSession && (state.energy < 55 || state.efficiency < 1.15));
 
   const settleSessionFuel = async (
@@ -192,6 +334,7 @@ export default function AttentionAcademy({
 
     const from = state.energy;
     let fuelApplied = false;
+    let onChainFuel = false;
     let to = from;
 
     try {
@@ -229,14 +372,70 @@ export default function AttentionAcademy({
           markEnergySurge();
           to = Math.min(100, from + session.rewards.energy);
           fuelApplied = true;
+          onChainFuel = true;
           setGrantRetry(null);
-          addLog(`ACADEMY ON-CHAIN: grant_energy confirmed. ${result.solscan}`, 'success');
+          addLog(`On-chain fuel landed — grant_energy. ${result.solscan}`, 'success');
+
+          // Mandatory PoA memo receipt (second signature) — proves this session on Devnet
+          const kind: AttentionProofKind =
+            session.id === FIRST_SPARK_SESSION.id
+              ? 'first_spark'
+              : session.id === HOOK_MIRROR_SESSION.id
+                ? 'hook_mirror'
+                : 'academy';
+          addLog('Sign the PoA receipt — one more signature seals attention on Devnet…', 'info');
+          const memoRes = await sendAttentionProofMemo({
+            kind,
+            parts: {
+              session: session.id,
+              score: agent?.score ?? 0,
+              grant: result.signature.slice(0, 12),
+              energy: session.rewards.energy,
+              bcc: session.rewards.cp,
+            },
+          });
+          if ('signature' in memoRes) {
+            if (agent?.verificationId) {
+              try {
+                await attestAttentionProof({
+                  verificationId: agent.verificationId,
+                  signature: memoRes.signature,
+                  sessionId: session.id,
+                  score: agent?.score,
+                });
+              } catch {
+                /* server record best-effort */
+              }
+            }
+            setState((prev) => ({
+              ...prev,
+              proofOfAttentions: (prev.proofOfAttentions || []).map((p, i) =>
+                i === 0 || p.sessionId === session.id
+                  ? {
+                      ...p,
+                      minted: true,
+                      attested: true,
+                      signature: memoRes.signature,
+                      attestPending: false,
+                    }
+                  : p
+              ),
+            }));
+            setPendingAttestId(null);
+            addLog(`PoA sealed on Devnet — ${memoRes.solscan}`, 'success');
+          } else {
+            setPendingAttestId(agent?.verificationId || `poa_${session.id}`);
+            addLog(
+              `PoA receipt needed — tap Attest memo (${memoRes.reason}). Fuel is already on-chain.`,
+              'warn'
+            );
+          }
         }
       }
     } catch (e: any) {
       setGrantRetry({ index, agent });
       addLog(
-        `ACADEMY GRANT FAILED: ${e?.message || e}. Tap Retry grant — stay here until fuel lands.`,
+        `Energy grant failed — ${e?.message || e}. Tap Retry grant so fuel lands on-chain.`,
         'warn'
       );
     }
@@ -247,12 +446,77 @@ export default function AttentionAcademy({
         setRitualPending(false);
         setFuelProofToast(true);
         onFirstRitualComplete?.({ from, to });
-        addLog('Proof accepted — your node has fuel.', 'success');
+        track('first_spark_complete', {
+          sessionId: session.id,
+          onChain: onChainFuel,
+        });
+        addLog(
+          onChainFuel
+            ? 'First Spark proved on-chain — your node has fuel.'
+            : 'Proof accepted — practice fuel for now; settlement brings on-chain next.',
+          'success'
+        );
       } else if (!opts?.retryOnly) {
         addLog(
           'First Spark quiz passed — finish the energy grant (Retry) so your node gets fuel.',
           'warn'
         );
+      }
+    }
+
+    if (fuelApplied && !opts?.retryOnly) {
+      track('session_complete', {
+        sessionId: session.id,
+        onChain: onChainFuel,
+      });
+      if (session.id === HOOK_MIRROR_SESSION.id) {
+        track('hook_mirror_complete', {
+          sessionId: session.id,
+          onChain: onChainFuel,
+        });
+        addLog(
+          onChainFuel
+            ? 'Hook Mirror sealed on-chain — bait, notice, why you stay.'
+            : 'HOOK MIRROR: Proof of Hook Awareness sealed — bait, notice, why you stay.',
+          'success'
+        );
+      }
+
+      // Practice mode: still try a PoA memo when a wallet is present (cheap attention proof)
+      if (!onChainFuel) {
+        const kind: AttentionProofKind =
+          session.id === FIRST_SPARK_SESSION.id
+            ? 'first_spark'
+            : session.id === HOOK_MIRROR_SESSION.id
+              ? 'hook_mirror'
+              : 'academy';
+        const memoRes = await sendAttentionProofMemo({
+          kind,
+          parts: {
+            session: session.id,
+            score: agent?.score ?? 0,
+            mode: 'practice',
+            energy: session.rewards.energy,
+          },
+        });
+        if ('signature' in memoRes) {
+          addLog(`Practice PoA memo on Devnet — ${memoRes.solscan}`, 'success');
+          setState((prev) => ({
+            ...prev,
+            proofOfAttentions: (prev.proofOfAttentions || []).map((p, i) =>
+              i === 0 || p.sessionId === session.id
+                ? {
+                    ...p,
+                    minted: true,
+                    attested: true,
+                    signature: memoRes.signature,
+                    attestPending: false,
+                  }
+                : p
+            ),
+          }));
+          setPendingAttestId(null);
+        }
       }
     }
 
@@ -293,8 +557,16 @@ export default function AttentionAcademy({
             arciumTxSignature: agent.arcium.txSignature,
           }
         : {};
+      const activityLabel =
+        session.id === HOOK_MIRROR_SESSION.id
+          ? 'Proof of Hook Awareness'
+          : session.title;
       if (agent?.proof) {
-        proofs.unshift({ ...agent.proof, ...arciumFields });
+        proofs.unshift({
+          ...agent.proof,
+          activity: session.id === HOOK_MIRROR_SESSION.id ? activityLabel : agent.proof.activity,
+          ...arciumFields,
+        });
       } else if (agent) {
         proofs.unshift({
           id: `poa_local_${Date.now()}`,
@@ -303,7 +575,7 @@ export default function AttentionAcademy({
               JSON.parse(localStorage.getItem('solana_current_user_session_v1') || '{}')
                 ?.walletAddress) ||
             'unknown',
-          activity: session.title,
+          activity: activityLabel,
           duration: session.durationMin,
           verification: agent.verification,
           rewardEnergy: session.rewards.energy,
@@ -454,6 +726,13 @@ export default function AttentionAcademy({
   const claimSessionRewards = (index: number) => {
     const session = catalog[index];
     if (!session || completedSessions.includes(session.id) || !exerciseReady) return;
+    if (getZenDecision(session.id) !== 'convert_fuel' && learningDecision !== 'convert_fuel') {
+      addLog('Sit with Mind a moment — or tap Machine when you’re ready to prove it.', 'info');
+      if (hearing?.active && hearing.speakLine) {
+        void hearing.speakLine(zenDecisionPrompt(session.title));
+      }
+      return;
+    }
 
     const pool = session.quiz.length ? session.quiz : [];
     const shuffled = [...pool].sort(() => 0.5 - Math.random());
@@ -466,16 +745,65 @@ export default function AttentionAcademy({
     setSelectedQuizAnswer(null);
     setQuizScore(0);
     setQuizState('quiz');
+    onRequestFocus?.(true);
+    track('neural_snap_start', { sessionId: session.id, questions: count });
     addLog(`NEURAL SNAP: ${count} question(s) for "${session.title}".`, 'info');
   };
 
   const attestPendingPoa = async () => {
     if (!pendingAttestId) return;
     try {
+      const poa = (state.proofOfAttentions || []).find((p) => p.id === pendingAttestId);
+      const kind: AttentionProofKind =
+        poa?.sessionId === FIRST_SPARK_SESSION.id
+          ? 'first_spark'
+          : poa?.sessionId === HOOK_MIRROR_SESSION.id
+            ? 'hook_mirror'
+            : 'academy';
+      const memoRes = await sendAttentionProofMemo({
+        kind,
+        parts: {
+          session: poa?.sessionId || pendingAttestId,
+          score: poa?.score ?? 0,
+        },
+      });
+      if ('skipped' in memoRes) {
+        addLog(`Attest blocked — ${memoRes.reason}`, 'warn');
+        return;
+      }
+      await attestAttentionProof({
+        verificationId: pendingAttestId,
+        signature: memoRes.signature,
+        sessionId: poa?.sessionId,
+        score: poa?.score,
+      });
+      setState((prev) => ({
+        ...prev,
+        proofOfAttentions: (prev.proofOfAttentions || []).map((p) =>
+          p.id === pendingAttestId
+            ? {
+                ...p,
+                minted: true,
+                attested: true,
+                signature: memoRes.signature,
+                attestPending: false,
+              }
+            : p
+        ),
+      }));
+      setPendingAttestId(null);
+      addLog(`PoA sealed on Devnet — ${memoRes.solscan}`, 'success');
+    } catch (err: any) {
+      addLog(`Attest failed — ${err?.message || err}`, 'warn');
+    }
+  };
+
+  const openSoulboundRitual = () => {
+    try {
       const sessionRaw = localStorage.getItem('solana_current_user_session_v1');
       const sessionUser = sessionRaw ? JSON.parse(sessionRaw) : null;
       if (!sessionUser?.walletAddress) {
-        addLog('ATTEST BLOCKED: No wallet session', 'warn');
+        addLog('SOULBOUND: Connect a wallet first.', 'warn');
         return;
       }
       let localKeypair: Keypair | null = null;
@@ -483,39 +811,40 @@ export default function AttentionAcademy({
         const secret = localStorage.getItem('solana_local_secret');
         if (secret) localKeypair = Keypair.fromSecretKey(Uint8Array.from(JSON.parse(secret)));
       }
-      const poa = (state.proofOfAttentions || []).find((p) => p.id === pendingAttestId);
-      const memo = `poa:${poa?.sessionId || pendingAttestId}:${poa?.score ?? 0}`;
-      const signature = await sendPoaMemoAttestation({
-        walletAddress: sessionUser.walletAddress,
-        walletType: sessionUser.walletType || 'local',
+      setRitualWallet({
+        address: sessionUser.walletAddress,
+        walletType: sessionUser.walletType === 'extension' ? 'extension' : 'local',
         localKeypair,
-        memo,
       });
-      await attestAttentionProof({
-        verificationId: pendingAttestId,
-        signature,
-        sessionId: poa?.sessionId,
-        score: poa?.score,
-      });
-      setState((prev) => ({
-        ...prev,
-        proofOfAttentions: (prev.proofOfAttentions || []).map((p) =>
-          p.id === pendingAttestId ? { ...p, minted: true, signature, attestPending: false } : p
-        ),
-      }));
-      setPendingAttestId(null);
-      addLog(`ATTESTED ON DEVNET: ${signature.slice(0, 16)}…`, 'success');
-    } catch (err: any) {
-      addLog(`ATTEST FAILED: ${err?.message || err}`, 'warn');
+      setShowSoulboundRitual(true);
+      onRequestFocus?.(true);
+    } catch {
+      addLog('SOULBOUND: Could not read wallet session.', 'warn');
     }
   };
 
+  const onSoulboundComplete = (rep: SoulboundReputation) => {
+    setState((prev) => ({
+      ...prev,
+      soulboundReputation: rep,
+      proofOfAttentions: (prev.proofOfAttentions || []).map((p) => ({
+        ...p,
+        soulboundMinted: true,
+        soulbound: rep,
+      })),
+    }));
+    onRequestFocus?.(false);
+  };
+
   if (!activeSession) {
-    return <p className="text-slate-500 text-sm">No sessions in catalog.</p>;
+    return (
+      <p className="text-slate-400 text-sm font-sans">
+        Curriculum catching up — give it a moment, then refresh.
+      </p>
+    );
   }
 
-  const isLocked =
-    activeSessionIdx > 0 && !completedSessions.includes(catalog[activeSessionIdx - 1]?.id);
+  const isLocked = isSessionLocked(activeSessionIdx);
 
   return (
     <div className="space-y-6">
@@ -527,17 +856,17 @@ export default function AttentionAcademy({
               : 'border-cyan-400/30 bg-gradient-to-r from-cyan-500/10 via-[#0a0a0c] to-emerald-500/10'
           }`}
         >
-          {ritualPending ? (
-            <div className="absolute inset-0 opacity-90">
-              <CinematicBackdrop variant="ritual" />
-            </div>
-          ) : (
-            <div className="absolute inset-0 bg-cyan-400/5 animate-pulse pointer-events-none" />
-          )}
+          <div className="absolute inset-0 opacity-95">
+            <CinematicBackdrop variant={ritualPending ? 'ritual' : 'duality'} />
+          </div>
           <div className="relative flex flex-wrap items-center gap-2 mb-1.5">
             <p className="text-[10px] font-mono text-cyan-400 tracking-[0.22em] uppercase flex items-center gap-1.5">
               <Sparkles className="w-3.5 h-3.5" />{' '}
-              {ritualPending ? 'First Spark · science you can feel' : 'AI mentor · Knowledge fuel'}
+              {ritualPending
+                ? 'First Spark · Proof of Attention'
+                : hookMirrorPending
+                  ? 'Hook Mirror · why you scroll again'
+                  : 'AI mentor · attention → fuel'}
             </p>
             <span
               className={`text-[9px] font-mono uppercase tracking-wider px-2 py-0.5 rounded-md border ${
@@ -564,8 +893,19 @@ export default function AttentionAcademy({
           <p className="text-sm text-slate-100 mt-1.5 relative leading-relaxed">
             {ritualPending ? (
               <>
-                Don&apos;t take our word — run the bias check, leave one honest line, watch fuel
-                climb. Plasticity + attention control, compressed.{' '}
+                We&apos;re here for attention — not empty hashes. Pass a short snap, leave one honest
+                line, watch knowledge become fuel. That&apos;s Proof of Attention.{' '}
+                {recommendedSession ? (
+                  <>
+                    <span className="text-amber-300 font-semibold">{recommendedSession.title}</span>
+                    {' '}(~{recommendedSession.durationMin} min).
+                  </>
+                ) : null}
+              </>
+            ) : hookMirrorPending ? (
+              <>
+                This is why Culture Node exists — name what hooks you, what you notice when
+                you&apos;re doomscrolling again, and why you keep going. Then Zen: Mind or Machine.{' '}
                 {recommendedSession ? (
                   <>
                     <span className="text-amber-300 font-semibold">{recommendedSession.title}</span>
@@ -593,7 +933,11 @@ export default function AttentionAcademy({
               onClick={() => setActiveSessionIdx(recommendedIdx)}
               className="mt-3 relative text-[10px] font-mono uppercase tracking-wider px-3 py-1.5 rounded-lg bg-cyan-500 text-black font-black hover:bg-cyan-400 cursor-pointer"
             >
-              {ritualPending ? 'Start First Spark →' : 'Start recommended session →'}
+              {ritualPending
+                ? 'Start First Spark →'
+                : hookMirrorPending
+                  ? 'Start Hook Mirror →'
+                  : 'Start recommended session →'}
             </button>
           )}
         </div>
@@ -627,8 +971,12 @@ export default function AttentionAcademy({
           className="w-full text-left rounded-xl border border-emerald-500/20 bg-gradient-to-r from-emerald-500/10 to-violet-500/10 px-4 py-3 flex items-center justify-between gap-3 hover:border-emerald-400/40 transition-colors"
         >
           <div>
-            <p className="text-[10px] font-mono text-emerald-400 tracking-widest uppercase">Roadmap</p>
-            <p className="text-sm text-slate-200">2D mining → weekly intelligence → creator labs → AR experiences</p>
+            <p className="text-[10px] font-mono text-emerald-400 tracking-widest uppercase">
+              Roadmap · 4 films
+            </p>
+            <p className="text-sm text-slate-200">
+              2D mining → weekly intelligence → creator labs → AR — each chapter has its own video
+            </p>
           </div>
           <Map className="w-4 h-4 text-emerald-400 shrink-0" />
         </button>
@@ -688,7 +1036,7 @@ export default function AttentionAcademy({
           <div className="space-y-1.5 max-h-[420px] overflow-y-auto pr-1">
             {catalog.map((session, idx) => {
               const done = completedSessions.includes(session.id);
-              const locked = idx > 0 && !completedSessions.includes(catalog[idx - 1].id);
+              const locked = isSessionLocked(idx);
               const recommended = recommendedIdx === idx && !done && !locked;
               return (
                 <button
@@ -732,7 +1080,10 @@ export default function AttentionAcademy({
         </div>
         )}
 
-        <div className={`${ritualPending ? '' : 'lg:col-span-2'} rounded-2xl border border-white/5 bg-[#0a0a0c] p-5 relative overflow-hidden`}>
+        <div className={`${ritualPending ? '' : 'lg:col-span-2'} rounded-2xl border border-white/10 bg-[#0a0a0c]/80 p-5 relative overflow-hidden`}>
+          <div className="absolute inset-0 opacity-80">
+            <CinematicBackdrop variant="duality" />
+          </div>
           {justUpgraded && (
             <div className="absolute inset-x-0 top-0 bg-emerald-500/20 text-emerald-300 text-center text-[11px] font-mono py-1.5 z-10">
               {fuelProofToast
@@ -741,20 +1092,21 @@ export default function AttentionAcademy({
             </div>
           )}
 
-          <div className="flex items-start justify-between gap-3 mb-4">
+          <div className="relative z-[1] flex items-start justify-between gap-3 mb-4">
             <div>
-              <p className="text-[10px] font-mono text-fuchsia-400 tracking-widest">
-                SESSION {String(activeSession.seriesOrder).padStart(2, '0')}
+              <p className="text-[10px] font-mono text-amber-300/90 tracking-widest">
+                SESSION {String(activeSession.seriesOrder).padStart(2, '0')} · MIND ↔ MACHINE
               </p>
               <h3 className="text-lg font-bold text-white mt-1">{activeSession.title}</h3>
             </div>
-            <span className="text-[10px] font-mono text-slate-500 shrink-0">
+            <span className="text-[10px] font-mono text-cyan-400/80 shrink-0">
               EST {activeSession.durationMin} MIN
             </span>
           </div>
 
+          <div className="relative z-[1]">
           {isLocked ? (
-            <div className="flex flex-col items-center justify-center py-16 text-slate-500">
+            <div className="flex flex-col items-center justify-center py-16 text-slate-400">
               <Lock className="w-8 h-8 mb-3" />
               <p className="text-sm">Complete the previous session to unlock.</p>
             </div>
@@ -768,17 +1120,26 @@ export default function AttentionAcademy({
                 addLog={addLog}
               />
 
-              <p className="mt-4 text-[11px] text-slate-500 italic">{activeSession.nextHook}</p>
+              <p className="mt-4 text-[11px] text-slate-400 italic">{activeSession.nextHook}</p>
+
+              {exerciseReady && !completedSessions.includes(activeSession.id) && (
+                <ZenDecisionGate
+                  sessionTitle={activeSession.title}
+                  decision={learningDecision}
+                  onDecide={(d) => void applyLearningDecision(d)}
+                  zenMode={zenModeOn}
+                />
+              )}
 
               <div className="mt-5 flex flex-wrap gap-3">
                 {!completedSessions.includes(activeSession.id) && (
                   <button
                     type="button"
-                    disabled={!exerciseReady}
+                    disabled={!exerciseReady || learningDecision !== 'convert_fuel'}
                     onClick={() => claimSessionRewards(activeSessionIdx)}
-                    className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-fuchsia-500/20 border border-fuchsia-400/40 text-fuchsia-200 text-xs font-bold disabled:opacity-40"
+                    className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-500/25 to-cyan-500/25 border border-cyan-400/40 text-cyan-100 text-xs font-bold disabled:opacity-40"
                   >
-                    SUBMIT FOR NEURAL SNAP <ArrowRight className="w-3.5 h-3.5" />
+                    Prove it · Neural Snap <ArrowRight className="w-3.5 h-3.5" />
                   </button>
                 )}
                 {pendingAttestId && (
@@ -787,16 +1148,26 @@ export default function AttentionAcademy({
                     onClick={() => void attestPendingPoa()}
                     className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-500/15 border border-emerald-400/40 text-emerald-300 text-xs font-bold"
                   >
-                    <ShieldCheck className="w-3.5 h-3.5" /> ATTEST ON DEVNET
+                    <ShieldCheck className="w-3.5 h-3.5" /> Seal PoA on Devnet
+                  </button>
+                )}
+                {!state.soulboundReputation?.soulboundMinted && (
+                  <button
+                    type="button"
+                    onClick={openSoulboundRitual}
+                    className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-cyan-500/20 border border-cyan-400/45 text-cyan-100 text-xs font-bold"
+                  >
+                    <Sparkles className="w-3.5 h-3.5" /> SEAL SOULBOUND · ZK
                   </button>
                 )}
               </div>
-              <p className="mt-3 text-[10px] text-slate-600">
+              <p className="mt-3 text-[10px] text-slate-500">
                 Rewards: +{activeSession.rewards.cp} CP · +{activeSession.rewards.energy}% energy · +
                 {activeSession.rewards.efficiency} efficiency
               </p>
             </>
           )}
+          </div>
         </div>
       </div>
 
@@ -806,10 +1177,19 @@ export default function AttentionAcademy({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[80] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4"
+            className="fixed inset-0 z-[80] bg-black/75 backdrop-blur-sm flex items-center justify-center p-4"
           >
-            <div className="w-full max-w-lg rounded-2xl border border-fuchsia-500/30 bg-[#0c0c12] p-6 shadow-2xl">
-              <p className="text-[10px] font-mono text-fuchsia-400 tracking-widest mb-2">NEURAL SNAP</p>
+            <div className="absolute inset-0 opacity-50 pointer-events-none">
+              <CinematicBackdrop variant="duality" />
+            </div>
+            <div className="relative z-[1] w-full max-w-lg rounded-2xl border border-cyan-400/30 bg-[#0c0c12]/90 p-6 shadow-2xl overflow-hidden">
+              <div className="absolute inset-0 opacity-40 pointer-events-none">
+                <CinematicBackdrop variant="duality" />
+              </div>
+              <div className="relative z-[1]">
+              <p className="text-[10px] font-mono text-amber-300 tracking-widest mb-2">
+                NEURAL SNAP · MIND ↔ MACHINE
+              </p>
               <p className="text-sm text-slate-200 mb-4">
                 {activeQuizQuestions[currentQuizIdx].question}
               </p>
@@ -821,7 +1201,7 @@ export default function AttentionAcademy({
                     onClick={() => setSelectedQuizAnswer(oi)}
                     className={`w-full text-left text-xs px-3 py-2.5 rounded-xl border ${
                       selectedQuizAnswer === oi
-                        ? 'border-fuchsia-400/50 bg-fuchsia-500/15 text-fuchsia-100'
+                        ? 'border-cyan-400/50 bg-cyan-500/15 text-cyan-100'
                         : 'border-white/10 text-slate-400'
                     }`}
                   >
@@ -847,15 +1227,25 @@ export default function AttentionAcademy({
                       setQuizScore(finalScore);
                       setQuizState('failed');
                       setAgentVerifyMsg(`Need 100% on Neural Snap (${finalScore}/${total}).`);
+                      track('neural_snap_fail', {
+                        score: finalScore,
+                        total,
+                        sessionId: activeSession?.id,
+                      });
                       return;
                     }
                     setQuizScore(finalScore);
+                    track('neural_snap_pass', {
+                      score: finalScore,
+                      total,
+                      sessionId: activeSession?.id,
+                    });
                     if (pendingSessionIdx != null) {
                       void runAgentVerification(pendingSessionIdx, finalScore, total);
                     }
                   }
                 }}
-                className="mt-4 w-full py-2.5 rounded-xl bg-fuchsia-500/25 border border-fuchsia-400/40 text-fuchsia-100 text-xs font-bold disabled:opacity-40"
+                className="mt-4 w-full py-2.5 rounded-xl bg-gradient-to-r from-amber-500/30 to-cyan-500/30 border border-cyan-400/40 text-cyan-50 text-xs font-bold disabled:opacity-40"
               >
                 {isScanningOverlay
                   ? 'CONFIDENTIAL VERIFY…'
@@ -866,6 +1256,7 @@ export default function AttentionAcademy({
               {agentVerifyMsg && (
                 <p className="mt-2 text-[11px] text-slate-500">{agentVerifyMsg}</p>
               )}
+              </div>
             </div>
           </motion.div>
         )}
@@ -959,6 +1350,21 @@ export default function AttentionAcademy({
             )}
           </div>
         </div>
+      )}
+
+      {ritualWallet && (
+        <SoulboundRitualOverlay
+          open={showSoulboundRitual}
+          onClose={() => {
+            setShowSoulboundRitual(false);
+            onRequestFocus?.(false);
+          }}
+          walletAddress={ritualWallet.address}
+          walletType={ritualWallet.walletType}
+          localKeypair={ritualWallet.localKeypair}
+          addLog={addLog}
+          onComplete={onSoulboundComplete}
+        />
       )}
     </div>
   );

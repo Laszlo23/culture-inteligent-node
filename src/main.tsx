@@ -2,11 +2,14 @@ import './buffer-polyfill';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App.tsx';
+import { SoundProvider } from './lib/sound/SoundContext';
 import './index.css';
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <App />
+    <SoundProvider>
+      <App />
+    </SoundProvider>
   </StrictMode>
 );
 

@@ -117,14 +117,14 @@ export default function Treasury({
             setClaimedToday(true);
             setLastClaimTime(String(player.lastDailyTs * 1000));
             const hrs = Math.ceil(remaining / 3600000);
-            setCooldownHint(`Program cooldown ~${hrs}h remaining (20h window)`);
+            setCooldownHint(`Next free refill in ~${hrs}h — you have got this`);
           } else {
             setClaimedToday(false);
-            setCooldownHint('claim_daily available — 20h program cooldown');
+            setCooldownHint('Ready again after ~20h — same for everyone');
           }
         } else {
           setClaimedToday(false);
-          setCooldownHint('First claim_daily — +15% energy + 50 BCC on-chain');
+          setCooldownHint('First free refill — +15% energy + 50 BCC on Devnet');
         }
       } catch {
         /* ignore */
@@ -170,7 +170,7 @@ export default function Treasury({
         const sig = await swapBccToCgtOnChain(cpVal);
         await syncLedgerToState(setState);
         addLog(
-          `DUALITY ON-CHAIN: Mind → Machine swap_bcc_to_cgt ${cpVal} BCC. https://solscan.io/tx/${sig}?cluster=devnet`,
+          `Duality on-chain (swap + PoA memo) — Mind → Machine ${cpVal} BCC. https://solscan.io/tx/${sig}?cluster=devnet`,
           'success'
         );
       }
@@ -184,24 +184,24 @@ export default function Treasury({
 
   const triggerDailyClaim = async () => {
     if (claimedToday) {
-      addLog('CLAIM BLOCKED: claim_daily still in 20h program cooldown.', 'warn');
+      addLog('Still cooling down — your next free refill lands in ~20h. Academy fuel still works.', 'info');
       return;
     }
 
     setIsSigning(true);
-    setSigStep('Building claim_daily…');
+    setSigStep('Preparing today’s refill…');
     try {
       const { fetchEconomyStatus } = await import('../lib/api');
       const { claimDailyOnChain, syncLedgerToState } = await import('../lib/economy-actions');
       const status = await fetchEconomyStatus();
       if (!status.ready) {
         addLog(
-          'CLAIM BLOCKED: Economy not configured — no local fake drip. Bootstrap mints to enable claim_daily (+15% energy + 50 BCC, 20h cooldown).',
-          'warn'
+          'Settlement warming up — Academy fuel still works while Devnet claim comes online.',
+          'info'
         );
         return;
       }
-      setSigStep('Awaiting wallet signature…');
+      setSigStep('Confirm in your wallet…');
       const sig = await claimDailyOnChain();
       setGeneratedSignature(sig);
       await syncLedgerToState(setState);
@@ -211,13 +211,13 @@ export default function Treasury({
       setClaimedToday(true);
       setStreak((s) => s + 1);
       localStorage.setItem('solana_daily_streak_v1', String(streak + 1));
-      setCooldownHint('Program cooldown ~20h — next claim_daily after window');
+      setCooldownHint('Next free refill in ~20h — see you then');
       addLog(
-        `CLAIM ON-CHAIN: claim_daily (+15% energy + 50 BCC). https://solscan.io/tx/${sig}?cluster=devnet`,
+        `Daily fuel + PoA memo on-chain — +15% energy · +50 BCC. https://solscan.io/tx/${sig}?cluster=devnet`,
         'success'
       );
     } catch (e: any) {
-      addLog(`CLAIM FAILED: ${e?.message || e}`, 'warn');
+      addLog(`Claim didn’t land — ${e?.message || e}. Try again when you’re ready.`, 'warn');
     } finally {
       setIsSigning(false);
       setSigStep('');
@@ -386,7 +386,7 @@ export default function Treasury({
             <div className="flex items-center gap-2">
               <Trophy className="w-5 h-5 text-cyan-400" />
               <h3 className="font-mono text-sm font-semibold text-slate-100 tracking-wider">
-                CLAIM_DAILY · SOLE FREE DRIP
+                TODAY&apos;S FUEL · FREE REFILL
               </h3>
             </div>
             <span
@@ -396,14 +396,13 @@ export default function Treasury({
                   : 'bg-amber-950/40 border-amber-500/20 text-amber-400'
               }`}
             >
-              {economyReady ? 'ON-CHAIN READY' : 'NEEDS BOOTSTRAP'}
+              {economyReady ? 'DEVNET LIVE' : 'SETTLEMENT OFF'}
             </span>
           </div>
 
           <p className="text-xs text-slate-400 font-sans mb-2 leading-relaxed">
-            Program instruction <span className="text-cyan-300 font-mono">claim_daily</span>: +15%
-            energy + 50 BCC, enforced ~20h cooldown on your Player PDA — not the browser. Fair for
-            everyone; no fake local drip when economy is live.
+            Your free daily — +15% energy + 50 BCC on Devnet. ~20h cooldown, same for everyone. No
+            fake drip when settlement is live.
           </p>
           {cooldownHint && (
             <p className="text-[10px] font-mono text-slate-500 mb-6">{cooldownHint}</p>
@@ -454,7 +453,7 @@ export default function Treasury({
             <div className="bg-[#050506] border border-white/5 rounded-xl p-4 flex flex-col justify-between text-center relative overflow-hidden">
               <div>
                 <span className="text-[8px] text-slate-500 font-mono tracking-widest block uppercase">
-                  claim_daily status
+                  Your refill
                 </span>
                 <div className="my-4 flex flex-col items-center justify-center">
                   {!economyReady ? (
@@ -463,10 +462,10 @@ export default function Treasury({
                         <Lock className="w-5 h-5" />
                       </div>
                       <span className="font-mono text-xs font-black text-amber-300 uppercase tracking-widest">
-                        Settlement offline
+                        Settlement warming
                       </span>
                       <span className="font-sans text-[10px] text-slate-400 mt-1 px-2">
-                        claim_daily needs on-chain mode — Academy fuel still works
+                        Academy fuel still works — keep proving attention
                       </span>
                     </>
                   ) : claimedToday ? (
@@ -475,10 +474,10 @@ export default function Treasury({
                         <Lock className="w-5 h-5" />
                       </div>
                       <span className="font-mono text-xs font-black text-emerald-400 uppercase tracking-widest">
-                        Cooldown active
+                        You claimed today
                       </span>
                       <span className="font-sans text-[10px] text-slate-400 mt-1 px-2">
-                        {cooldownHint || 'Wait for the 20h program window'}
+                        {cooldownHint || 'Next free refill in ~20h'}
                       </span>
                     </>
                   ) : (
@@ -487,7 +486,7 @@ export default function Treasury({
                         <Unlock className="w-5 h-5" />
                       </div>
                       <span className="font-mono text-xs font-black text-cyan-400 uppercase tracking-widest">
-                        Ready to claim
+                        Ready for you
                       </span>
                       <span className="font-sans text-[10px] text-slate-400 mt-1 px-2">
                         +15% energy · +50 BCC on Devnet
@@ -510,12 +509,12 @@ export default function Treasury({
                 >
                   <FileText className="w-3.5 h-3.5" />
                   {isSigning
-                    ? 'SIGNING…'
+                    ? 'CONFIRM…'
                     : !economyReady
-                      ? 'UNAVAILABLE'
+                      ? 'WARMING UP'
                       : claimedToday
-                        ? 'COOLDOWN'
-                        : 'CLAIM_DAILY'}
+                        ? 'SEE YOU IN ~20H'
+                        : 'CLAIM TODAY · +15% · +50 BCC'}
                 </button>
                 {!economyReady && onOpenAcademy && (
                   <button

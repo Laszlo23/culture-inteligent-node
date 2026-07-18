@@ -48,6 +48,7 @@ const IX: Record<string, number[]> = {
   cancel_list: [0, 0, 0, 0, 0, 0, 0, 0],
   buy_miner: [0, 0, 0, 0, 0, 0, 0, 0],
   drain_energy: [0, 0, 0, 0, 0, 0, 0, 0],
+  mint_soulbound_badge: [0, 0, 0, 0, 0, 0, 0, 0],
 };
 
 // Compute discriminators with SubtleCrypto-compatible sync hash via tweetnacl-style:

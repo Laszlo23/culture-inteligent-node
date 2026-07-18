@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { GameState } from '../types';
 import AttentionAcademy from './AttentionAcademy';
+import SignalDesk from './SignalDesk';
 import { isFirstRitualPending } from '../lib/first-run';
 
 interface ResearchLabProps {
@@ -27,6 +28,8 @@ interface ResearchLabProps {
   onOpenRoadmap?: () => void;
   onFirstRitualComplete?: (detail?: { from: number; to: number }) => void;
   onOpenTollShop?: (sku?: 'academy_retake' | 'spark_refill') => void;
+  onOpenVoid?: (draft?: string) => void;
+  onRequestFocus?: (on: boolean) => void;
 }
 
 interface SavedSession {
@@ -45,6 +48,8 @@ export default function ResearchLab({
   onOpenRoadmap,
   onFirstRitualComplete,
   onOpenTollShop,
+  onOpenVoid,
+  onRequestFocus,
 }: ResearchLabProps) {
   const [topic, setTopic] = useState('');
   const [summary, setSummary] = useState('');
@@ -142,23 +147,25 @@ export default function ResearchLab({
         )}
         <div className="relative z-10">
           <p className="text-[10px] font-mono uppercase tracking-[0.25em] text-cyan-400">
-            {ritualPending ? 'Attention Intelligence · cold start' : 'Knowledge → Energy → Node'}
+            {ritualPending
+              ? "We're here for attention · cold start"
+              : 'Attention → Proof → Fuel → Node'}
           </p>
           <h2 className="font-display mt-1 text-xl md:text-2xl font-extrabold italic text-white">
             {ritualPending ? 'First Spark' : 'Attention Academy'}
           </h2>
           <p className="mt-1.5 text-sm text-slate-400 max-w-xl">
             {ritualPending
-              ? 'Bias check + one artifact line. Same science stack as the full series — just the first charge. Watch fuel move when you pass.'
-              : 'Complete a verified session to refill knowledge fuel. When fuel is live, your NFT mining feeds wake up.'}
+              ? 'Prove focused attention in ~2 min. Bias check + one honest line. Fuel moves when Proof of Attention lands — not before.'
+              : 'Verified attention refills knowledge fuel. Complete sessions. Name your hooks. Zen-decide. Mining wakes when attention is live.'}
           </p>
           {ritualPending && (
             <div className="mt-3 flex flex-wrap gap-2 text-[9px] font-mono uppercase tracking-wider">
               <span className="px-2 py-1 rounded-md border border-cyan-400/30 bg-cyan-500/10 text-cyan-200">
-                Why empty hashes fail
+                Proof of Attention
               </span>
               <span className="px-2 py-1 rounded-md border border-white/12 bg-white/5 text-slate-300">
-                Focused attention → fuel
+                Not empty hashes
               </span>
               <span className="px-2 py-1 rounded-md border border-amber-400/25 bg-amber-500/10 text-amber-100">
                 ~2 min
@@ -167,6 +174,14 @@ export default function ResearchLab({
           )}
         </div>
       </div>
+
+      {!ritualPending && (
+        <SignalDesk
+          addLog={addLog}
+          onOpenVoid={onOpenVoid}
+          onOpenAcademy={() => setActiveTab('academy')}
+        />
+      )}
 
       {!ritualPending && (
       <div className="flex border-b border-white/5 gap-6 font-mono text-xs">
@@ -212,6 +227,7 @@ export default function ResearchLab({
               onOpenRoadmap={onOpenRoadmap}
               onFirstRitualComplete={onFirstRitualComplete}
               onOpenTollShop={onOpenTollShop}
+              onRequestFocus={onRequestFocus}
             />
           </motion.div>
         ) : (

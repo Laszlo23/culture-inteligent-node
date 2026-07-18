@@ -2,16 +2,24 @@
  * Generic Attention Intelligence exercise renderer by exerciseType.
  */
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { motion } from 'motion/react';
 import { Zap, Check, Play, RotateCcw } from 'lucide-react';
 import type { AttentionSession } from '../content/attention-intelligence';
+import { CinematicBackdrop } from './fx';
+import { useHearing } from '../lib/hearing/context';
+import { setHearingSessionHandler } from '../lib/hearing/session-bridge';
+import type { HearingCommand } from '../lib/hearing/commands';
 
 interface AttentionSessionPlayerProps {
   session: AttentionSession;
   completed: boolean;
   onReadyChange: (ready: boolean, artifacts: string) => void;
   addLog: (message: string, type: 'info' | 'success' | 'warn' | 'system') => void;
+}
+
+function optionLabel(i: number): string {
+  return ['one', 'two', 'three'][i] || String(i + 1);
 }
 
 export default function AttentionSessionPlayer({
@@ -21,6 +29,12 @@ export default function AttentionSessionPlayer({
   addLog,
 }: AttentionSessionPlayerProps) {
   const ex = session.exercise;
+  const hearing = useHearing();
+  const hearingActive = Boolean(hearing?.active);
+  const speakLine = hearing?.speakLine;
+  const narratedSessionRef = useRef<string | null>(null);
+  const lastBreathCueRef = useRef('');
+  const lastScanCueRef = useRef(0);
 
   // shared-ish state keyed by type
   const [skill, setSkill] = useState('');
@@ -47,6 +61,10 @@ export default function AttentionSessionPlayer({
   const [multiplierIdx, setMultiplierIdx] = useState(0);
   const [multiplierRating, setMultiplierRating] = useState(5);
   const [multiplierAction, setMultiplierAction] = useState('');
+  const [hookBait, setHookBait] = useState('');
+  const [hookNotice, setHookNotice] = useState('');
+  const [hookWhy, setHookWhy] = useState('');
+  const hookReadyAnnouncedRef = useRef(false);
 
   useEffect(() => {
     // reset when session changes
@@ -70,6 +88,10 @@ export default function AttentionSessionPlayer({
     setMultiplierIdx(0);
     setMultiplierRating(5);
     setMultiplierAction('');
+    setHookBait('');
+    setHookNotice('');
+    setHookWhy('');
+    hookReadyAnnouncedRef.current = false;
     if (ex.type === 'bias_quiz') {
       setBiasAnswers(ex.questions.map(() => null));
     }
@@ -131,6 +153,169 @@ export default function AttentionSessionPlayer({
     return () => clearInterval(interval);
   }, [scanActive, ex, addLog]);
 
+  // Hearing Mode: narrate session open once
+  useEffect(() => {
+    if (!hearingActive || !speakLine || completed) return;
+    if (narratedSessionRef.current === session.id) return;
+    narratedSessionRef.current = session.id;
+
+    void (async () => {
+      await speakLine(
+        `${session.title}. ${session.hook} Duration about ${session.durationMin} minutes.`
+      );
+
+      if (ex.type === 'bias_quiz') {
+        const q = ex.questions[0];
+        const opts = q.options
+          .map((o, i) => `Option ${optionLabel(i)}: ${o}`)
+          .join('. ');
+        await speakLine(`Question one. ${q.prompt}. ${opts}. Say one, two, or three.`);
+      } else if (ex.type === 'grounding_breath') {
+        await speakLine(
+          `Grounding first. Fill five senses, then say start for box breathing. ${ex.breathRounds} rounds.`
+        );
+      } else if (ex.type === 'body_scan') {
+        await speakLine(`Body scan. Say start for a ${ex.seconds} second landing.`);
+      } else if (ex.type === 'reps_track') {
+        await speakLine(`${ex.skillPrompt} Type your skill on screen, then discharge reps.`);
+      } else if (ex.type === 'hook_mirror') {
+        await speakLine(
+          [
+            'Hook Mirror. Proof of Hook Awareness.',
+            ex.hookPrompt,
+            'Type your answer on screen.',
+            'Then the notice prompt.',
+            'Then why you keep going.',
+            'When all three are honest, Zen break waits — Mind or Machine.',
+          ].join(' ')
+        );
+        await speakLine(ex.noticePrompt);
+        await speakLine(ex.whyPrompt);
+      } else {
+        await speakLine('Follow the on-screen prompts. Say help anytime.');
+      }
+    })();
+  }, [hearingActive, speakLine, session.id, session.title, session.hook, session.durationMin, ex, completed]);
+
+  // Hearing Mode: breath phase cues
+  useEffect(() => {
+    if (!hearingActive || !speakLine || ex.type !== 'grounding_breath') return;
+    if (breathState === 'idle') return;
+    const cue =
+      breathState === 'complete'
+        ? 'Breathing complete. Calibrated.'
+        : breathState === 'inhale'
+          ? 'Inhale'
+          : breathState === 'hold1' || breathState === 'hold2'
+            ? 'Hold'
+            : 'Exhale';
+    if (lastBreathCueRef.current === `${breathState}-${breathRounds}`) return;
+    lastBreathCueRef.current = `${breathState}-${breathRounds}`;
+    void speakLine(cue);
+  }, [hearingActive, speakLine, breathState, breathRounds, ex]);
+
+  // Hearing Mode: body scan milestones
+  useEffect(() => {
+    if (!hearingActive || !speakLine || ex.type !== 'body_scan' || !scanActive) return;
+    if (scanLeft === 30 || scanLeft === 10) {
+      if (lastScanCueRef.current === scanLeft) return;
+      lastScanCueRef.current = scanLeft;
+      void speakLine(`${scanLeft} seconds left.`);
+    }
+  }, [hearingActive, speakLine, scanActive, scanLeft, ex]);
+
+  useEffect(() => {
+    if (!hearingActive || !speakLine || ex.type !== 'body_scan' || !scanDone) return;
+    if (lastScanCueRef.current === -1) return;
+    lastScanCueRef.current = -1;
+    void speakLine('Landing complete. Type a short summary on screen.');
+  }, [hearingActive, speakLine, scanDone, ex]);
+
+  // Hearing Mode: voice answers while session is open
+  useEffect(() => {
+    if (!hearingActive) {
+      setHearingSessionHandler(null);
+      return;
+    }
+
+    setHearingSessionHandler(async (cmd: HearingCommand) => {
+      if (completed) return false;
+
+      if (cmd === 'start') {
+        if (ex.type === 'grounding_breath' && breathState === 'idle') {
+          setBreathRounds(0);
+          setBreathSec(ex.breathSeconds);
+          setBreathState('inhale');
+          if (speakLine) await speakLine('Box breathing started. Inhale.');
+          return true;
+        }
+        if (ex.type === 'body_scan' && !scanActive && !scanDone) {
+          setScanLeft(ex.seconds);
+          setScanActive(true);
+          if (speakLine) await speakLine(`Landing started. ${ex.seconds} seconds.`);
+          return true;
+        }
+        return false;
+      }
+
+      if (ex.type === 'bias_quiz' && (cmd === 'option_1' || cmd === 'option_2' || cmd === 'option_3')) {
+        const idx = cmd === 'option_1' ? 0 : cmd === 'option_2' ? 1 : 2;
+        const qi = biasAnswers.findIndex((a) => a == null);
+        const questionIndex = qi === -1 ? ex.questions.length - 1 : qi;
+        const q = ex.questions[questionIndex];
+        if (!q || idx >= q.options.length) {
+          if (speakLine) await speakLine('That option is not available.');
+          return true;
+        }
+        const next = [...biasAnswers];
+        while (next.length < ex.questions.length) next.push(null);
+        next[questionIndex] = idx;
+        setBiasAnswers(next);
+        if (speakLine) {
+          await speakLine(`Selected ${optionLabel(idx)}. ${q.reveal}`);
+          const unanswered = next.findIndex((a) => a == null);
+          if (unanswered >= 0) {
+            const nq = ex.questions[unanswered];
+            const opts = nq.options
+              .map((o, i) => `Option ${optionLabel(i)}: ${o}`)
+              .join('. ');
+            await speakLine(`Question ${unanswered + 1}. ${nq.prompt}. ${opts}`);
+          } else {
+            await speakLine(`${ex.journalPrompt} Type your answer on screen when ready.`);
+          }
+        }
+        return true;
+      }
+
+      if (cmd === 'next' && ex.type === 'bias_quiz') {
+        const unanswered = biasAnswers.findIndex((a) => a == null);
+        if (unanswered >= 0 && speakLine) {
+          const nq = ex.questions[unanswered];
+          const opts = nq.options
+            .map((o, i) => `Option ${optionLabel(i)}: ${o}`)
+            .join('. ');
+          await speakLine(`Question ${unanswered + 1}. ${nq.prompt}. ${opts}`);
+          return true;
+        }
+        if (speakLine) await speakLine(ex.journalPrompt);
+        return true;
+      }
+
+      return false;
+    });
+
+    return () => setHearingSessionHandler(null);
+  }, [
+    hearingActive,
+    speakLine,
+    completed,
+    ex,
+    biasAnswers,
+    breathState,
+    scanActive,
+    scanDone,
+  ]);
+
   useEffect(() => {
     let ready = false;
     let artifacts = '';
@@ -184,6 +369,14 @@ export default function AttentionSessionPlayer({
         artifacts = `Multiplier: ${ex.multipliers[multiplierIdx]} | Rating ${multiplierRating}/10 | Action: ${multiplierAction}`;
         break;
       }
+      case 'hook_mirror': {
+        ready =
+          hookBait.trim().length >= ex.minLen &&
+          hookNotice.trim().length >= ex.minLen &&
+          hookWhy.trim().length >= ex.minLen;
+        artifacts = `Hook: ${hookBait.trim()}\nNotice: ${hookNotice.trim()}\nWhy: ${hookWhy.trim()}`;
+        break;
+      }
       default: {
         const _exhaustive: never = ex;
         void _exhaustive;
@@ -212,23 +405,48 @@ export default function AttentionSessionPlayer({
     multiplierIdx,
     multiplierRating,
     multiplierAction,
+    hookBait,
+    hookNotice,
+    hookWhy,
     completed,
     onReadyChange,
   ]);
+
+  // Hearing: announce when Hook Mirror is ready for Zen
+  useEffect(() => {
+    if (!hearingActive || !speakLine || completed || ex.type !== 'hook_mirror') return;
+    const ready =
+      hookBait.trim().length >= ex.minLen &&
+      hookNotice.trim().length >= ex.minLen &&
+      hookWhy.trim().length >= ex.minLen;
+    if (!ready || hookReadyAnnouncedRef.current) return;
+    hookReadyAnnouncedRef.current = true;
+    void speakLine(
+      'Hook Mirror ready. You named the bait, the notice, and why you stay. Zen break — say Mind or Machine.'
+    );
+  }, [hearingActive, speakLine, completed, ex, hookBait, hookNotice, hookWhy]);
 
   const inputClass =
     'w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-sm text-slate-200 placeholder:text-slate-600 focus:outline-none focus:border-fuchsia-500/50';
   const labelClass = 'text-[10px] font-mono tracking-wider text-slate-500 uppercase mb-1.5 block';
 
   return (
-    <div className="space-y-5">
-      <div className="rounded-xl border border-fuchsia-500/20 bg-fuchsia-500/5 p-4">
-        <p className="text-[10px] font-mono text-fuchsia-400 tracking-widest uppercase mb-2">Hook</p>
+    <div className="relative space-y-5 rounded-xl overflow-hidden">
+      <div className="pointer-events-none absolute inset-0 opacity-55 rounded-xl overflow-hidden">
+        <CinematicBackdrop variant="duality" />
+      </div>
+      <div className="relative z-[1] space-y-5">
+      <div className="rounded-xl border border-amber-400/25 bg-black/35 backdrop-blur-[2px] p-4">
+        <p className="text-[10px] font-mono text-amber-300 tracking-widest uppercase mb-2">
+          Hook · Mind · Knowledge first
+        </p>
         <p className="text-slate-200 text-sm leading-relaxed italic">&ldquo;{session.hook}&rdquo;</p>
       </div>
-      <div className="rounded-xl border border-white/5 bg-white/[0.02] p-4">
-        <p className="text-[10px] font-mono text-cyan-400 tracking-widest uppercase mb-2">Insight</p>
-        <p className="text-slate-400 text-sm leading-relaxed">{session.insight}</p>
+      <div className="rounded-xl border border-cyan-400/25 bg-black/35 backdrop-blur-[2px] p-4">
+        <p className="text-[10px] font-mono text-cyan-300 tracking-widest uppercase mb-2">
+          Insight · Machine · Duality holds
+        </p>
+        <p className="text-slate-300 text-sm leading-relaxed">{session.insight}</p>
       </div>
 
       {ex.type === 'reps_track' && (
@@ -545,6 +763,55 @@ export default function AttentionSessionPlayer({
         </div>
       )}
 
+      {ex.type === 'hook_mirror' && (
+        <div className="space-y-4">
+          <p className="font-mono text-[9px] font-black uppercase tracking-[0.22em] text-amber-400/90">
+            Proof of Hook Awareness · three honest lines
+          </p>
+          <div className="rounded-xl border border-amber-500/25 bg-amber-500/5 p-3">
+            <label className={labelClass}>1 · The bait · Mind</label>
+            <p className="text-[11px] text-slate-400 mb-2 leading-snug">{ex.hookPrompt}</p>
+            <textarea
+              className={inputClass + ' min-h-[72px]'}
+              value={hookBait}
+              disabled={completed}
+              placeholder="What pulls you in…"
+              onChange={(e) => setHookBait(e.target.value)}
+            />
+          </div>
+          <div className="rounded-xl border border-rose-500/20 bg-rose-500/5 p-3">
+            <label className={labelClass}>2 · The catch · Notice</label>
+            <p className="text-[11px] text-slate-400 mb-2 leading-snug">{ex.noticePrompt}</p>
+            <textarea
+              className={inputClass + ' min-h-[72px]'}
+              value={hookNotice}
+              disabled={completed}
+              placeholder="What you notice when you're scrolling again…"
+              onChange={(e) => setHookNotice(e.target.value)}
+            />
+          </div>
+          <div className="rounded-xl border border-cyan-500/25 bg-cyan-500/5 p-3">
+            <label className={labelClass}>3 · Why you stay · Honest</label>
+            <p className="text-[11px] text-slate-400 mb-2 leading-snug">{ex.whyPrompt}</p>
+            <textarea
+              className={inputClass + ' min-h-[72px]'}
+              value={hookWhy}
+              disabled={completed}
+              placeholder="Why you keep going anyway…"
+              onChange={(e) => setHookWhy(e.target.value)}
+            />
+          </div>
+          {hookBait.trim().length >= ex.minLen &&
+            hookNotice.trim().length >= ex.minLen &&
+            hookWhy.trim().length >= ex.minLen &&
+            !completed && (
+              <p className="text-[11px] text-emerald-400/90 font-medium">
+                Mirror ready. Zen break next — Mind to hold, Machine to fuel.
+              </p>
+            )}
+        </div>
+      )}
+
       {completed && (
         <p className="text-xs font-mono text-emerald-400 flex items-center gap-2">
           <Check className="w-3.5 h-3.5" /> SESSION INTEGRATED
@@ -563,6 +830,7 @@ export default function AttentionSessionPlayer({
           <RotateCcw className="w-3 h-3" /> Reset breath
         </button>
       )}
+      </div>
     </div>
   );
 }

@@ -10,7 +10,8 @@ export type ExerciseType =
   | 'growth_scale'
   | 'mental_models'
   | 'habit_stack'
-  | 'multiplier_audit';
+  | 'multiplier_audit'
+  | 'hook_mirror';
 
 export type SessionStatus = 'core' | 'draft' | 'published';
 
@@ -91,6 +92,15 @@ export interface MultiplierAuditExercise {
   minActionLen: number;
 }
 
+/** Proof of Hook Awareness — name the bait, the catch, why you stay. */
+export interface HookMirrorExercise {
+  type: 'hook_mirror';
+  hookPrompt: string;
+  noticePrompt: string;
+  whyPrompt: string;
+  minLen: number;
+}
+
 export type SessionExercise =
   | RepsTrackExercise
   | BiasQuizExercise
@@ -99,7 +109,8 @@ export type SessionExercise =
   | GrowthScaleExercise
   | MentalModelsExercise
   | HabitStackExercise
-  | MultiplierAuditExercise;
+  | MultiplierAuditExercise
+  | HookMirrorExercise;
 
 export interface AttentionSession {
   id: string;
@@ -136,9 +147,9 @@ export const FIRST_SPARK_SESSION: AttentionSession = {
   id: 'ai_first_spark',
   seriesOrder: 0,
   title: 'First Spark — Prove Attention Moves Fuel',
-  hook: 'Don\'t take our word. Pass a short snap (~2 min) and watch knowledge become node fuel.',
+  hook: 'We\'re here for attention — not empty hashes. Pass a short snap (~2 min) and watch knowledge become node fuel.',
   insight:
-    'Proof of Attention is simple: focused questions + a short artifact beat empty hashes. Your score crosses a confidential threshold (Arcium mirror) — then energy lands on your node. That\'s the loop. Everything else is optional depth.',
+    'Proof of Attention is the product: focused questions + a short artifact beat empty hashes. Your score crosses a confidential threshold (Arcium mirror) — then energy lands on your node. Attention first. Everything else is optional depth.',
   durationMin: 2,
   exerciseType: 'bias_quiz',
   exercise: {
@@ -165,7 +176,7 @@ export const FIRST_SPARK_SESSION: AttentionSession = {
         reveal: 'Honesty first: prove the loop, then decide if it\'s real for you.',
       },
     ],
-    journalPrompt: 'One line: what would convince you the Knowledge → Energy → Node loop is real?',
+    journalPrompt: 'One line: what would convince you that focused attention (not empty hashes) really moves fuel?',
     minJournalLen: 8,
   },
   quiz: [
@@ -190,8 +201,57 @@ export const FIRST_SPARK_SESSION: AttentionSession = {
       explanation: 'Proof accepted → node fueled → map unlocks.',
     },
   ],
-  nextHook: 'Spark lit. Dive the core series when you want deeper Attention Intelligence.',
+  nextHook: 'Spark lit. Next: Hook Mirror — prove you see why you scroll again.',
   rewards: { cp: 40, energy: 18, efficiency: 0.03 },
+  status: 'core',
+};
+
+/**
+ * Hook Mirror — Proof of Hook Awareness (~3 min).
+ * After First Spark: name what hooks you, what you notice when doomscrolling returns, why you keep going.
+ */
+export const HOOK_MIRROR_SESSION: AttentionSession = {
+  id: 'ai_hook_mirror',
+  seriesOrder: 0.5,
+  title: 'Hook Mirror — Why You Scroll Again',
+  hook: 'You already know the feed is a trap. The proof is what happens the second you notice — and keep going anyway.',
+  insight:
+    'Doomscrolling is not a mystery of willpower. It is a loop: bait → relief → return. The moment you catch yourself ("I\'m doing it again") is where attention becomes yours — or where the curve takes you. Name the bait. Name the notice. Name why you stay. That honesty is Proof of Hook Awareness. Then Zen: hold the knowledge, or convert it to fuel.',
+  durationMin: 3,
+  exerciseType: 'hook_mirror',
+  exercise: {
+    type: 'hook_mirror',
+    hookPrompt: 'What hooks you? Name the bait (app, vibe, fear, boredom — be specific).',
+    noticePrompt:
+      'When you catch yourself doomscrolling again, what do you notice first — body, excuse, or the next thumb swipe?',
+    whyPrompt:
+      'Why do you keep going even when you understand? One honest line. No performance.',
+    minLen: 8,
+  },
+  quiz: [
+    {
+      question: 'Proof of Hook Awareness means…',
+      options: [
+        'You named the bait, the notice, and why you stay — then chose',
+        'You deleted every app forever',
+        'You mined empty hashes until the feed felt quiet',
+      ],
+      correctIdx: 0,
+      explanation: 'Seeing the loop clearly is the proof. Choice comes after.',
+    },
+    {
+      question: 'The failure curve wants you to…',
+      options: [
+        'Scroll without noticing, then feel ashamed without changing',
+        'Sit with knowledge and decide Mind or Machine',
+        'Buy more PH/s so you never feel the hook',
+      ],
+      correctIdx: 0,
+      explanation: 'Their curve is optional. Notice → name → decide.',
+    },
+  ],
+  nextHook: 'Mirror held. Core series mines deeper Attention Intelligence when you are ready.',
+  rewards: { cp: 35, energy: 14, efficiency: 0.02 },
   status: 'core',
 };
 
@@ -519,6 +579,7 @@ export function mergeCatalog(
 ): AttentionSession[] {
   const byId = new Map<string, AttentionSession>();
   byId.set(FIRST_SPARK_SESSION.id, FIRST_SPARK_SESSION);
+  byId.set(HOOK_MIRROR_SESSION.id, HOOK_MIRROR_SESSION);
   for (const s of CORE_ATTENTION_SESSIONS) byId.set(s.id, s);
   for (const s of published) {
     if (s.status === 'published') byId.set(s.id, s);

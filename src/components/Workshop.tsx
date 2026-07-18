@@ -5,8 +5,9 @@
 
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Cpu, HardDrive, Zap, Compass, Check, Hammer, ShoppingCart, ArrowUp, AlertCircle } from 'lucide-react';
+import { Zap, Check, Hammer, ShoppingCart, ArrowUp } from 'lucide-react';
 import { GameState, HardwareModule } from '../types';
+import HardwareModuleArt from './HardwareModuleArt';
 
 interface WorkshopProps {
   state: GameState;
@@ -149,22 +150,56 @@ export default function Workshop({ state, setState, addLog }: WorkshopProps) {
     }
   };
 
+  const mountedCount = state.hardware.filter((h) => h.installed && h.unlocked).length;
+
   return (
     <div id="workshop-room" className="space-y-6">
-      <div className="rounded-xl border border-fuchsia-500/15 bg-fuchsia-500/5 px-4 py-2.5">
-        <p className="text-[10px] font-mono text-fuchsia-300 tracking-widest uppercase">Mount modules to amplify attention throughput · changes appear in the Reactor</p>
+      {/* Cinematic bay hero */}
+      <div className="relative overflow-hidden rounded-2xl border border-white/10 min-h-[140px] sm:min-h-[168px]">
+        <img
+          src="/hardware/gpu.png"
+          alt=""
+          className="absolute inset-0 w-full h-full object-cover scale-105 brightness-[0.45]"
+          draggable={false}
+        />
+        <div className="absolute inset-0 bg-gradient-to-r from-black via-black/75 to-cyan-950/40" />
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_80%_20%,rgba(34,211,238,0.18),transparent_55%)]" />
+        <div className="relative z-10 p-5 sm:p-6 flex flex-col sm:flex-row sm:items-end justify-between gap-4">
+          <div>
+            <span className="text-[9px] font-mono tracking-[0.22em] uppercase text-cyan-300/90">
+              Hardware Bay · Product line
+            </span>
+            <h2 className="mt-1 text-xl sm:text-2xl font-semibold text-white tracking-tight font-sans">
+              Specs you can see. Power you can mount.
+            </h2>
+            <p className="mt-1.5 text-xs text-slate-300/90 max-w-md font-sans leading-relaxed">
+              Unlock cinematic modules, mount them into the reactor, watch throughput climb.
+              Locked crates stay sealed until you spend BCC.
+            </p>
+          </div>
+          <div className="flex gap-3 font-mono text-[10px]">
+            <div className="px-3 py-2 rounded-xl border border-white/15 bg-black/50 backdrop-blur-sm">
+              <span className="text-slate-500 block uppercase tracking-wider">Mounted</span>
+              <span className="text-emerald-300 font-black text-sm">{mountedCount}</span>
+            </div>
+            <div className="px-3 py-2 rounded-xl border border-amber-400/25 bg-black/50 backdrop-blur-sm">
+              <span className="text-slate-500 block uppercase tracking-wider">Wallet</span>
+              <span className="text-amber-300 font-black text-sm">{state.credits} BCC</span>
+            </div>
+          </div>
+        </div>
       </div>
       
       {/* Filters and Header */}
       <div className="flex flex-wrap items-center justify-between gap-4 bg-[#0a0a0c] border border-white/5 p-4 rounded-2xl shadow-xl">
         <div className="flex items-center gap-2">
           <Hammer className="w-5 h-5 text-cyan-400" />
-          <h3 className="font-mono text-sm font-semibold text-slate-100 tracking-wider">HARDWARE BAY · MODULE ASSEMBLY</h3>
+          <h3 className="font-mono text-sm font-semibold text-slate-100 tracking-wider">MODULE CATALOG</h3>
         </div>
         
         {/* Filters */}
         <div className="flex flex-wrap gap-1.5 font-mono text-[11px]">
-          {['all', 'unlocked', 'locked', 'gpu', 'memory', 'cooler', 'battery'].map(type => (
+          {['all', 'unlocked', 'locked', 'gpu', 'memory', 'accelerator', 'cooler', 'battery', 'dock', 'chip'].map(type => (
             <button
               key={type}
               onClick={() => setFilterType(type)}
@@ -188,17 +223,20 @@ export default function Workshop({ state, setState, addLog }: WorkshopProps) {
             <motion.div
               layout
               key={item.id}
-              className={`bg-[#0a0a0c] border-2 ${rStyles.border} rounded-2xl p-5 shadow-xl relative flex flex-col justify-between overflow-hidden group hover:scale-[1.01] transition-all`}
+              className={`bg-[#0a0a0c] border-2 ${rStyles.border} rounded-2xl p-4 shadow-xl relative flex flex-col justify-between overflow-hidden group hover:scale-[1.01] transition-all ${
+                item.installed ? 'shadow-[0_0_28px_rgba(16,185,129,0.12)]' : ''
+              }`}
             >
               {/* Decorative top corner rarity label */}
-              <div className="absolute top-0 right-0">
+              <div className="absolute top-0 right-0 z-10">
                 <span className={`text-[9px] font-mono border-l border-b px-2.5 py-1 block rounded-bl-lg tracking-wider ${rStyles.badge}`}>
                   {item.rarity.toUpperCase()}
                 </span>
               </div>
 
               <div>
-                <span className="text-[10px] font-mono text-slate-500 tracking-widest block">{item.type.toUpperCase()} INTERFACE</span>
+                <HardwareModuleArt module={item} />
+                <span className="text-[10px] font-mono text-slate-500 tracking-widest block mt-3">{item.type.toUpperCase()} INTERFACE</span>
                 <h4 className="text-sm font-semibold text-slate-100 font-mono mt-1 group-hover:text-cyan-300 transition-colors">
                   {item.name}
                 </h4>
@@ -287,6 +325,10 @@ export default function Workshop({ state, setState, addLog }: WorkshopProps) {
                 className="bg-[#0a0a0c] border border-white/10 rounded-2xl max-w-md w-full p-6 relative overflow-hidden shadow-2xl"
               >
                 <div className="absolute top-0 left-0 w-full h-[3px] bg-gradient-to-r from-cyan-500 via-fuchsia-500 to-amber-500" />
+
+                <div className="mb-4">
+                  <HardwareModuleArt module={selectedModule} compact />
+                </div>
                 
                 <h4 className="text-sm font-semibold font-mono tracking-wider text-slate-100 flex items-center gap-2 mb-2">
                   <Hammer className="w-4 h-4 text-cyan-400" />

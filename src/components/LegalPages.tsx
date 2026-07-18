@@ -35,6 +35,10 @@ const COPY: Record<
         p: 'Confidential Proof of Attention pass/fail uses the Arcium threshold policy (encrypted score + artifact length bucket). Optional AI coaching (e.g. Gemini) may receive session artifacts for narrative feedback only — it does not gate energy grants. Do not submit personal data you do not want processed.',
       },
       {
+        h: 'The Void (anonymous asks)',
+        p: 'The Void accepts questions only without Authorization or wallet tokens — the API returns HTTP 400 if identity headers are present. Stored fields are limited to id, body, content hash, timestamps, and reply counts. No user_id, wallet, email, or IP columns exist on void_asks. Verify via GET /api/void/manifest. Do not put information in The Void that could identify you in the text itself.',
+      },
+      {
         h: 'Contact',
         p: 'Questions: support via the in-app Feedback panel or the Building Culture ecosystem sites linked from Ecosystem Hub.',
       },

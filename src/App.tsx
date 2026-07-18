@@ -3,12 +3,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   Zap, Battery, ShieldAlert, Cpu, Hammer, 
   Compass, Bot, Coins, Users, Calendar, 
-  Map, LogIn, LayoutGrid, Award, Volume2, VolumeX, RefreshCw, User, Trophy, HelpCircle, Bell, Rocket, Menu, Images, X
+  Map, LogIn, LayoutGrid, Award, Ear, Focus, Activity, RefreshCw, User, Trophy, HelpCircle, Bell, Rocket, Menu, Images, X, EyeOff
 } from 'lucide-react';
 
 import { clearWalletToken, ensureWalletApiSession, getWalletToken } from './lib/api';
@@ -26,7 +26,6 @@ import MemberProfile from './components/MemberProfile';
 import Leaderboard from './components/Leaderboard';
 import NftGallery from './components/nft/NftGallery';
 import { NFT_POSTERS } from './lib/nft-media';
-
 import OnboardingModal from './components/OnboardingModal';
 import AuthPortal, { AuthAutoStart } from './components/AuthPortal';
 import EconomyStatusBanner, { EconomyStatus } from './components/EconomyStatusBanner';
@@ -35,6 +34,7 @@ import FeedbackPortal from './components/FeedbackPortal';
 import PartnerProgram from './components/PartnerProgram';
 import OnboardingHub from './components/OnboardingHub';
 import NavMenu, { NavDestination, NavPhase } from './components/NavMenu';
+import MobileBottomNav from './components/MobileBottomNav';
 import LegalPages, { LegalPageId } from './components/LegalPages';
 import InstallPrompt from './components/InstallPrompt';
 import {
@@ -47,18 +47,112 @@ import {
   RoomEnter,
   buildAttentionBrief,
 } from './components/fx';
+import FacilitySectorCard from './components/FacilitySectorCard';
+import PersonalHomeHero from './components/PersonalHomeHero';
+import FieldDeckClaim from './components/FieldDeckClaim';
+import SoundControls from './components/SoundControls';
+import { useSound } from './lib/sound/SoundContext';
 import { CORE_ATTENTION_SESSIONS } from './content/attention-intelligence';
+import { normalizeCardCode } from './lib/field-deck';
 import {
   dismissStory,
   ensureFirstRitualPending,
   isFirstRitualPending,
   isStoryDismissed,
 } from './lib/first-run';
+import {
+  classifySuccessBeat,
+  peekMomentum,
+  tickMomentum,
+} from './lib/play-momentum';
+import PlayMomentumBar from './components/PlayMomentumBar';
+import {
+  advanceMetaQuest,
+  bootstrapMetaQuestFromWorld,
+  classifyMetaEvent,
+  markChapterRewarded,
+  markSealRewarded,
+  peekMetaQuest,
+  wasChapterRewarded,
+  wasSealRewarded,
+  type MetaQuestView,
+} from './lib/meta-quest';
+import MetaQuestWhisper from './components/MetaQuestWhisper';
+import AnonymousChamber from './components/AnonymousChamber';
+import ClubOath from './components/ClubOath';
+import {
+  buildMemberInvitePost,
+  hasClubOath,
+  hasSpreadLove,
+  markSpreadLove,
+} from './lib/club-oath';
+import { sendAttentionProofMemo } from './lib/poa-chain';
+import { SLOGANS } from './lib/brand-slogans';
+import {
+  CULTURE_BROADCAST,
+  HEARING_MODE_URL,
+  hasSeenCultureBroadcast,
+  markCultureBroadcastSeen,
+  shareCultureText,
+} from './lib/culture-broadcast';
+import { HearingModeContext } from './lib/hearing/context';
+import { dispatchHearingSessionCommand } from './lib/hearing/session-bridge';
+import {
+  academyOpenScript,
+  broadcastCopiedScript,
+  broadcastScript,
+  clubScript,
+  hearingBannerLine,
+  spreadDoneScript,
+  statusScript,
+} from './lib/hearing/scripts';
+import { dispatchZenDecision } from './lib/hearing/zen-bridge';
+import {
+  isZenMode,
+  setZenMode,
+  zenModeOffScript,
+  zenModeOnScript,
+} from './lib/zen-duality';
+import {
+  buildAttentionSnapshot,
+  isFocusModeStored,
+  setFocusModeStored,
+  track,
+} from './lib/attention-metrics';
+import {
+  HEARING_BANNER_KEY,
+  useHearingMode,
+  type HearingCommandHandler,
+} from './hooks/useHearingMode';
+import HearingModeShell from './components/HearingModeShell';
+import AttentionMetricsPanel from './components/AttentionMetricsPanel';
 
 /** Demo seed IDs — stripped on hydrate so the bell isn't permanently "5 unread". */
 const LEGACY_SEED_NOTIFICATION_IDS = new Set(['n_1', 'n_2', 'n_3', 'n_4', 'n_5']);
 const INITIAL_NOTIFICATIONS: GameState['notifications'] = [];
 const TOAST_ONCE_KEY = 'culture_toast_seen_v1';
+/** Success celebrations can reappear in a long session; warns stay once-forever. */
+const SUCCESS_TOAST_COOLDOWN_MS = 90_000;
+
+function countsTowardMomentum(message: string): boolean {
+  const m = message.toUpperCase();
+  if (m.startsWith('MOMENTUM') || m.startsWith('OUTER CIRCUIT')) return false;
+  if (
+    m.includes('DATA SYNCHRONIZED') ||
+    m.includes('DATA SECURED') ||
+    m.includes('API SESSION') ||
+    m.includes('ONBOARDING') ||
+    m.includes('GATEWAY') ||
+    m.includes('WALLET CONNECTED') ||
+    m.includes('LOCAL WALLET') ||
+    m.includes('ECONOMY SYNC') ||
+    m.includes('SYSTEM REBOOTED') ||
+    m.includes('GUIDE:')
+  ) {
+    return false;
+  }
+  return true;
+}
 
 function toastFingerprint(message: string): string {
   return message.replace(/\d+(\.\d+)?%/g, '%').replace(/\s+/g, ' ').trim().slice(0, 140);
@@ -131,7 +225,7 @@ const INITIAL_ROOMS: FacilityRoom[] = [
   { id: 'lab', name: 'Attention Academy', level: 1, maxLevel: 5, unlocked: true, costToUnlock: 0, costToUpgrade: 700, description: 'Learn, verify focus, and refuel the reactor with Proof of Attention.', perk: '+20% Energy Refuel Multiplier' },
   { id: 'ai', name: 'Automation Center', level: 0, maxLevel: 3, unlocked: false, costToUnlock: 800, costToUpgrade: 1200, description: 'Deploy AI companions that passively boost facility output.', perk: '+5% Worker Passive Speed' },
   { id: 'treasury', name: 'Ecosystem Vault', level: 1, maxLevel: 3, unlocked: true, costToUnlock: 0, costToUpgrade: 1500, description: 'Claim yields, attest daily streaks, and operate the Solana Devnet portal.', perk: '+12% Hourly Claim Multiplier' },
-  { id: 'guild', name: 'Community Guilds', level: 1, maxLevel: 1, unlocked: true, costToUnlock: 0, costToUpgrade: 0, description: 'Align with builder factions for shared output and seasonal competitions.', perk: '+10% Team Output Boost' },
+  { id: 'guild', name: 'Apex Summit', level: 1, maxLevel: 1, unlocked: true, costToUnlock: 0, costToUpgrade: 0, description: 'Monthly chamber for the top of the top — faction houses feed the Apex Circle.', perk: '+10% Team Output · Apex seating' },
 ];
 
 const INITIAL_GUILDS: Guild[] = [
@@ -230,17 +324,29 @@ export default function App() {
     partners: INITIAL_PARTNERS
   });
 
+  const [pendingCardCode, setPendingCardCode] = useState<string | null>(() => {
+    if (typeof window === 'undefined') return null;
+    try {
+      return normalizeCardCode(new URLSearchParams(window.location.search).get('card'));
+    } catch {
+      return null;
+    }
+  });
+
   const [activeRoom, setActiveRoom] = useState<string>(() => {
     if (typeof window === 'undefined') return 'map';
     try {
-      const room = new URLSearchParams(window.location.search).get('room');
+      const params = new URLSearchParams(window.location.search);
+      if (normalizeCardCode(params.get('card'))) return 'field-deck';
+      const room = params.get('room');
       if (
         room === 'legal-privacy' ||
         room === 'legal-terms' ||
         room === 'legal-disclaimer' ||
         room === 'treasury' ||
         room === 'lab' ||
-        room === 'map'
+        room === 'map' ||
+        room === 'field-deck'
       ) {
         return room;
       }
@@ -255,7 +361,14 @@ export default function App() {
   const notificationsMenuRef = useRef<HTMLDivElement | null>(null);
   const notificationsPanelRef = useRef<HTMLDivElement | null>(null);
   const shownToastsRef = useRef<Set<string>>(new Set());
+  const successToastAtRef = useRef<globalThis.Map<string, number>>(new globalThis.Map());
   const flowToastTimerRef = useRef<number | null>(null);
+  const [momentumUi, setMomentumUi] = useState(() => {
+    const p = peekMomentum();
+    return { beats: p.beats, nextAt: p.nextAt, progress: p.progressToNext };
+  });
+  const [metaView, setMetaView] = useState<MetaQuestView>(() => peekMetaQuest());
+  const [rewardBurst, setRewardBurst] = useState<string | null>(null);
 
   // Auth Session State (wallet-only — no Firebase email/password gate)
   const [currentUser, setCurrentUser] = useState<{
@@ -301,6 +414,22 @@ export default function App() {
   } | null>(null);
   const [apiSessionMissing, setApiSessionMissing] = useState(false);
   const [retryingApiSession, setRetryingApiSession] = useState(false);
+  /** Culture Club oath — signed membership before the facility opens */
+  const [clubOathPending, setClubOathPending] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    try {
+      const saved = localStorage.getItem('solana_current_user_session_v1');
+      if (!saved) return false;
+      const user = JSON.parse(saved) as { walletAddress?: string };
+      if (!user.walletAddress) return false;
+      return !hasClubOath(user.walletAddress);
+    } catch {
+      return false;
+    }
+  });
+  const [showCultureBroadcast, setShowCultureBroadcast] = useState(
+    () => !hasSeenCultureBroadcast()
+  );
 
   const dismissStoryToAuth = (auto: AuthAutoStart = null) => {
     dismissStory();
@@ -487,12 +616,13 @@ export default function App() {
     ensureFirstRitualPending();
     setFirstRitualPending(isFirstRitualPending());
     setShowStory(false);
+    setClubOathPending(user.walletAddress ? !hasClubOath(user.walletAddress) : false);
 
     const walletHint = user.walletAddress
       ? ` (${user.walletAddress.slice(0, 4)}…${user.walletAddress.slice(-4)})`
       : '';
     addLog(
-      `WALLET LINKED: "${user.username}"${walletHint}. First Spark next — pass the snap, watch fuel move.`,
+      `WALLET LINKED: "${user.username}"${walletHint}. We're here for attention — Club oath, then prove it (First Spark).`,
       'success'
     );
   };
@@ -502,6 +632,9 @@ export default function App() {
       localStorage.setItem(`building_culture_state_${currentUser.username}_v1`, JSON.stringify(state));
       localStorage.removeItem('solana_current_user_session_v1');
       localStorage.removeItem('solana_wallet_session_v1');
+      // Wipe session keys from this browser (honest "wipe anytime")
+      localStorage.removeItem('solana_local_secret');
+      localStorage.removeItem('building_culture_admin');
       clearWalletToken();
       if (currentUser.walletType === 'extension' && (window as any).solana) {
         try {
@@ -510,15 +643,50 @@ export default function App() {
           // ignore
         }
       }
-      addLog(`GATEWAY SECURED: Wallet session for "${currentUser.username}" closed.`, "system");
+      addLog(
+        `GATEWAY SECURED: "${currentUser.username}" signed out — local secret & API session cleared.`,
+        'system'
+      );
       setCurrentUser(null);
       setActiveRoom('map');
     }
   };
 
   const [logs, setLogs] = useState<InspectionLog[]>([]);
-  const [soundOn, setSoundOn] = useState<boolean>(true);
   const [showSaveToast, setShowSaveToast] = useState<boolean>(false);
+  const [showHearingBanner, setShowHearingBanner] = useState(() => {
+    try {
+      return localStorage.getItem(HEARING_BANNER_KEY) !== '1';
+    } catch {
+      return false;
+    }
+  });
+  const [focusMode, setFocusModeState] = useState(() => isFocusModeStored());
+  const [showMetricsPanel, setShowMetricsPanel] = useState(false);
+  const focusPinnedRef = useRef(false);
+  const focusModeRef = useRef(focusMode);
+  focusModeRef.current = focusMode;
+
+  const setFocusMode = useCallback((on: boolean, opts?: { pinned?: boolean; source?: string }) => {
+    if (opts?.pinned != null) focusPinnedRef.current = opts.pinned;
+    if (focusModeRef.current === on) {
+      setFocusModeStored(on);
+      return;
+    }
+    setFocusModeState(on);
+    setFocusModeStored(on);
+    if (on) track('focus_enter', { source: opts?.source || 'ui' });
+    else track('focus_exit', { source: opts?.source || 'ui' });
+  }, []);
+
+  const requestFocus = useCallback(
+    (on: boolean) => {
+      if (!on && focusPinnedRef.current) return;
+      if (on) setFocusMode(true, { source: 'academy' });
+      else if (!focusPinnedRef.current) setFocusMode(false, { source: 'academy' });
+    },
+    [setFocusMode]
+  );
   const lastUserActionStateRef = React.useRef<string>('');
 
   const attentionBrief = useMemo(() => {
@@ -538,24 +706,116 @@ export default function App() {
   }, [state.energy, state.dailyMissions, state.notifications]);
 
 
-  // Helper log function — warn/success surface as toasts once (auto-dismiss, no second press)
-  const addLog = (message: string, type: 'info' | 'success' | 'warn' | 'system') => {
-    const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-    setLogs((prev) => [...prev, { timestamp: timeStr, message, type }]);
-    if (type !== 'warn' && type !== 'success') return;
-
-    const fp = toastFingerprint(message);
-    if (shownToastsRef.current.has(fp) || hasSeenToastOnce(fp)) return;
-    shownToastsRef.current.add(fp);
-    markToastSeenOnce(fp);
-
+  const pushFlowToast = (message: string, tone: 'warn' | 'success') => {
     const id = Date.now();
-    setFlowToast({ id, message, tone: type === 'warn' ? 'warn' : 'success' });
+    setFlowToast({ id, message, tone });
     if (flowToastTimerRef.current) window.clearTimeout(flowToastTimerRef.current);
     flowToastTimerRef.current = window.setTimeout(() => {
       setFlowToast((prev) => (prev?.id === id ? null : prev));
       flowToastTimerRef.current = null;
-    }, 4500);
+    }, tone === 'success' && message.startsWith('OUTER CIRCUIT') ? 6500 : 4500);
+  };
+
+  const grantMetaRewards = (view: MetaQuestView) => {
+    if (view.justClosed && !wasChapterRewarded(view.justClosed.id)) {
+      const ch = view.justClosed;
+      markChapterRewarded(ch.id);
+      setState((prev) => ({
+        ...prev,
+        credits: prev.credits + ch.rewardBcc,
+        energy: Math.min(100, prev.energy + ch.rewardEnergy),
+        notifications: [
+          {
+            id: `meta_${ch.id}_${Date.now()}`,
+            title: 'Outer Circuit',
+            message: ch.reveal,
+            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            read: false,
+            type: 'success' as const,
+          },
+          ...(prev.notifications || []),
+        ],
+      }));
+      const fuelBit = ch.rewardEnergy > 0 ? ` · +${ch.rewardEnergy}% fuel` : '';
+      setRewardBurst(`OUTER · ${ch.reveal.split('—')[0].trim()} · +${ch.rewardBcc} BCC${fuelBit}`);
+      pushFlowToast(
+        `OUTER CIRCUIT: ${ch.reveal} (+${ch.rewardBcc} BCC${fuelBit})`,
+        'success'
+      );
+    }
+    if (view.sealBonus && !wasSealRewarded()) {
+      const bonus = view.sealBonus;
+      markSealRewarded();
+      setState((prev) => ({
+        ...prev,
+        credits: prev.credits + bonus.bcc,
+        energy: Math.min(100, prev.energy + bonus.energy),
+        efficiency: parseFloat((prev.efficiency + bonus.efficiency).toFixed(3)),
+        notifications: [
+          {
+            id: `meta_seal_${Date.now()}`,
+            title: 'Outer Circuit sealed',
+            message: 'The quiet path above all quests is complete. Duality holds.',
+            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            read: false,
+            type: 'success' as const,
+          },
+          ...(prev.notifications || []),
+        ],
+      }));
+      setRewardBurst(`OUTER CIRCUIT SEALED · +${bonus.bcc} BCC · +eff`);
+      pushFlowToast(
+        `OUTER CIRCUIT SEALED: +${bonus.bcc} BCC · +${bonus.energy}% fuel · +${bonus.efficiency} efficiency`,
+        'success'
+      );
+    }
+  };
+
+  // Helper log — warns once-forever; success can re-toast after cooldown; meta + momentum tick here
+  const addLog = (message: string, type: 'info' | 'success' | 'warn' | 'system') => {
+    const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    setLogs((prev) => [...prev, { timestamp: timeStr, message, type }]);
+
+    if (type === 'success' && countsTowardMomentum(message)) {
+      const beat = classifySuccessBeat(message);
+      const tick = tickMomentum(beat);
+      setMomentumUi({ beats: tick.beats, nextAt: tick.nextAt, progress: tick.progressToNext });
+      if (tick.milestone) {
+        const m = tick.milestone;
+        setState((prev) => ({
+          ...prev,
+          credits: prev.credits + m.bcc,
+          energy: Math.min(100, prev.energy + m.energy),
+        }));
+        const fuelBit = m.energy > 0 ? ` · +${m.energy}% fuel` : '';
+        setRewardBurst(`${m.label} · +${m.bcc} BCC${fuelBit}`);
+        pushFlowToast(`MOMENTUM: ${m.label} (+${m.bcc} BCC${fuelBit})`, 'success');
+      }
+
+      const metaEvent = classifyMetaEvent(message);
+      if (metaEvent) {
+        const nextMeta = advanceMetaQuest(metaEvent);
+        setMetaView(nextMeta);
+        grantMetaRewards(nextMeta);
+      }
+    }
+
+    if (type !== 'warn' && type !== 'success') return;
+
+    const fp = toastFingerprint(message);
+    if (type === 'warn') {
+      if (shownToastsRef.current.has(fp) || hasSeenToastOnce(fp)) return;
+      shownToastsRef.current.add(fp);
+      markToastSeenOnce(fp);
+      pushFlowToast(message, 'warn');
+      return;
+    }
+
+    // Success: session cooldown only (long play stays rewarding)
+    const lastAt = successToastAtRef.current.get(fp) || 0;
+    if (Date.now() - lastAt < SUCCESS_TOAST_COOLDOWN_MS) return;
+    successToastAtRef.current.set(fp, Date.now());
+    pushFlowToast(message, 'success');
   };
 
   // Hydrate state from localStorage on mount
@@ -624,6 +884,32 @@ export default function App() {
         'warn'
       );
     }
+
+    // Outer Circuit: sync hidden chapters from world progress already earned
+    try {
+      const academyCompleted: string[] = JSON.parse(
+        localStorage.getItem('kronos_academy_completed') || '[]'
+      );
+      const savedState = localStorage.getItem('building_culture_state_v1');
+      const parsed = savedState ? JSON.parse(savedState) : null;
+      bootstrapMetaQuestFromWorld({
+        firstRitualDone: !isFirstRitualPending(),
+        academyCompleted,
+        hasKpi: Boolean(parsed?.kpiProof?.signature),
+        hasMountedHardware: Boolean(
+          parsed?.hardware?.some((h: { installed?: boolean }) => h.installed)
+        ),
+        hasClaimedDaily: Boolean(localStorage.getItem('solana_daily_last_claim_v1')),
+        missionsDone: (parsed?.dailyMissions || []).filter((m: DailyMission) => m.completed).length,
+        hasPresence: Boolean(
+          parsed?.profile?.profileCompletedRewardClaimed ||
+            localStorage.getItem('last_check_in_timestamp')
+        ),
+      });
+      setMetaView(peekMetaQuest());
+    } catch {
+      // ignore
+    }
   }, []);
 
   // Save state to localStorage whenever it modifies
@@ -659,13 +945,24 @@ export default function App() {
     lastUserActionStateRef.current = userActionSignature;
   }, [state]);
 
+  const { play: playSound } = useSound();
+
   const changeRoom = (roomId: string) => {
+    if (activeRoom === 'lab' && roomId !== 'lab') {
+      requestFocus(false);
+    }
+    if (roomId === 'lab') {
+      requestFocus(true);
+    }
+    if (roomId !== activeRoom) playSound('enter');
     setActiveRoom(roomId);
     let roomName = "Facility Schematic";
     if (roomId === 'admin') {
       roomName = "Backstage Admin Control Centre";
     } else if (roomId === 'feedback') {
       roomName = "Feedback & Telemetry Support Portal";
+    } else if (roomId === 'void') {
+      roomName = 'The Void — Nameless Questions';
     } else if (roomId === 'partners') {
       roomName = "Cooperative Node Alliances";
     } else if (roomId === 'onboarding') {
@@ -684,6 +981,10 @@ export default function App() {
       roomName = "Member Profile";
     } else if (roomId === 'leaderboard') {
       roomName = "Season Leaderboard";
+    } else if (roomId === 'guild') {
+      roomName = 'Apex Summit — Monthly Top Circle';
+    } else if (roomId === 'field-deck') {
+      roomName = 'Field Deck — Hunt & Claim';
     } else {
       roomName = state.rooms.find(r => r.id === roomId)?.name || "Facility Schematic";
     }
@@ -701,6 +1002,188 @@ export default function App() {
     }
   };
 
+  const hearingWorldRef = useRef({
+    state,
+    activeRoom,
+    firstRitualPending,
+    currentUser,
+    changeRoom,
+    addLog,
+    clubOathPending,
+  });
+  hearingWorldRef.current = {
+    state,
+    activeRoom,
+    firstRitualPending,
+    currentUser,
+    changeRoom,
+    addLog,
+    clubOathPending,
+  };
+
+  const hearingCommandHandler = useCallback<HearingCommandHandler>(async (cmd, { speakLine }) => {
+    if (await dispatchHearingSessionCommand(cmd)) return true;
+
+    const w = hearingWorldRef.current;
+
+    switch (cmd) {
+      case 'status': {
+        await speakLine(
+          statusScript({
+            energy: w.state.energy,
+            miningPower: w.state.miningPower,
+            credits: w.state.credits,
+            room: w.activeRoom,
+            firstRitualPending: w.firstRitualPending,
+          })
+        );
+        return true;
+      }
+      case 'academy': {
+        w.changeRoom('lab');
+        await speakLine(academyOpenScript());
+        w.addLog('HEARING: Opening Attention Academy.', 'system');
+        return true;
+      }
+      case 'zen': {
+        const next = !isZenMode();
+        setZenMode(next);
+        track('zen_mode_toggle', { on: next });
+        await speakLine(next ? zenModeOnScript() : zenModeOffScript());
+        w.addLog(
+          next
+            ? 'ZEN: Knowledge first. Duality holds — Mind ↔ Machine.'
+            : 'ZEN: Off. Decision break still waits at Academy ready.',
+          'system'
+        );
+        return true;
+      }
+      case 'focus': {
+        const next = !focusModeRef.current;
+        setFocusMode(next, { pinned: next, source: 'hearing' });
+        await speakLine(
+          next
+            ? 'Focus Mode on. Facility chrome dims. Full attention.'
+            : 'Focus Mode off. Facility chrome restored.'
+        );
+        return true;
+      }
+      case 'metrics': {
+        const snap = buildAttentionSnapshot(7);
+        setShowMetricsPanel(true);
+        await speakLine(
+          `Seven day snapshot. Active days ${snap.uniqueDaysActive}. Hearing opens ${snap.hearingOpens}. Academy starts ${snap.academyStarts}. Hook Mirrors ${snap.hookMirrors}. Zen Mind ${snap.zenMind}, Machine ${snap.zenMachine}. Spreads ${snap.spreads}. Focus minutes about ${snap.focusMinutesApprox}.`
+        );
+        return true;
+      }
+      case 'mind': {
+        if (await dispatchZenDecision('hold_knowledge')) return true;
+        await speakLine(
+          'Mind is the knowledge pole. Finish the Academy exercise first — then choose Mind or Machine at the Zen break.'
+        );
+        return true;
+      }
+      case 'machine': {
+        if (await dispatchZenDecision('convert_fuel')) return true;
+        await speakLine(
+          'Machine is the fuel pole. Finish the Academy exercise first — then say Machine to convert attention to fuel.'
+        );
+        return true;
+      }
+      case 'club': {
+        await speakLine(clubScript());
+        return true;
+      }
+      case 'map': {
+        w.changeRoom('map');
+        await speakLine('Facility map.');
+        return true;
+      }
+      case 'spread': {
+        const user = w.currentUser;
+        if (!user?.walletAddress) {
+          await speakLine('Connect a wallet and sign Culture Club before Spread.');
+          return true;
+        }
+        const post = buildMemberInvitePost({
+          displayName: user.username,
+          walletAddress: user.walletAddress,
+        });
+        try {
+          const how = await shareCultureText(post);
+          const first = !hasSpreadLove(user.walletAddress);
+          markSpreadLove(user.walletAddress);
+          track('spread_copy', { channel: 'hearing', first, how });
+          await speakLine(spreadDoneScript(first));
+          w.addLog(
+            how === 'share'
+              ? 'Spread shared — love on the move.'
+              : 'Invite copied — pass it on.',
+            'success'
+          );
+          if (first) {
+            const res = await sendAttentionProofMemo({
+              kind: 'spread',
+              parts: { channel: 'hearing', how },
+            });
+            if ('signature' in res) {
+              w.addLog(`Spread sealed on Devnet — ${res.solscan}`, 'success');
+              await speakLine('Spread sealed on Devnet.');
+            }
+          }
+        } catch {
+          await speakLine('Spread cancelled.');
+        }
+        return true;
+      }
+      case 'broadcast': {
+        try {
+          const how = await shareCultureText(CULTURE_BROADCAST.sharePost);
+          track('broadcast_share', { channel: 'hearing', how });
+          await speakLine(broadcastCopiedScript());
+          w.addLog(
+            how === 'share'
+              ? 'BROADCAST: Shared — Hearing Mode link included.'
+              : 'BROADCAST: Share copy copied — paste to X, Telegram, Discord.',
+            'success'
+          );
+        } catch {
+          await speakLine(broadcastScript());
+        }
+        return true;
+      }
+      case 'next': {
+        if (w.firstRitualPending) {
+          w.changeRoom('lab');
+          await speakLine(academyOpenScript());
+          return true;
+        }
+        await speakLine('Say Academy, Status, Club, Spread, or Help.');
+        return true;
+      }
+      case 'start':
+      case 'option_1':
+      case 'option_2':
+      case 'option_3': {
+        await speakLine('No quiz or timer waiting. Say Academy, or Help.');
+        return true;
+      }
+      case 'stop':
+      case 'repeat':
+      case 'help':
+      case 'exit':
+      case 'unknown':
+        return false;
+      default: {
+        const _exhaustive: never = cmd;
+        void _exhaustive;
+        return false;
+      }
+    }
+  }, [setFocusMode]);
+
+  const hearing = useHearingMode(hearingCommandHandler);
+
   const openTollShop = (
     sku?: 'spark_refill' | 'academy_retake' | 'claim_turbo' | 'list_slot' | 'spark_pack_100'
   ) => {
@@ -708,10 +1191,35 @@ export default function App() {
     changeRoom('treasury');
   };
 
-  const academyCompletedCount = (() => {
+  const academyCompletedIds = (() => {
     try {
-      return (JSON.parse(localStorage.getItem('kronos_academy_completed') || '[]') as string[])
-        .length;
+      return JSON.parse(localStorage.getItem('kronos_academy_completed') || '[]') as string[];
+    } catch {
+      return [] as string[];
+    }
+  })();
+  const academyCompletedCount = academyCompletedIds.length;
+  const hookMirrorPending =
+    academyCompletedIds.includes('ai_first_spark') &&
+    !academyCompletedIds.includes('ai_hook_mirror');
+  const dailyClaimReady = (() => {
+    if (!economyStatus?.ready) return false;
+    try {
+      const last = Number(localStorage.getItem('solana_daily_last_claim_v1') || '0');
+      if (!last) return true;
+      return Date.now() - last >= 20 * 60 * 60 * 1000;
+    } catch {
+      return true;
+    }
+  })();
+  const spreadPending = Boolean(
+    currentUser?.walletAddress &&
+      hasClubOath(currentUser.walletAddress) &&
+      !hasSpreadLove(currentUser.walletAddress)
+  );
+  const dailyStreak = (() => {
+    try {
+      return Number(localStorage.getItem('solana_daily_streak_v1') || '0');
     } catch {
       return 0;
     }
@@ -724,45 +1232,80 @@ export default function App() {
       : 'open';
 
   const navNextStep = (() => {
+    const you = currentUser?.username?.replace(/^@/, '') || 'operator';
     if (firstRitualPending) {
       return {
         id: 'lab' as NavDestination,
         label: 'Ignite First Spark',
-        reason: 'Pass one short Attention session — then the rest of the facility opens.',
+        reason: `${you}, one short session — just for you. Then your facility opens.`,
       };
     }
     if (fuelWin) {
       return {
         id: 'map' as NavDestination,
         label: 'See your fuel',
-        reason: 'Proof landed. Confirm the energy strip, then decide mint or daily.',
-      };
-    }
-    if (showMintMinerCta && (state.credits > 0 || (state.bccTokens ?? 0) > 0)) {
-      return {
-        id: 'profile' as NavDestination,
-        label: 'Mint your first miner',
-        reason: 'You have fuel/credits — turn them into an on-chain miner when ready.',
+        reason: `Proof landed for you, ${you}. Feel the strip move — then decide.`,
       };
     }
     if (state.energy < 35) {
       return {
         id: 'lab' as NavDestination,
         label: 'Refuel in Academy',
-        reason: 'Knowledge fuel is low. Another short session restores the node.',
+        reason: `${you}, fuel’s low. Another short session brings your node back.`,
+      };
+    }
+    if (dailyClaimReady) {
+      return {
+        id: 'treasury' as NavDestination,
+        label: 'Claim today’s fuel',
+        reason: `Your free refill is ready, ${you} — +15% energy · +50 BCC.`,
+      };
+    }
+    if (hookMirrorPending) {
+      return {
+        id: 'lab' as NavDestination,
+        label: 'Try Hook Mirror',
+        reason: `${you}, name what hooks you when you scroll — Proof of Hook Awareness.`,
+      };
+    }
+    if (spreadPending) {
+      return {
+        id: 'profile' as NavDestination,
+        label: 'Pass the invite',
+        reason: `You’re in, ${you}. Copy your invite when you’re ready — love travels.`,
+      };
+    }
+    if (showMintMinerCta && (state.credits > 0 || (state.bccTokens ?? 0) > 0)) {
+      return {
+        id: 'profile' as NavDestination,
+        label: 'Mint your first miner',
+        reason: `You have fuel, ${you} — turn it into a rig when it feels right.`,
+      };
+    }
+    if (
+      metaView.discovered &&
+      !metaView.sealed &&
+      metaView.current &&
+      state.energy >= 40
+    ) {
+      const room = metaView.current.room as NavDestination;
+      return {
+        id: room,
+        label: 'A quieter path waits',
+        reason: metaView.current.whisper,
       };
     }
     if (economyStatus?.ready) {
       return {
         id: 'treasury' as NavDestination,
         label: 'Open the Vault',
-        reason: 'Claim daily, swap BCC→CGT, or check Devnet balances.',
+        reason: `${you}, check balances, swap, or when your next refill lands.`,
       };
     }
     return {
       id: 'reactor' as NavDestination,
       label: 'Check the Reactor',
-      reason: 'Your node is warm — see output and keep the loop going.',
+      reason: `${you}, your node is warm — peek at output and keep the loop going.`,
     };
   })();
 
@@ -776,7 +1319,10 @@ export default function App() {
         'legal-disclaimer',
       ];
       if (!allowed.includes(id)) {
-        addLog('FIRST SPARK: Finish the Academy ritual before exploring other rooms.', 'warn');
+        addLog(
+          'First Spark unlocks that room — ~2 min in Academy, just for you.',
+          'info'
+        );
         changeRoom('lab');
         return;
       }
@@ -930,64 +1476,273 @@ export default function App() {
   // Cold start: landing / auth only — no mining dashboard behind the gate
   if (!currentUser) {
     return (
-      <div className="min-h-screen bg-[#050608] text-slate-300 font-sans selection:bg-cyan-500/30 selection:text-cyan-300 relative overflow-hidden">
-        <AnimatePresence mode="wait">
-          {showStory ? (
-            <OnboardingModal
-              key="cold-story"
-              replay={false}
-              onClose={() => {
-                dismissStoryToAuth(null);
-                addLog('ONBOARDING: Connect a wallet — then prove the loop in First Spark.', 'info');
-              }}
-              onEnterLocal={() => {
-                dismissStoryToAuth('local');
-                addLog('ONBOARDING: Entering with local Devnet wallet…', 'info');
-              }}
-              onEnterPhantom={() => {
-                dismissStoryToAuth('phantom');
-                addLog('ONBOARDING: Phantom path…', 'info');
-              }}
-            />
-          ) : (
-            <AuthPortal
-              key="cold-auth"
-              autoStart={authAutoStart}
-              onLoginSuccess={handleLoginSuccess}
-            />
-          )}
-        </AnimatePresence>
-      </div>
+      <HearingModeContext.Provider value={hearing}>
+        <div className="min-h-screen bg-[#050608] text-slate-300 font-sans selection:bg-cyan-500/30 selection:text-cyan-300 relative overflow-hidden">
+          <AnimatePresence mode="wait">
+            {showStory ? (
+              <OnboardingModal
+                key="cold-story"
+                replay={false}
+                onClose={() => {
+                  dismissStoryToAuth(null);
+                  addLog(
+                    "ONBOARDING: We're here for attention — connect, then prove it in First Spark.",
+                    'info'
+                  );
+                }}
+                onEnterLocal={() => {
+                  dismissStoryToAuth('local');
+                  addLog('ONBOARDING: Entering with local Devnet wallet…', 'info');
+                }}
+                onEnterPhantom={() => {
+                  dismissStoryToAuth('phantom');
+                  addLog('ONBOARDING: Phantom path…', 'info');
+                }}
+              />
+            ) : (
+              <AuthPortal
+                key="cold-auth"
+                autoStart={authAutoStart}
+                onLoginSuccess={handleLoginSuccess}
+              />
+            )}
+          </AnimatePresence>
+          <HearingModeShell />
+        </div>
+      </HearingModeContext.Provider>
+    );
+  }
+
+  // Culture Club: every member signs the oath once per wallet before the floor opens
+  if (clubOathPending && currentUser.walletAddress) {
+    return (
+      <HearingModeContext.Provider value={hearing}>
+        <div className="min-h-screen bg-[#050608] text-slate-300 font-sans selection:bg-cyan-500/30 selection:text-cyan-300 relative overflow-hidden">
+          <ClubOath
+            walletAddress={currentUser.walletAddress}
+            walletType={currentUser.walletType === 'extension' ? 'extension' : 'local'}
+            displayName={currentUser.username}
+            addLog={addLog}
+            onSigned={({ spread }) => {
+              setClubOathPending(false);
+              if (spread) {
+                setState((prev) => ({
+                  ...prev,
+                  credits: prev.credits + 40,
+                  energy: Math.min(100, prev.energy + 8),
+                  notifications: [
+                    {
+                      id: `club_spread_${Date.now()}`,
+                      title: 'Love & knowledge',
+                      message:
+                        "You spread the invite — +40 BCC · +8% fuel. We're here for attention — pull the next soul in.",
+                      timestamp: new Date().toLocaleTimeString([], {
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      }),
+                      read: false,
+                      type: 'success' as const,
+                    },
+                    ...(prev.notifications || []),
+                  ],
+                }));
+                addLog(
+                  "CULTURE CLUB: Spread +40 BCC · +8% fuel. Floor open — prove attention (First Spark).",
+                  'success'
+                );
+              } else {
+                setState((prev) => ({
+                  ...prev,
+                  notifications: [
+                    {
+                      id: `club_in_${Date.now()}`,
+                      title: 'Culture Club',
+                      message:
+                        "You're in. We're here for attention — First Spark next, then Spread when ready.",
+                      timestamp: new Date().toLocaleTimeString([], {
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      }),
+                      read: false,
+                      type: 'info' as const,
+                    },
+                    ...(prev.notifications || []),
+                  ],
+                }));
+                addLog(
+                  "CULTURE CLUB: Floor open. We're here for attention — First Spark when ready.",
+                  'system'
+                );
+              }
+            }}
+          />
+          <HearingModeShell />
+        </div>
+      </HearingModeContext.Provider>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[#050506] text-slate-300 flex flex-col justify-between font-sans selection:bg-cyan-500/30 selection:text-cyan-300 relative overflow-x-hidden">
+    <HearingModeContext.Provider value={hearing}>
+    <div
+      className={`min-h-screen bg-[#050506] text-slate-300 flex flex-col justify-between font-sans selection:bg-cyan-500/30 selection:text-cyan-300 relative overflow-x-hidden ${
+        focusMode ? 'focus-mode-active' : ''
+      }`}
+    >
 
-      {/* Background Atmosphere — cinematic video field */}
+      {/* Background Atmosphere — quiet single-plate field */}
       <div className="absolute inset-0 pointer-events-none z-0 overflow-hidden">
-        <AmbientField variant={firstRitualPending ? 'ritual' : 'facility'} dim={!firstRitualPending} />
+        <AmbientField
+          variant={firstRitualPending ? 'ritual' : 'duality'}
+          dim={!firstRitualPending || focusMode}
+        />
       </div>
 
-      {/* Top Main Navigation Bar */}
-      <header className="border border-white/8 bg-[#0a0a0c]/75 backdrop-blur-xl sticky top-2 z-40 mx-4 mt-2 px-6 py-4 rounded-2xl flex flex-wrap items-center justify-between gap-4 shadow-[0_12px_40px_rgba(0,0,0,0.45)]">
-        {/* Left branding */}
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-cyan-500/20 border border-cyan-500/30 flex items-center justify-center relative overflow-hidden">
-            <div className="absolute inset-0 bg-cyan-400/10 animate-pulse" />
-            <Cpu className="w-5 h-5 text-cyan-400 relative z-10" />
+      {focusMode && (
+        <div className="relative z-50 mx-4 mt-2 rounded-xl border border-amber-500/30 bg-amber-950/40 px-4 py-2 flex flex-wrap items-center justify-between gap-2">
+          <p className="text-xs text-amber-100/90 font-medium">
+            Focus Mode — facility chrome dimmed. Knowledge first.
+          </p>
+          <button
+            type="button"
+            onClick={() => setFocusMode(false, { pinned: false, source: 'banner' })}
+            className="px-2.5 py-1 rounded-lg border border-amber-500/40 text-amber-200 font-mono text-[10px] font-black uppercase cursor-pointer"
+          >
+            Exit focus
+          </button>
+        </div>
+      )}
+
+      {showCultureBroadcast && !focusMode && (
+        <div className="relative z-50 mx-4 mt-2 rounded-2xl border border-amber-500/35 bg-gradient-to-r from-amber-950/80 via-[#0a0a0c]/95 to-cyan-950/50 px-4 py-3 flex flex-wrap items-center justify-between gap-3 shadow-[0_12px_40px_rgba(0,0,0,0.5)]">
+          <div className="min-w-0">
+            <p className="font-mono text-[9px] font-black tracking-[0.28em] uppercase text-amber-400">
+              {CULTURE_BROADCAST.notificationTitle}
+            </p>
+            <p className="mt-1 text-sm font-semibold text-white leading-snug">
+              {CULTURE_BROADCAST.sloganLoud}
+            </p>
+            <p className="mt-0.5 text-[11px] text-slate-400 leading-relaxed max-w-2xl">
+              {CULTURE_BROADCAST.notificationBody}
+            </p>
           </div>
-          <div>
-            <span className="text-[10px] font-mono tracking-widest uppercase text-slate-500">Proof of Attention OS</span>
-            <h1 className="text-sm font-bold tracking-tight text-white flex items-center gap-2">
-              CULTURE NODE <span className="text-[8px] font-mono tracking-widest uppercase bg-cyan-950/60 border border-cyan-800 text-cyan-400 px-1.5 py-0.5 rounded">DEVNET</span>
+          <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
+            <button
+              type="button"
+              onClick={() => {
+                void shareCultureText(CULTURE_BROADCAST.sharePost)
+                  .then((how) => {
+                    track('broadcast_share', { channel: 'banner', how });
+                    addLog(
+                      how === 'share'
+                        ? 'BROADCAST: Shared — Hearing Mode link included.'
+                        : 'BROADCAST: Share copy copied — paste to X, Telegram, Discord.',
+                      'success'
+                    );
+                  })
+                  .catch(() => {
+                    /* user cancelled share sheet */
+                  });
+              }}
+              className="px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-black font-mono text-[10px] font-black uppercase tracking-wider cursor-pointer"
+            >
+              Share post
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                void shareCultureText(CULTURE_BROADCAST.hearingSharePost)
+                  .then((how) => {
+                    track('broadcast_share', { channel: 'hearing_link', how });
+                    addLog(
+                      how === 'share'
+                        ? 'HEARING: Deep link shared.'
+                        : `HEARING: Link copied — ${HEARING_MODE_URL}`,
+                      'success'
+                    );
+                  })
+                  .catch(() => {
+                    void navigator.clipboard?.writeText(HEARING_MODE_URL);
+                    track('broadcast_share', { channel: 'hearing_link', how: 'clipboard' });
+                    addLog(`HEARING: Link copied — ${HEARING_MODE_URL}`, 'success');
+                  });
+              }}
+              className="px-3 py-1.5 rounded-lg border border-cyan-500/40 bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-200 font-mono text-[10px] font-black uppercase tracking-wider cursor-pointer"
+            >
+              Hearing link
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                markCultureBroadcastSeen();
+                setShowCultureBroadcast(false);
+                track('broadcast_dismiss');
+              }}
+              className="p-1.5 text-slate-500 hover:text-slate-200 cursor-pointer"
+              aria-label="Dismiss broadcast"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {showHearingBanner && !hearing.active && (
+        <div className="relative z-50 mx-4 mt-2 rounded-xl border border-cyan-500/30 bg-cyan-950/40 px-4 py-2.5 flex flex-wrap items-center justify-between gap-2">
+          <p className="text-xs text-cyan-100/90 font-medium">{hearingBannerLine()}</p>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={() => hearing.enable()}
+              className="px-3 py-1 rounded-lg bg-cyan-500 text-black font-mono text-[10px] font-black uppercase tracking-wider cursor-pointer"
+            >
+              Enter Hearing
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                try {
+                  localStorage.setItem(HEARING_BANNER_KEY, '1');
+                } catch {
+                  // ignore
+                }
+                setShowHearingBanner(false);
+              }}
+              className="p-1 text-slate-500 hover:text-slate-200 cursor-pointer"
+              aria-label="Dismiss hearing banner"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Top bar — slim on mobile; desktop keeps facility metrics */}
+      <header className="border border-white/8 bg-[#0a0a0c]/75 backdrop-blur-xl sticky top-2 z-40 mx-3 sm:mx-4 mt-2 px-3 sm:px-6 py-3 sm:py-4 rounded-2xl flex items-center justify-between gap-3 shadow-[0_12px_40px_rgba(0,0,0,0.45)]">
+        {/* Left branding */}
+        <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+          <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-cyan-500/20 border border-cyan-500/30 flex items-center justify-center relative overflow-hidden shrink-0">
+            <div className="absolute inset-0 bg-cyan-400/10 animate-pulse" />
+            <Cpu className="w-4 h-4 sm:w-5 sm:h-5 text-cyan-400 relative z-10" />
+          </div>
+          <div className="min-w-0">
+            <span className="hidden sm:block text-[10px] font-mono tracking-widest uppercase text-amber-500/80">
+              {SLOGANS.attention}
+            </span>
+            <h1 className="text-sm font-bold tracking-tight text-white flex items-center gap-1.5 sm:gap-2">
+              <span className="truncate">CULTURE NODE</span>
+              <span className="text-[8px] font-mono tracking-widest uppercase bg-cyan-950/60 border border-cyan-800 text-cyan-400 px-1.5 py-0.5 rounded shrink-0">DEVNET</span>
             </h1>
           </div>
         </div>
 
-        {/* Global Facility Live Metrics — ritual: fuel only */}
-        <div className="flex flex-wrap items-center gap-4 lg:gap-8 font-mono text-xs">
-          {!firstRitualPending && (
+        {/* Desktop facility metrics — hidden on phone (lives in bottom strip) */}
+        <div
+          className={`hidden md:flex flex-wrap items-center gap-4 lg:gap-8 font-mono text-xs transition-opacity ${
+            focusMode ? 'opacity-40' : ''
+          }`}
+        >
+          {!firstRitualPending && !focusMode && (
             <div className="flex flex-col">
               <span className="text-[9px] font-mono tracking-widest uppercase text-cyan-400">NODE OUTPUT</span>
               <span className="text-lg font-black text-white italic">
@@ -1008,7 +1763,7 @@ export default function App() {
             </div>
           </div>
 
-          {!firstRitualPending && (
+          {!firstRitualPending && !focusMode && (
             <>
               <div className="flex flex-col">
                 <span className="text-[9px] font-mono tracking-widest uppercase text-slate-500">EFFICIENCY</span>
@@ -1023,49 +1778,143 @@ export default function App() {
           )}
         </div>
 
-        {/* Global Season / Reset controls */}
-        <div className="flex items-center gap-3">
+        {/* Actions — phone: Hear + bell only; desktop: full toolkit */}
+        <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
           {currentUser && (
-            <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-cyan-950/20 border border-cyan-500/20 rounded-lg font-mono text-[10px] text-cyan-400 font-bold uppercase" title={currentUser.walletAddress || currentUser.username}>
+            <div className="hidden md:flex items-center gap-2 px-3 py-1.5 bg-cyan-950/20 border border-cyan-500/20 rounded-lg font-mono text-[10px] text-cyan-400 font-bold uppercase" title={currentUser.walletAddress || currentUser.username}>
               <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
               <span>@{currentUser.username}</span>
+              {currentUser.walletAddress && hasClubOath(currentUser.walletAddress) && (
+                <span className="text-amber-400/90 border border-amber-500/30 bg-amber-500/10 px-1.5 py-0.5 rounded" title="Culture Club oath signed">
+                  Club
+                </span>
+              )}
               {currentUser.walletAddress && (
                 <span className="text-slate-500 font-normal normal-case">
                   {currentUser.walletAddress.slice(0, 4)}…{currentUser.walletAddress.slice(-4)}
                 </span>
               )}
+              {currentUser.walletAddress && hasClubOath(currentUser.walletAddress) && (
+                <button
+                  type="button"
+                  title="Copy your Culture Club invite — spread love & knowledge"
+                  onClick={() => {
+                    const post = buildMemberInvitePost({
+                      displayName: currentUser.username,
+                      walletAddress: currentUser.walletAddress!,
+                    });
+                    void navigator.clipboard?.writeText(post).then(async () => {
+                      const first = !hasSpreadLove(currentUser.walletAddress!);
+                      markSpreadLove(currentUser.walletAddress!);
+                      track('spread_copy', { channel: 'header', first });
+                      addLog(
+                        first
+                          ? 'Invite copied — pass it to someone who needs the hook.'
+                          : 'Invite copied — love & knowledge on the move.',
+                        'success'
+                      );
+                      if (first) {
+                        const res = await sendAttentionProofMemo({
+                          kind: 'spread',
+                          parts: { channel: 'header' },
+                        });
+                        if ('signature' in res) {
+                          addLog(`Spread sealed on Devnet — ${res.solscan}`, 'success');
+                        }
+                      }
+                    });
+                  }}
+                  className="text-rose-300 border border-rose-500/35 bg-rose-500/10 hover:bg-rose-500/20 px-1.5 py-0.5 rounded cursor-pointer"
+                >
+                  Spread
+                </button>
+              )}
             </div>
           )}
 
+          {/* Next-step CTA — desktop only; phone uses bottom Next chip */}
           {firstRitualPending ? (
             <button
               type="button"
               onClick={() => changeRoom('lab')}
               title="Continue First Spark"
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-cyan-500 text-black rounded-lg font-mono text-[10px] tracking-wider uppercase font-black transition-all cursor-pointer hover:bg-cyan-400"
+              className="hidden md:flex items-center gap-1.5 px-3 py-1.5 bg-cyan-500 text-black rounded-lg font-mono text-[10px] tracking-wider uppercase font-black transition-all cursor-pointer hover:bg-cyan-400"
             >
               <Compass className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">First Spark</span>
+              <span>First Spark</span>
             </button>
           ) : (
             <button
               type="button"
               onClick={() => handleNavNavigate(navNextStep.id)}
               title={navNextStep.reason}
-              className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 bg-cyan-600/15 border border-cyan-500/40 hover:bg-cyan-600/25 text-cyan-300 rounded-lg font-mono text-[10px] tracking-wider uppercase font-black transition-all cursor-pointer max-w-[9rem] sm:max-w-[11rem]"
+              className="hidden md:flex items-center gap-1.5 px-3 py-1.5 bg-cyan-600/15 border border-cyan-500/40 hover:bg-cyan-600/25 text-cyan-300 rounded-lg font-mono text-[10px] tracking-wider uppercase font-black transition-all cursor-pointer max-w-[11rem]"
             >
               <span className="truncate">{navNextStep.label}</span>
             </button>
           )}
 
+          <SoundControls />
+
+          <button
+            type="button"
+            onClick={() => hearing.toggle()}
+            title={hearing.active ? 'Exit Hearing Mode' : 'Enter Hearing Mode — ears first'}
+            aria-pressed={hearing.active}
+            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg font-mono text-[10px] tracking-wider uppercase font-black transition-all cursor-pointer border ${
+              hearing.active
+                ? 'bg-cyan-500/20 border-cyan-400/50 text-cyan-200'
+                : 'bg-white/5 border-white/10 hover:border-cyan-500/40 text-slate-400 hover:text-cyan-300'
+            }`}
+          >
+            <Ear className="w-4 h-4" />
+            <span className="inline">{hearing.active ? 'Hearing' : 'Hear'}</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              const next = !focusMode;
+              setFocusMode(next, { pinned: next, source: 'header' });
+              addLog(
+                next
+                  ? 'FOCUS: Chrome dimmed — full attention.'
+                  : 'FOCUS: Facility chrome restored.',
+                'system'
+              );
+            }}
+            title={focusMode ? 'Exit Focus Mode' : 'Focus Mode — full attention'}
+            aria-pressed={focusMode}
+            className={`hidden md:flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg font-mono text-[10px] tracking-wider uppercase font-black transition-all cursor-pointer border ${
+              focusMode
+                ? 'bg-amber-500/20 border-amber-400/50 text-amber-200'
+                : 'bg-white/5 border-white/10 hover:border-amber-500/40 text-slate-400 hover:text-amber-300'
+            }`}
+          >
+            <Focus className="w-4 h-4" />
+            <span className="hidden lg:inline">Focus</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setShowMetricsPanel(true)}
+            title="Attention metrics (7d)"
+            className="hidden md:flex items-center gap-1.5 px-2.5 py-1.5 bg-white/5 border border-white/10 hover:border-white/20 text-slate-400 hover:text-slate-200 rounded-lg font-mono text-[10px] tracking-wider uppercase font-black transition-all cursor-pointer"
+          >
+            <Activity className="w-4 h-4" />
+            <span className="hidden xl:inline">Metrics</span>
+          </button>
+
           <button
             type="button"
             onClick={() => setMenuOpen(true)}
             title="Open navigation"
-            className="flex items-center gap-1.5 px-2.5 py-1.5 bg-white/5 border border-white/10 hover:border-white/20 text-slate-400 hover:text-slate-200 rounded-lg font-mono text-[10px] tracking-wider uppercase font-black transition-all cursor-pointer"
+            className={`hidden md:flex items-center gap-1.5 px-2.5 py-1.5 bg-white/5 border border-white/10 hover:border-white/20 text-slate-400 hover:text-slate-200 rounded-lg font-mono text-[10px] tracking-wider uppercase font-black transition-all cursor-pointer ${
+              focusMode ? 'opacity-40' : ''
+            }`}
           >
             <Menu className="w-4 h-4" />
-            <span className="hidden md:inline">More</span>
+            <span>More</span>
           </button>
 
           {!firstRitualPending && navPhase === 'open' && (
@@ -1114,15 +1963,15 @@ export default function App() {
           <button
             onClick={resetProgress}
             title="Wipe diagnostics ledger & restart simulation"
-            className="w-9 h-9 rounded-xl bg-white/5 border border-white/10 hover:border-red-500/40 hover:bg-red-950/20 text-slate-400 hover:text-red-400 flex items-center justify-center transition-all cursor-pointer"
+            className="hidden md:flex w-9 h-9 rounded-xl bg-white/5 border border-white/10 hover:border-red-500/40 hover:bg-red-950/20 text-slate-400 hover:text-red-400 items-center justify-center transition-all cursor-pointer"
           >
             <RefreshCw className="w-4 h-4" />
           </button>
         </div>
       </header>
 
-      {/* Main Content Area */}
-      <main className="flex-1 max-w-7xl w-full mx-auto p-4 lg:p-6 z-10 relative">
+      {/* Main Content Area — extra bottom pad on phone for fixed tab bar */}
+      <main className="flex-1 max-w-7xl w-full mx-auto p-4 lg:p-6 z-10 relative pb-[calc(7.5rem+env(safe-area-inset-bottom))] md:pb-6">
         
         {/* Navigation Breadcrumb back button when inside a room */}
         {activeRoom !== 'map' && (
@@ -1132,7 +1981,8 @@ export default function App() {
             className="mb-6 flex justify-between items-center"
           >
             <button
-              onClick={() => setActiveRoom('map')}
+              type="button"
+              onClick={() => changeRoom('map')}
               className="px-4 py-2 bg-[#0a0a0c] hover:bg-[#111115] border border-white/10 text-slate-200 font-mono text-xs font-bold rounded-xl flex items-center gap-2 cursor-pointer transition-all"
             >
               <Map className="w-4 h-4 text-cyan-400" />
@@ -1140,9 +1990,43 @@ export default function App() {
             </button>
 
             <span className="text-[10px] font-mono text-slate-500 hidden sm:inline uppercase tracking-widest">
-              SECTOR 0{state.rooms.findIndex(r => r.id === activeRoom) + 1}
+              {(() => {
+                const roomIdx = state.rooms.findIndex((r) => r.id === activeRoom);
+                if (roomIdx >= 0) return `SECTOR 0${roomIdx + 1}`;
+                const labels: Record<string, string> = {
+                  gallery: 'SECTOR_NFT',
+                  missions: 'SECTOR_OPS',
+                  profile: 'SECTOR_HQ',
+                  leaderboard: 'SECTOR_ARENA',
+                  void: 'SECTOR_VOID',
+                  'field-deck': 'SECTOR_FIELD',
+                  roadmap: 'SECTOR_PATH',
+                  onboarding: 'SECTOR_HUB',
+                  partners: 'SECTOR_ALLY',
+                  feedback: 'SECTOR_SIGNAL',
+                  admin: 'SECTOR_BACKSTAGE',
+                  'legal-privacy': 'LEGAL',
+                  'legal-terms': 'LEGAL',
+                  'legal-disclaimer': 'LEGAL',
+                };
+                return labels[activeRoom] ?? String(activeRoom).toUpperCase();
+              })()}
             </span>
           </motion.div>
+        )}
+
+        {!firstRitualPending && !focusMode && (
+          <>
+            <MetaQuestWhisper
+              view={metaView}
+              onFollow={(roomId) => handleNavNavigate(roomId as NavDestination)}
+            />
+            <PlayMomentumBar
+              beats={momentumUi.beats}
+              nextAt={momentumUi.nextAt}
+              progress={momentumUi.progress}
+            />
+          </>
         )}
 
         <div className="px-4 mb-4 space-y-2">
@@ -1179,6 +2063,21 @@ export default function App() {
           {activeRoom === 'map' ? (
             <RoomEnter key="map-view" roomKey="map-view">
               <div className="space-y-6">
+              {currentUser && (
+                <PersonalHomeHero
+                  username={currentUser.username}
+                  avatarUrl={state.profile?.avatarUrl}
+                  aboutMe={state.profile?.aboutMe}
+                  state={state}
+                  firstRitualPending={firstRitualPending}
+                  academyCompletedCount={academyCompletedCount}
+                  coreSessionTotal={CORE_ATTENTION_SESSIONS.length}
+                  streak={dailyStreak}
+                  nextStep={navNextStep}
+                  onNavigate={(room) => handleNavNavigate(room)}
+                />
+              )}
+
               {firstRitualPending ? (
                 <motion.div
                   initial={{ opacity: 0, y: 10 }}
@@ -1197,14 +2096,18 @@ export default function App() {
                       </div>
                       <div className="min-w-0">
                         <span className="text-[10px] font-mono font-bold text-cyan-400 block tracking-widest uppercase">
-                          First Spark · fuel starts empty on purpose
+                          {currentUser
+                            ? `@${currentUser.username.replace(/^@/, '')} · first spark waiting`
+                            : 'Just for you · fuel starts empty on purpose'}
                         </span>
                         <h4 className="font-display text-xl font-extrabold italic text-white mt-1 tracking-tight">
-                          Prove attention moves energy
+                          {currentUser
+                            ? `${currentUser.username.replace(/^@/, '')}, prove attention moves energy`
+                            : 'Prove attention moves energy'}
                         </h4>
                         <p className="text-xs text-slate-400 mt-2 max-w-xl font-sans leading-relaxed">
-                          Neuroplasticity isn&apos;t a slogan — pass a short Attention Intelligence snap
-                          (~2 min). Watch knowledge fuel fill. Science first, then the facility.
+                          One short snap (~2 min). Watch knowledge fuel fill — yours. Attention first,
+                          then the facility opens around you.
                         </p>
                         <div className="mt-3 flex flex-wrap gap-2 text-[9px] font-mono uppercase tracking-wider">
                           <span className="px-2 py-1 rounded-md border border-cyan-400/25 bg-cyan-500/10 text-cyan-200">
@@ -1219,7 +2122,7 @@ export default function App() {
                         </div>
                         <div className="mt-4 max-w-xs">
                           <span className="text-[9px] font-mono text-slate-500 uppercase tracking-widest">
-                            Core fuel
+                            Your core fuel
                           </span>
                           <EnergyFlow energy={state.energy} className="mt-1.5 h-2" />
                           <span className="text-[10px] font-mono text-orange-400/90 mt-1 block">
@@ -1368,14 +2271,14 @@ export default function App() {
                       <span className="font-mono text-[10px] font-bold text-cyan-400 uppercase tracking-wider block mb-0.5">
                         Free daily refill (~20h)
                       </span>
-                      On-chain claim_daily — +15% energy + 50 BCC. Lucky Wheel stays practice.
+                      Free on-chain refill — +15% energy + 50 BCC. Lucky Wheel stays practice.
                     </p>
                     <button
                       type="button"
                       onClick={() => changeRoom('treasury')}
                       className="px-4 py-2 bg-cyan-500 hover:bg-cyan-400 text-black font-mono text-[10px] font-black uppercase tracking-wider rounded-lg cursor-pointer shrink-0"
                     >
-                      Claim refill →
+                      Claim today&apos;s fuel →
                     </button>
                   </div>
                   )}
@@ -1386,7 +2289,7 @@ export default function App() {
                         <span className="font-mono text-[10px] font-bold text-amber-300 uppercase tracking-wider block mb-0.5">
                           Practice mode — stay in the loop
                         </span>
-                        Mint / claim_daily wait for settlement. Academy fuel still works here.
+                        On-chain claim waits for settlement. Academy fuel still works — keep going.
                       </p>
                       <button
                         type="button"
@@ -1446,95 +2349,103 @@ export default function App() {
                 </>
               )}
 
-              {/* Blueprint map Hero — quiet until First Spark fuels the node */}
+              {/* Your facility — rigs wake when your fuel is live */}
               {!firstRitualPending && (
-              <div className="p-6 md:p-8 bg-[#0a0a0c] border border-cyan-500/15 rounded-2xl relative overflow-hidden shadow-2xl">
-                <div className="absolute inset-0 bg-cyber-grid bg-[size:24px_24px] opacity-[0.06]" />
-                <div className="absolute top-0 right-0 w-96 h-96 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none" />
-                <div className="absolute bottom-0 left-1/3 w-72 h-72 bg-amber-500/8 rounded-full blur-3xl pointer-events-none" />
-
-                <div className="relative z-10 grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
-                  <div className="lg:col-span-7 max-w-2xl">
+              <div className="p-5 md:p-6 bg-[#0a0a0c] border border-cyan-500/15 rounded-2xl relative overflow-hidden shadow-2xl">
+                <div className="absolute inset-0 bg-cyber-grid bg-[size:24px_24px] opacity-[0.05]" />
+                <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-5">
+                  <div className="min-w-0 max-w-xl">
                     <span className="text-[10px] font-mono text-cyan-400 tracking-[0.2em] block uppercase font-bold">
-                      Culture Node · Proof of Attention
+                      {currentUser
+                        ? `@${currentUser.username.replace(/^@/, '')} · your facility`
+                        : 'Your facility'}
                     </span>
-                    <h2 className="font-display text-3xl lg:text-5xl font-extrabold italic text-white leading-[0.95] mt-2 mb-3">
-                      Fuel your node<br />
-                      <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-300 to-amber-300">
-                        with knowledge
-                      </span>
+                    <h2 className="font-display text-2xl md:text-3xl font-extrabold italic text-white leading-tight mt-1.5">
+                      {state.energy > 0 ? (
+                        <>
+                          Your rigs can wake —{' '}
+                          <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-300 to-amber-300">
+                            fuel is live
+                          </span>
+                        </>
+                      ) : (
+                        <>
+                          Your art stays still until{' '}
+                          <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-300 to-amber-300">
+                            you earn fuel
+                          </span>
+                        </>
+                      )}
                     </h2>
-                    <p className="text-sm text-slate-400 font-sans mt-3.5 leading-relaxed max-w-xl">
-                      Learn in the Academy → energy fills your reactor → owned NFTs wake up and loop their mining feed.
-                      Idle art stays still until you earn fuel.
+                    <p className="text-xs text-slate-400 font-sans mt-2 leading-relaxed">
+                      Academy fills your reactor. Owned NFTs loop their mining feed only while your
+                      knowledge fuel lasts.
                     </p>
-
-                    <div className="flex flex-wrap gap-3 mt-6 font-mono text-xs">
+                    <div className="flex flex-wrap gap-2 mt-4 font-mono text-xs">
                       <button
                         type="button"
                         onClick={() => changeRoom('reactor')}
-                        className="px-5 py-3 bg-cyan-500 hover:bg-cyan-400 text-black font-black uppercase tracking-wider rounded-xl cursor-pointer transition-all"
+                        className="px-4 py-2.5 bg-cyan-500 hover:bg-cyan-400 text-black font-black uppercase tracking-wider rounded-xl cursor-pointer"
                       >
-                        Enter Reactor
+                        Your Reactor
                       </button>
                       <button
                         type="button"
                         onClick={() => changeRoom('gallery')}
-                        className="px-5 py-3 bg-amber-500/15 hover:bg-amber-500/25 border border-amber-400/35 text-amber-100 font-black uppercase tracking-wider rounded-xl cursor-pointer inline-flex items-center gap-2"
+                        className="px-4 py-2.5 bg-amber-500/15 hover:bg-amber-500/25 border border-amber-400/35 text-amber-100 font-black uppercase tracking-wider rounded-xl cursor-pointer inline-flex items-center gap-2"
                       >
                         <Images className="w-3.5 h-3.5" />
-                        NFT Gallery
+                        Your Gallery
                       </button>
                     </div>
                   </div>
 
-                  <div className="lg:col-span-5">
-                    <button
-                      type="button"
-                      onClick={() => changeRoom('gallery')}
-                      className="w-full group cursor-pointer text-left"
-                    >
-                      <div className="grid grid-cols-2 gap-2.5">
-                        {(Object.entries(NFT_POSTERS) as [string, string][]).map(([key, src], i) => (
-                          <div
-                            key={key}
-                            className={`relative aspect-square rounded-xl overflow-hidden border border-white/10 bg-black/40 ${
-                              i === 0 && state.energy > 0 ? 'ring-1 ring-cyan-400/50' : ''
+                  <button
+                    type="button"
+                    onClick={() => changeRoom('gallery')}
+                    className="w-full md:w-56 shrink-0 group cursor-pointer text-left"
+                  >
+                    <div className="grid grid-cols-2 gap-1.5">
+                      {(Object.entries(NFT_POSTERS) as [string, string][]).slice(0, 4).map(([key, src], i) => (
+                        <div
+                          key={key}
+                          className={`relative aspect-square rounded-lg overflow-hidden border border-white/10 bg-black/40 ${
+                            i === 0 && state.energy > 0 ? 'ring-1 ring-cyan-400/50' : ''
+                          }`}
+                        >
+                          <img
+                            src={src}
+                            alt={`${key} miner`}
+                            className={`h-full w-full object-cover transition duration-700 group-hover:scale-105 ${
+                              state.energy > 0 ? 'brightness-110' : 'brightness-75'
                             }`}
-                          >
-                            <img
-                              src={src}
-                              alt={`${key} miner`}
-                              className={`h-full w-full object-cover transition duration-700 group-hover:scale-105 ${
-                                state.energy > 0 ? 'brightness-110' : 'brightness-75'
-                              }`}
-                              draggable={false}
-                            />
-                            {state.energy > 0 && (
-                              <div className="nft-mining-feed absolute inset-0 pointer-events-none opacity-80">
-                                <div className="nft-mining-scan" />
-                              </div>
-                            )}
-                            <span className="absolute bottom-1.5 left-1.5 text-[8px] font-mono uppercase tracking-wider text-white/80 bg-black/50 px-1.5 py-0.5 rounded">
-                              {key}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                      <p className="mt-2.5 text-[10px] font-mono text-slate-500 uppercase tracking-widest text-center group-hover:text-cyan-400 transition-colors">
-                        {state.energy > 0 ? 'Mining feeds live · open gallery' : 'Static until you refuel · open gallery'}
-                      </p>
-                    </button>
-                  </div>
+                            draggable={false}
+                          />
+                          {state.energy > 0 && (
+                            <div className="nft-mining-feed absolute inset-0 pointer-events-none opacity-80">
+                              <div className="nft-mining-scan" />
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                    <p className="mt-2 text-[9px] font-mono text-slate-500 uppercase tracking-widest text-center group-hover:text-cyan-400 transition-colors">
+                      {state.energy > 0 ? 'Your feeds live' : 'Your art · waiting on fuel'}
+                    </p>
+                  </button>
                 </div>
               </div>
               )}
 
-              {/* The living blueprints of "My Facility" Expandable rooms */}
+              {/* Sectors — filtered to Academy until First Spark */}
               <div>
                 <h3 className="font-mono text-[10px] font-bold text-slate-500 tracking-[0.2em] uppercase mb-4 flex items-center gap-2">
                   <LayoutGrid className="w-4 h-4 text-cyan-400" />
-                  {firstRitualPending ? 'NEXT STEP · ACADEMY' : 'FACILITY SCHEMATIC'}
+                  {firstRitualPending
+                    ? 'YOUR NEXT ROOM · ACADEMY'
+                    : currentUser
+                      ? `@${currentUser.username.replace(/^@/, '')} · FACILITY MAP`
+                      : 'FACILITY SCHEMATIC'}
                 </h3>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -1550,79 +2461,17 @@ export default function App() {
                       return { text: `LEVEL ${room.level} NOMINAL`, color: 'text-cyan-400 border-cyan-500/20 bg-cyan-950/5' };
                     };
 
-                    const rStatus = getRoomStatus();
-
                     return (
-                      <motion.div
+                      <FacilitySectorCard
                         key={room.id}
-                        whileHover={room.unlocked ? { y: -4, scale: 1.01 } : undefined}
-                        transition={{ type: 'spring', stiffness: 400, damping: 28 }}
-                        className={`bg-[#0a0a0c]/90 border rounded-2xl p-5 shadow-xl flex flex-col justify-between overflow-hidden relative min-h-[210px] backdrop-blur-sm ${
-                          room.unlocked 
-                            ? firstRitualPending
-                              ? 'border-cyan-400/40 shadow-[0_0_28px_rgba(34,211,238,0.12)]'
-                              : 'border-white/5 hover:border-cyan-500/40 hover:shadow-[0_0_28px_rgba(34,211,238,0.08)]' 
-                            : 'border-white/5 opacity-50'
-                        }`}
-                      >
-                        {room.unlocked && (
-                          <div className="absolute inset-0 pointer-events-none opacity-[0.08] bg-gradient-to-br from-cyan-400/10 via-transparent to-fuchsia-500/5 animate-pulse" />
-                        )}
-                        {/* Blueprint grid coordinate numbers */}
-                        <span className="absolute top-4 right-4 font-mono text-[9px] text-slate-600">SECTOR_0{idx + 1}</span>
-
-                        <div>
-                          <div className="flex items-center gap-2 mb-3">
-                            {room.id === 'reactor' ? <Cpu className="w-4 h-4 text-cyan-400" /> :
-                             room.id === 'workshop' ? <Hammer className="w-4 h-4 text-fuchsia-400" /> :
-                             room.id === 'lab' ? <Compass className="w-4 h-4 text-teal-400" /> :
-                             room.id === 'ai' ? <Bot className="w-4 h-4 text-pink-400" /> :
-                             room.id === 'treasury' ? <Coins className="w-4 h-4 text-emerald-400" /> :
-                             <Users className="w-4 h-4 text-amber-400" />}
-                            <h4 className="font-sans text-sm font-bold text-white tracking-tight">
-                              {room.name}
-                            </h4>
-                          </div>
-
-                          <p className="text-xs text-slate-400 font-sans leading-relaxed">
-                            {room.description}
-                          </p>
-                        </div>
-
-                        {/* Room stats / purchase controls */}
-                        <div className="mt-5 pt-3.5 border-t border-white/5 flex items-center justify-between gap-3 font-mono text-[11px]">
-                          <span className={`border px-2 py-0.5 rounded-lg text-[9px] font-bold tracking-widest uppercase ${rStatus.color}`}>
-                            {rStatus.text}
-                          </span>
-
-                          {room.unlocked ? (
-                            <div className="flex gap-2">
-                              {room.costToUpgrade > 0 && room.level < room.maxLevel && (
-                                <button
-                                  onClick={() => upgradeRoom(room.id)}
-                                  className="px-2.5 py-1.5 bg-[#0a0a0c] hover:bg-[#111115] border border-white/10 text-slate-400 hover:text-slate-200 rounded-lg text-[10px] cursor-pointer font-bold"
-                                  title={`Upgrade Room to increase operations (+${room.perk})`}
-                                >
-                                  UPGRADE({room.costToUpgrade} CP)
-                                </button>
-                              )}
-                              <button
-                                onClick={() => changeRoom(room.id)}
-                                className="px-3.5 py-1.5 bg-cyan-600 text-black hover:bg-cyan-500 font-black rounded-lg text-[10px] cursor-pointer tracking-wider"
-                              >
-                                ENTER
-                              </button>
-                            </div>
-                          ) : (
-                            <button
-                              onClick={() => unlockRoom(room.id)}
-                              className="px-3 py-1.5 bg-orange-600 hover:bg-orange-500 text-black font-black rounded-lg text-[10px] cursor-pointer tracking-wider"
-                            >
-                              CONSTRUCT ({room.costToUnlock} CP)
-                            </button>
-                          )}
-                        </div>
-                      </motion.div>
+                        room={room}
+                        sectorIndex={idx}
+                        firstRitualPending={firstRitualPending}
+                        status={getRoomStatus()}
+                        onEnter={() => changeRoom(room.id)}
+                        onUpgrade={() => upgradeRoom(room.id)}
+                        onUnlock={() => unlockRoom(room.id)}
+                      />
                     );
                   })}
 
@@ -1727,37 +2576,102 @@ export default function App() {
                     </div>
                   </div>
 
-                  {/* 8th Premium Card: Global Season Leaderboard */}
+                  {/* 8th Premium Card: Arena / Season — cinematic still */}
                   <div
-                    className="bg-gradient-to-br from-[#120e0a] to-[#070503] border border-amber-500/20 hover:border-amber-500/50 rounded-2xl p-5 shadow-xl flex flex-col justify-between overflow-hidden relative min-h-[210px] transition-all duration-300 shadow-[0_0_20px_rgba(245,158,11,0.02)] hover:shadow-[0_0_35px_rgba(245,158,11,0.06)]"
+                    className="border border-amber-500/25 hover:border-amber-400/50 rounded-2xl p-5 shadow-xl flex flex-col justify-between overflow-hidden relative min-h-[210px] transition-all duration-300 group"
                   >
-                    {/* Blueprint grid coordinate numbers */}
-                    <span className="absolute top-4 right-4 font-mono text-[9px] text-amber-500/60">SECTOR_ARENA</span>
+                    <img
+                      src="/atmosphere/arena-hero.png"
+                      alt=""
+                      className="absolute inset-0 w-full h-full object-cover brightness-[0.4] group-hover:brightness-[0.5] group-hover:scale-105 transition-all duration-700"
+                      draggable={false}
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black via-black/70 to-amber-950/20" />
+                    <span className="absolute top-4 right-4 font-mono text-[9px] text-amber-300/70 z-10">SECTOR_ARENA</span>
 
-                    <div>
+                    <div className="relative z-10">
                       <div className="flex items-center gap-2 mb-3">
-                        <Trophy className="w-4 h-4 text-amber-400" />
+                        <Trophy className="w-4 h-4 text-amber-300" />
                         <h4 className="font-sans text-sm font-bold text-white tracking-tight">
-                          Global Season Leaderboard
+                          Attention Arena
                         </h4>
                       </div>
 
-                      <p className="text-xs text-slate-400 font-sans leading-relaxed">
-                        Compete in Season 8: AI & Cognitive Core. Maintain regular check-ins to prevent rig stasis cooling and secure exclusive NFT Miner rewards.
+                      <p className="text-xs text-slate-300 font-sans leading-relaxed">
+                        Call out handles. AI judges the snap. Season leaderboard — Proof of Attention, not hash spam.
                       </p>
                     </div>
 
-                    {/* Stats / active indicators */}
-                    <div className="mt-5 pt-3.5 border-t border-white/5 flex items-center justify-between gap-3 font-mono text-[11px]">
-                      <span className="border border-amber-500/20 px-2 py-0.5 rounded-lg text-[9px] font-bold tracking-widest uppercase bg-amber-950/20 text-amber-400 font-black">
-                        SEASON 8 ACTIVE
+                    <div className="relative z-10 mt-5 pt-3.5 border-t border-white/10 flex items-center justify-between gap-3 font-mono text-[11px]">
+                      <span className="border border-amber-400/30 px-2 py-0.5 rounded-lg text-[9px] font-bold tracking-widest uppercase bg-amber-950/40 text-amber-300">
+                        AI JUDGE LIVE
                       </span>
 
                       <button
+                        type="button"
                         onClick={() => changeRoom('leaderboard')}
-                        className="px-3.5 py-1.5 bg-amber-600 hover:bg-amber-500 text-black font-black rounded-lg text-[10px] cursor-pointer tracking-wider"
+                        className="px-3.5 py-1.5 bg-amber-500 hover:bg-amber-400 text-black font-black rounded-lg text-[10px] cursor-pointer tracking-wider"
                       >
                         ENTER ARENA
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Field Deck — physical cards */}
+                  <div className="bg-gradient-to-br from-[#120c08] to-[#080605] border border-amber-500/30 hover:border-amber-400/50 rounded-2xl p-5 shadow-xl flex flex-col justify-between overflow-hidden relative min-h-[210px] transition-all duration-300">
+                    <span className="absolute top-4 right-4 font-mono text-[9px] text-amber-500/60">SECTOR_FIELD</span>
+                    <div>
+                      <div className="flex items-center gap-2 mb-3">
+                        <Rocket className="w-4 h-4 text-amber-400" />
+                        <h4 className="font-sans text-sm font-bold text-white tracking-tight">
+                          Field Deck
+                        </h4>
+                      </div>
+                      <p className="text-xs text-slate-400 font-sans leading-relaxed">
+                        Hunt printed Hook Cycle cards in the wild. Scan · claim the chapter · trade the missing beat.
+                      </p>
+                    </div>
+                    <div className="mt-5 pt-3.5 border-t border-white/5 flex items-center justify-between gap-3 font-mono text-[11px]">
+                      <span className="border border-amber-500/25 px-2 py-0.5 rounded-lg text-[9px] font-bold tracking-widest uppercase bg-amber-950/30 text-amber-300">
+                        IRL HUNT
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setPendingCardCode(null);
+                          changeRoom('field-deck');
+                        }}
+                        className="px-3.5 py-1.5 bg-amber-500 hover:bg-amber-400 text-black font-black rounded-lg text-[10px] cursor-pointer tracking-wider"
+                      >
+                        OPEN DECK
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* The Void — verifiably anonymous */}
+                  <div className="bg-gradient-to-br from-[#0c0a14] to-[#050508] border border-violet-500/25 hover:border-violet-400/50 rounded-2xl p-5 shadow-xl flex flex-col justify-between overflow-hidden relative min-h-[210px] transition-all duration-300">
+                    <span className="absolute top-4 right-4 font-mono text-[9px] text-violet-500/60">SECTOR_VOID</span>
+                    <div>
+                      <div className="flex items-center gap-2 mb-3">
+                        <EyeOff className="w-4 h-4 text-violet-300" />
+                        <h4 className="font-sans text-sm font-bold text-white tracking-tight">
+                          The Void
+                        </h4>
+                      </div>
+                      <p className="text-xs text-slate-400 font-sans leading-relaxed">
+                        Ask what you would never ask with a name. No wallet. No auth. Receipt proves identity was never attached.
+                      </p>
+                    </div>
+                    <div className="mt-5 pt-3.5 border-t border-white/5 flex items-center justify-between gap-3 font-mono text-[11px]">
+                      <span className="border border-violet-500/25 px-2 py-0.5 rounded-lg text-[9px] font-bold tracking-widest uppercase bg-violet-950/30 text-violet-300">
+                        ANONYMOUS PROOF
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => changeRoom('void')}
+                        className="px-3.5 py-1.5 bg-violet-600 hover:bg-violet-500 text-white font-black rounded-lg text-[10px] cursor-pointer tracking-wider"
+                      >
+                        ENTER VOID
                       </button>
                     </div>
                   </div>
@@ -1798,6 +2712,17 @@ export default function App() {
                   addLog={addLog}
                   onOpenRoadmap={() => changeRoom('roadmap')}
                   onOpenTollShop={(sku) => openTollShop(sku || 'academy_retake')}
+                  onRequestFocus={requestFocus}
+                  onOpenVoid={(draft) => {
+                    if (draft) {
+                      try {
+                        localStorage.setItem('culture_void_draft_v1', draft);
+                      } catch {
+                        // ignore
+                      }
+                    }
+                    changeRoom('void');
+                  }}
                   onFirstRitualComplete={(detail) => {
                     setFirstRitualPending(false);
                     setShowMintMinerCta(Boolean(economyStatus?.ready));
@@ -1805,8 +2730,11 @@ export default function App() {
                       from: detail?.from ?? 0,
                       to: detail?.to ?? Math.min(100, state.energy + 18),
                     });
+                    const meta = advanceMetaQuest('first_spark');
+                    setMetaView(meta);
+                    grantMetaRewards(meta);
                     changeRoom('map');
-                    addLog('Proof accepted — your node has fuel. Next step is on the map.', 'success');
+                    addLog('Proof accepted — your node has fuel. Feel that? Next step is on Home.', 'success');
                   }}
                 />
               )}
@@ -1814,8 +2742,19 @@ export default function App() {
                 <ProductRoadmap onEnterAcademy={() => changeRoom('lab')} />
               )}
               {activeRoom === 'ai' && <AICore state={state} setState={setState} addLog={addLog} />}
-              {activeRoom === 'missions' && <DailyMissions state={state} setState={setState} addLog={addLog} />}
-              {activeRoom === 'guild' && <GuildHall state={state} setState={setState} addLog={addLog} />}
+              {activeRoom === 'missions' && (
+                <DailyMissions state={state} setState={setState} addLog={addLog} />
+              )}
+              {activeRoom === 'guild' && (
+                <GuildHall
+                  state={state}
+                  setState={setState}
+                  addLog={addLog}
+                  currentUser={currentUser}
+                  onOpenAcademy={() => changeRoom('lab')}
+                  onOpenLeaderboard={() => changeRoom('leaderboard')}
+                />
+              )}
               {activeRoom === 'treasury' && (
                 <Treasury
                   state={state}
@@ -1847,10 +2786,75 @@ export default function App() {
                   setNotificationTarget={setNotificationTarget} 
                 />
               )}
+              {activeRoom === 'void' && <AnonymousChamber addLog={addLog} />}
+              {activeRoom === 'field-deck' && (
+                <FieldDeckClaim
+                  initialCode={pendingCardCode}
+                  username={currentUser?.username}
+                  walletAddress={currentUser?.walletAddress}
+                  addLog={addLog}
+                  onOpenAcademy={() => changeRoom('lab')}
+                  onOpenMap={() => changeRoom('map')}
+                  onClaimReward={({ setComplete }) => {
+                    // Story unlock only — codes are public; no soft-currency farm
+                    if (setComplete) {
+                      playSound('success');
+                      setRewardBurst('HOOK CYCLE COMPLETE · OPEN ACADEMY');
+                      addLog(
+                        'FIELD DECK: Hook Cycle complete — story unlocked. Bring it into Hook Mirror.',
+                        'success'
+                      );
+                    } else {
+                      playSound('soft');
+                    }
+                  }}
+                />
+              )}
               {activeRoom === 'partners' && <PartnerProgram state={state} setState={setState} addLog={addLog} />}
-              {activeRoom === 'onboarding' && <OnboardingHub state={state} setState={setState} addLog={addLog} onEnterApp={() => changeRoom('reactor')} />}
+              {activeRoom === 'onboarding' && (
+                <OnboardingHub
+                  state={state}
+                  setState={setState}
+                  addLog={addLog}
+                  onEnterApp={() => changeRoom('reactor')}
+                />
+              )}
               {(activeRoom === 'legal-privacy' || activeRoom === 'legal-terms' || activeRoom === 'legal-disclaimer') && (
                 <LegalPages page={activeRoom as LegalPageId} onBack={() => changeRoom('map')} />
+              )}
+              {![
+                'reactor',
+                'gallery',
+                'workshop',
+                'lab',
+                'roadmap',
+                'ai',
+                'missions',
+                'guild',
+                'treasury',
+                'profile',
+                'leaderboard',
+                'admin',
+                'feedback',
+                'void',
+                'field-deck',
+                'partners',
+                'onboarding',
+                'legal-privacy',
+                'legal-terms',
+                'legal-disclaimer',
+              ].includes(activeRoom) && (
+                <div className="rounded-2xl border border-amber-500/30 bg-amber-950/20 p-8 text-center space-y-4">
+                  <p className="text-sm text-amber-100 font-semibold">This sector is offline or unknown.</p>
+                  <p className="text-xs text-slate-400">Head back to the facility map — every live room is waiting there.</p>
+                  <button
+                    type="button"
+                    onClick={() => changeRoom('map')}
+                    className="px-4 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-black font-mono text-[10px] font-black uppercase tracking-wider cursor-pointer"
+                  >
+                    Back to overview
+                  </button>
+                </div>
               )}
             </RoomEnter>
           )}
@@ -1872,9 +2876,35 @@ export default function App() {
         onAdmin={() => changeRoom('admin')}
       />
 
+      <MobileBottomNav
+        activeRoom={activeRoom}
+        phase={navPhase}
+        nextStep={navNextStep}
+        walletShort={
+          currentUser?.walletAddress
+            ? `${currentUser.walletAddress.slice(0, 4)}…${currentUser.walletAddress.slice(-4)}`
+            : currentUser?.username
+              ? `@${currentUser.username}`
+              : null
+        }
+        bccBalance={firstRitualPending ? undefined : state.credits}
+        energy={state.energy}
+        onNavigate={handleNavNavigate}
+        onOpenMore={() => setMenuOpen(true)}
+        onNext={() => handleNavNavigate(navNextStep.id)}
+        onLockedHint={() =>
+          addLog('First Spark unlocks that — ~2 min in Academy, just for you.', 'info')
+        }
+        hidden={focusMode}
+      />
+
       <InstallPrompt />
 
-      <footer className="border-t border-white/5 bg-[#0a0a0c]/80 py-3 px-5 mx-4 mb-2 rounded-2xl text-slate-500 flex flex-col gap-2 shadow-lg z-10 relative backdrop-blur-md">
+      <footer
+        className={`hidden md:flex border-t border-white/5 bg-[#0a0a0c]/80 py-3 px-5 mx-4 mb-2 rounded-2xl text-slate-500 flex-col gap-2 shadow-lg z-10 relative backdrop-blur-md transition-opacity ${
+          focusMode ? 'opacity-25 pointer-events-none' : ''
+        }`}
+      >
         <div className="flex flex-col sm:flex-row justify-between items-center gap-2 font-mono text-[9px] tracking-widest">
           <div className="flex items-center gap-2">
             <div className="w-1.5 h-1.5 bg-green-500 rounded-full" />
@@ -2022,6 +3052,12 @@ export default function App() {
         )}
       </AnimatePresence>
 
+      <ClaimBurst
+        show={!!rewardBurst}
+        label={rewardBurst || ''}
+        onDone={() => setRewardBurst(null)}
+      />
+
       <AnimatePresence>
         {flowToast && (
           <motion.div
@@ -2091,12 +3127,21 @@ export default function App() {
             onClose={() => {
               setShowStory(false);
               setGuideReplay(false);
-              addLog('GUIDE: Knowledge → Energy → Node closed.', 'info');
+              addLog("GUIDE: Closed — we're here for attention (Attention → Proof → Fuel).", 'info');
             }}
           />
         )}
       </AnimatePresence>
 
+      <AttentionMetricsPanel
+        open={showMetricsPanel}
+        onClose={() => setShowMetricsPanel(false)}
+        onCopyLog={(message) => addLog(message, 'success')}
+      />
+
+      <HearingModeShell />
+
     </div>
+    </HearingModeContext.Provider>
   );
 }

@@ -7,7 +7,7 @@ Use these as-is. Prefer the short block if the form is character-limited; use th
 ## One-liner (headline / title field)
 
 ```
-Building Culture — prove Solana Devnet contributions inside an AI cyber-mining facility
+Culture Node — mine culture: Proof of Attention OS on Solana (Culture Club + Academy)
 ```
 
 ---
@@ -15,16 +15,16 @@ Building Culture — prove Solana Devnet contributions inside an AI cyber-mining
 ## Short project description (Earn form — ~800 chars)
 
 ```
-Building Culture is a gamified Solana facility where operators connect a wallet, send a real Devnet contribution tx, and unlock AI-powered mining rewards.
+Culture Node (Building Culture): Proof of Attention OS on Solana Devnet. Operators sign into Culture Club, pass First Spark in Attention Academy, and earn on-chain knowledge fuel — not empty hashes.
 
-Primary KPI (fixed): confirmed 0.05 SOL Devnet transfer → +300 CP / +25% energy only after on-chain confirmation (Solscan-verifiable). No confirmed tx = KPI fail.
+Primary KPI: confirmed Devnet contribution tx → energy/credits only after Solscan confirmation. Also live: wallet login, grant_energy economy loop, Arcium-gated PoA path, Gemini research drafts.
 
-Already built: React facility UI, wallet-only login (Phantom/local), Postgres, Gemini, SolanaPortal with KPI proof module.
+Why now: collectible culture (cards, PFPs) already won attention — we mine love + knowledge that sticks. Public demo: https://mining.buildingcultureid.space/
 
-With $200 USDG I’ll buy one month of Cursor/Claude/Codex Pro to ship a public MVP of that loop + live URL + demo.
+Ask $200 USDG → 1 month AI Pro tools to harden public MVP + Tranche 2 receipts.
 
 Repo: https://github.com/Laszlo23/culture-inteligent-node
-Drive package: [PASTE YOUR DRIVE FOLDER URL HERE]
+Drive: [PASTE YOUR DRIVE FOLDER URL HERE]
 ```
 
 ---

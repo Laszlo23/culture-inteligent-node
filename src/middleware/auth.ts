@@ -3,8 +3,18 @@ import { Request, Response, NextFunction } from 'express';
 import { DecodedIdToken } from 'firebase-admin/auth';
 import { adminAuth } from '../lib/firebase-admin.ts';
 
-const WALLET_JWT_SECRET =
-  process.env.WALLET_JWT_SECRET || 'building-culture-devnet-wallet-secret-v1';
+const DEV_FALLBACK_SECRET = 'building-culture-devnet-wallet-secret-v1';
+const WALLET_JWT_SECRET = (() => {
+  const fromEnv = process.env.WALLET_JWT_SECRET?.trim();
+  if (fromEnv) return fromEnv;
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error(
+      'WALLET_JWT_SECRET must be set in production — refuse to boot with a default JWT secret'
+    );
+  }
+  console.warn('[auth] Using DEV fallback WALLET_JWT_SECRET — set a unique secret before any real deploy');
+  return DEV_FALLBACK_SECRET;
+})();
 const CHALLENGE_TTL_MS = 5 * 60 * 1000;
 const TOKEN_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -73,7 +83,13 @@ export function verifyWalletToken(token: string): WalletAuthUser | null {
   const expected = b64url(
     crypto.createHmac('sha256', WALLET_JWT_SECRET).update(data).digest()
   );
-  if (expected !== signature) return null;
+  try {
+    const a = Buffer.from(expected);
+    const b = Buffer.from(signature);
+    if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) return null;
+  } catch {
+    return null;
+  }
   try {
     const json = JSON.parse(
       Buffer.from(payload.replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString()

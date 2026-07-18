@@ -11,6 +11,10 @@ export default defineConfig(() => {
         '@': path.resolve(__dirname, '.'),
       },
     },
+    // Optional peer — live NFC uniqueness when installed; mock path otherwise.
+    optimizeDeps: {
+      exclude: ['@zkpassport/sdk'],
+    },
     server: {
       // HMR is disabled in AI Studio via DISABLE_HMR env var.
       // Do not modifyâfile watching is disabled to prevent flickering during agent edits.

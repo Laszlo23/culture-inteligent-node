@@ -28,6 +28,8 @@ import {
   ChevronDown,
   ChevronUp,
   ArrowRight,
+  EyeOff,
+  Layers,
 } from 'lucide-react';
 
 export type NavDestination =
@@ -45,7 +47,9 @@ export type NavDestination =
   | 'onboarding'
   | 'partners'
   | 'feedback'
+  | 'void'
   | 'roadmap'
+  | 'field-deck'
   | 'legal-privacy'
   | 'legal-terms'
   | 'legal-disclaimer';
@@ -73,66 +77,71 @@ interface NavMenuProps {
 }
 
 const ALL: Record<string, NavItem> = {
-  map: { id: 'map', label: 'Facility Map', hint: 'Home overview', icon: <Map className="w-4 h-4" /> },
+  map: { id: 'map', label: 'Home', hint: 'Facility overview', icon: <Map className="w-4 h-4" /> },
   lab: {
     id: 'lab',
-    label: 'Attention Academy',
+    label: 'Academy',
     hint: 'Earn knowledge fuel',
     icon: <Compass className="w-4 h-4" />,
   },
   reactor: {
     id: 'reactor',
-    label: 'Mining Reactor',
+    label: 'Reactor',
     hint: 'Core energy & yield',
     icon: <Zap className="w-4 h-4" />,
   },
   workshop: {
     id: 'workshop',
-    label: 'Hardware Workshop',
-    hint: 'Buy & install modules',
+    label: 'Workshop',
+    hint: 'Buy & mount hardware',
     icon: <Hammer className="w-4 h-4" />,
   },
   gallery: {
     id: 'gallery',
-    label: 'NFT Gallery',
+    label: 'Gallery',
     hint: 'Your miners',
     icon: <Images className="w-4 h-4" />,
   },
   treasury: {
     id: 'treasury',
-    label: 'Ecosystem Vault',
-    hint: 'Daily claim · swap · KPI',
+    label: 'Vault',
+    hint: 'Daily refill · swap · KPI',
     icon: <Coins className="w-4 h-4" />,
   },
   profile: {
     id: 'profile',
-    label: 'Member Profile',
-    hint: 'Mint & list miners',
+    label: 'You',
+    hint: 'Mint · list · invite',
     icon: <User className="w-4 h-4" />,
   },
   missions: {
     id: 'missions',
-    label: 'Daily Missions',
-    hint: 'Practice + Lucky Wheel',
+    label: 'Missions',
+    hint: 'Daily practice + Lucky Wheel',
     icon: <RotateCw className="w-4 h-4" />,
   },
-  ai: { id: 'ai', label: 'Automation Center', hint: 'AI workers', icon: <Bot className="w-4 h-4" /> },
-  guild: { id: 'guild', label: 'Community Guilds', hint: 'Team bonuses', icon: <Users className="w-4 h-4" /> },
+  ai: { id: 'ai', label: 'Automation', hint: 'AI workers', icon: <Bot className="w-4 h-4" /> },
+  guild: {
+    id: 'guild',
+    label: 'Apex Summit',
+    hint: 'Monthly top circle',
+    icon: <Users className="w-4 h-4" />,
+  },
   leaderboard: {
     id: 'leaderboard',
-    label: 'Season Leaderboard',
-    hint: 'Compete & check in',
+    label: 'Leaderboard',
+    hint: 'Season standings',
     icon: <Trophy className="w-4 h-4" />,
   },
   roadmap: {
     id: 'roadmap',
-    label: 'Product Roadmap',
+    label: 'Roadmap',
     hint: 'Where this is going',
     icon: <Glasses className="w-4 h-4" />,
   },
   onboarding: {
     id: 'onboarding',
-    label: 'Ecosystem Hub',
+    label: 'Hub',
     hint: 'Sister apps & ledger',
     icon: <Rocket className="w-4 h-4" />,
   },
@@ -147,6 +156,18 @@ const ALL: Record<string, NavItem> = {
     label: 'Feedback',
     hint: 'Tickets & notes',
     icon: <MessageSquare className="w-4 h-4" />,
+  },
+  void: {
+    id: 'void',
+    label: 'The Void',
+    hint: 'Nameless questions',
+    icon: <EyeOff className="w-4 h-4" />,
+  },
+  'field-deck': {
+    id: 'field-deck',
+    label: 'Field Deck',
+    hint: 'Physical cards · hunt & claim',
+    icon: <Layers className="w-4 h-4" />,
   },
 };
 
@@ -235,11 +256,11 @@ function Collapsed({
 function phaseCopy(phase: NavPhase): { title: string; subtitle: string } {
   switch (phase) {
     case 'ritual':
-      return { title: 'Right now', subtitle: 'One step — First Spark' };
+      return { title: 'Just for you', subtitle: 'Ignite First Spark — ~2 min' };
     case 'guided':
-      return { title: 'Your path', subtitle: 'Suggested next moves' };
+      return { title: 'Your path', subtitle: 'What fits this moment' };
     case 'open':
-      return { title: 'Navigate', subtitle: 'Facility & account' };
+      return { title: 'Navigate', subtitle: 'Rooms & account' };
     default: {
       const _exhaustive: never = phase;
       return _exhaustive;
@@ -279,7 +300,9 @@ export default function NavMenu({
         : [];
 
   const accountIds: NavDestination[] =
-    phase === 'ritual' ? [] : ['onboarding', 'partners', 'feedback'];
+    phase === 'ritual'
+      ? ['field-deck']
+      : ['field-deck', 'onboarding', 'partners', 'feedback', 'void'];
 
   return (
     <AnimatePresence>
@@ -325,7 +348,7 @@ export default function NavMenu({
                   className="w-full mb-5 text-left rounded-2xl border border-cyan-400/40 bg-cyan-500/10 px-4 py-3.5 cursor-pointer hover:bg-cyan-500/15 transition-colors"
                 >
                   <span className="font-mono text-[9px] tracking-[0.22em] uppercase text-cyan-400 block">
-                    Do this next
+                    For you next
                   </span>
                   <span className="mt-1 flex items-center justify-between gap-2">
                     <span className="text-sm font-bold text-white font-display italic">

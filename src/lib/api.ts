@@ -25,13 +25,30 @@ async function authHeaders(): Promise<HeadersInit> {
   return headers;
 }
 
+function walletFromJwt(token: string): string | null {
+  try {
+    const payload = token.split('.')[1];
+    if (!payload) return null;
+    const json = JSON.parse(
+      atob(payload.replace(/-/g, '+').replace(/_/g, '/'))
+    ) as { wallet?: string };
+    return typeof json.wallet === 'string' ? json.wallet : null;
+  } catch {
+    return null;
+  }
+}
+
 export async function ensureWalletApiSession(opts: {
   walletAddress: string;
   walletType: 'extension' | 'local';
   localKeypair?: Keypair | null;
 }): Promise<string> {
   const existing = getWalletToken();
-  if (existing) return existing;
+  if (existing) {
+    const bound = walletFromJwt(existing);
+    if (bound && bound === opts.walletAddress) return existing;
+    clearWalletToken();
+  }
 
   const challengeRes = await fetch('/api/wallet/challenge', {
     method: 'POST',
@@ -374,7 +391,93 @@ export async function rejectCurriculumDraft(draftId: string) {
   return response.json();
 }
 
-/** Send Devnet memo attestation for a PoA */
+/** ZKPassport soulbound reputation API */
+export async function zkVerify(payload: {
+  uniqueIdentifier: string;
+  verified: boolean;
+  mode?: 'live' | 'mock';
+  proofs?: unknown[];
+  originalQuery?: unknown;
+  queryResult?: unknown;
+}) {
+  const headers = await authHeaders();
+  const response = await fetch('/api/zk/verify', {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(payload),
+  });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.error || 'ZK verify failed');
+  return data as {
+    verified: boolean;
+    nullifierHash: string;
+    mode: string;
+    scope: string;
+    alreadyBound: boolean;
+  };
+}
+
+export async function zkBind(nullifierHash?: string) {
+  const headers = await authHeaders();
+  const response = await fetch('/api/zk/bind', {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ nullifierHash }),
+  });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.error || 'ZK bind failed');
+  return data as {
+    bound: boolean;
+    nullifierHash: string;
+    mintable: boolean;
+    soulboundMinted: boolean;
+    badgePda?: string;
+    zkProvider: string;
+  };
+}
+
+export async function zkStatus() {
+  const headers = await authHeaders();
+  const response = await fetch('/api/zk/status', { headers });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.error || 'ZK status failed');
+  return data as {
+    bound: boolean;
+    mintable: boolean;
+    soulboundMinted: boolean;
+    nullifierHash?: string;
+    mintAddress?: string;
+    mintSignature?: string;
+    badgePda?: string;
+    verifiedAt?: string;
+    zkProvider?: string;
+    pendingVerify?: boolean;
+    devMode: boolean;
+    scope: string;
+  };
+}
+
+export async function zkMintSoulbound() {
+  const headers = await authHeaders();
+  const response = await fetch('/api/zk/mint', {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({}),
+  });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.error || 'Soulbound mint failed');
+  return data as {
+    soulboundMinted?: boolean;
+    alreadyMinted?: boolean;
+    mintAddress: string;
+    mintSignature?: string;
+    badgePda?: string;
+    mode: string;
+    nonTransferable?: boolean;
+    note?: string;
+  };
+}
+
 export async function sendPoaMemoAttestation(opts: {
   walletAddress: string;
   walletType: 'extension' | 'local';
@@ -593,6 +696,34 @@ export type MarketPulseResponse =
     };
 
 /** Live Solana market pulse from OKX OnchainOS (server-side CLI). */
+export type ScienceSignalDeskResponse = {
+  available: boolean;
+  fetchedAt: string;
+  mode: 'live-research' | 'seeded-pulse';
+  signals: Array<{
+    id: string;
+    title: string;
+    summary: string;
+    domain: 'ai' | 'bio' | 'quantum' | 'space' | 'energy' | 'neuro' | 'other';
+    sourceUrl?: string;
+    sourceLabel?: string;
+    attentionLens: string;
+    voidPrompt: string;
+    academyHook: string;
+    publishedAt?: string;
+  }>;
+  note: string;
+};
+
+export async function fetchScienceSignalDesk(): Promise<ScienceSignalDeskResponse> {
+  const response = await fetch('/api/signal/desk');
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error(err.error || 'Signal desk unavailable');
+  }
+  return response.json();
+}
+
 export async function fetchMarketPulse(): Promise<MarketPulseResponse> {
   const response = await fetch('/api/market/pulse');
   const body = (await response.json().catch(() => null)) as MarketPulseResponse | null;

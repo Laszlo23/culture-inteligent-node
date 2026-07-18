@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Partner Attention Session — Culture Node</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,500&family=Fraunces:opsz,wght@9..144,600;9..144,700&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --void: #050608;
+      --signal: #22d3ee;
+      --ember: #f59e0b;
+      --heart: #fb7185;
+      --bone: #f8fafc;
+      --mute: #94a3b8;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      min-height: 100vh;
+      background:
+        radial-gradient(ellipse 80% 50% at 20% 0%, rgba(245, 158, 11, 0.12), transparent 50%),
+        radial-gradient(ellipse 70% 40% at 90% 20%, rgba(34, 211, 238, 0.1), transparent 45%),
+        var(--void);
+      color: var(--bone);
+      font-family: "DM Sans", system-ui, sans-serif;
+      -webkit-font-smoothing: antialiased;
+      padding: clamp(1.5rem, 4vw, 3rem);
+      line-height: 1.45;
+    }
+    .sheet {
+      max-width: 720px;
+      margin: 0 auto;
+    }
+    .eyebrow {
+      font-size: 0.7rem;
+      font-weight: 700;
+      letter-spacing: 0.28em;
+      text-transform: uppercase;
+      color: var(--ember);
+      margin-bottom: 0.75rem;
+    }
+    h1 {
+      font-family: "Fraunces", Georgia, serif;
+      font-size: clamp(1.85rem, 5vw, 2.6rem);
+      font-weight: 700;
+      font-style: italic;
+      letter-spacing: -0.02em;
+      line-height: 1.15;
+      margin-bottom: 0.75rem;
+    }
+    .lede {
+      font-size: 1.05rem;
+      color: var(--mute);
+      max-width: 38rem;
+      margin-bottom: 2rem;
+    }
+    .lede strong { color: var(--bone); font-weight: 600; }
+    .grid {
+      display: grid;
+      gap: 1rem;
+      grid-template-columns: 1fr;
+      margin-bottom: 1.75rem;
+    }
+    @media (min-width: 560px) {
+      .grid.two { grid-template-columns: 1fr 1fr; }
+    }
+    .card {
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      background: rgba(10, 10, 12, 0.75);
+      border-radius: 1rem;
+      padding: 1.15rem 1.25rem;
+    }
+    .card.mind { border-color: rgba(245, 158, 11, 0.35); }
+    .card.machine { border-color: rgba(34, 211, 238, 0.35); }
+    .card h2 {
+      font-size: 0.68rem;
+      font-weight: 700;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      margin-bottom: 0.5rem;
+    }
+    .card.mind h2 { color: var(--ember); }
+    .card.machine h2 { color: var(--signal); }
+    .card ul {
+      list-style: none;
+      font-size: 0.9rem;
+      color: var(--mute);
+    }
+    .card li { padding: 0.25rem 0; }
+    .card li::before {
+      content: "→ ";
+      color: rgba(248, 250, 252, 0.35);
+    }
+    .packages {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.85rem;
+      margin-bottom: 1.75rem;
+    }
+    .packages th {
+      text-align: left;
+      font-size: 0.65rem;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--mute);
+      padding: 0.5rem 0.6rem;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    .packages td {
+      padding: 0.65rem 0.6rem;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+      color: var(--mute);
+    }
+    .packages td:first-child { color: var(--bone); font-weight: 600; }
+    .cta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      align-items: center;
+      margin-bottom: 1.5rem;
+    }
+    .cta a {
+      display: inline-flex;
+      align-items: center;
+      padding: 0.65rem 1.1rem;
+      border-radius: 0.65rem;
+      font-size: 0.75rem;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      text-decoration: none;
+    }
+    .cta a.primary {
+      background: var(--ember);
+      color: #000;
+    }
+    .cta a.ghost {
+      border: 1px solid rgba(34, 211, 238, 0.4);
+      color: var(--signal);
+    }
+    .foot {
+      font-size: 0.8rem;
+      color: var(--mute);
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+      padding-top: 1.25rem;
+    }
+    .foot em { color: var(--heart); font-style: normal; font-weight: 600; }
+  </style>
+</head>
+<body>
+  <article class="sheet">
+    <p class="eyebrow">Building Culture · Culture Node</p>
+    <h1>Partner Attention Session</h1>
+    <p class="lede">
+      We don’t sell impressions. We ship your insight inside a
+      <strong>Proof of Attention OS</strong> — learn, Zen decision
+      (<strong>Mind ↔ Machine</strong>), fuel, Spread.
+      Optional <strong>Hearing Mode</strong>: ears-first, screen optional.
+    </p>
+
+    <div class="grid two">
+      <div class="card mind">
+        <h2>You get</h2>
+        <ul>
+          <li>Session drop in Attention Academy</li>
+          <li>Zen break — knowledge first, then decide</li>
+          <li>Hearing scripts + deep link</li>
+          <li>Metrics: starts, completes, Spreads</li>
+        </ul>
+      </div>
+      <div class="card machine">
+        <h2>Members get</h2>
+        <ul>
+          <li>Free First Spark — door stays open</li>
+          <li>Your knowledge in a club ritual</li>
+          <li>Ears-optional path</li>
+          <li>Attention → decision → fuel</li>
+        </ul>
+      </div>
+    </div>
+
+    <table class="packages">
+      <thead>
+        <tr>
+          <th>Package</th>
+          <th>Fits</th>
+          <th>From</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Pilot week</td>
+          <td>Proof of fit — cash or trade</td>
+          <td>$0–$1.5k</td>
+        </tr>
+        <tr>
+          <td>Single session</td>
+          <td>One drop + report</td>
+          <td>$1.5k–$5k</td>
+        </tr>
+        <tr>
+          <td>Hearing week</td>
+          <td>Session + ears-first spotlight</td>
+          <td>$3k–$8k</td>
+        </tr>
+        <tr>
+          <td>Always-on track</td>
+          <td>Monthly Academy session</td>
+          <td>$3k–$12k/mo</td>
+        </tr>
+        <tr>
+          <td>Zen cohort</td>
+          <td>Facilitated Mind→Machine</td>
+          <td>$10k–$40k</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="cta">
+      <a class="primary" href="https://mining.buildingcultureid.space/?hear=1">Open Hearing Mode</a>
+      <a class="ghost" href="https://mining.buildingcultureid.space/">Culture Node live</a>
+    </div>
+
+    <p class="foot">
+      Full brief: docs/INVESTOR_PARTNER_BRIEF.md · Markdown one-pager: docs/PARTNER_ATTENTION_SESSION.md<br />
+      <em>Spread love and knowledge — that’s how we win.</em>
+    </p>
+  </article>
+</body>
+</html>

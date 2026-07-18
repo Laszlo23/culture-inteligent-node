@@ -121,6 +121,7 @@ function normalizeDraft(raw: any, existingTitles: string[]): AttentionSession {
 
 export async function researchWeeklySession(opts?: {
   existingTitles?: string[];
+  scienceContext?: string;
 }): Promise<AttentionSession> {
   const existingTitles = [
     ...CORE_ATTENTION_SESSIONS.map((s) => s.title),
@@ -134,10 +135,15 @@ export async function researchWeeklySession(opts?: {
 
   try {
     const ai = new GoogleGenAI({ apiKey });
+    const signalBlock = opts?.scienceContext
+      ? `\nCurrent science/tech signals to optionally ground the session (pick ONE as the real-world hook):\n${opts.scienceContext}\n`
+      : '';
     const prompt = `You are the Building Culture Attention Intelligence research agent.
 Create ONE new 4-7 minute practical, non-spiritual session on attention, neuroplasticity, cognitive control, habits, or decision quality.
 Must NOT duplicate these existing titles: ${existingTitles.join(' | ')}
 Ground claims in well-known cognitive science (you may cite classic papers/authors by name). No mysticism.
+When useful, tie the exercise to one CURRENT science/tech signal so learners practice attention on real emerging knowledge — not abstract only.
+${signalBlock}
 
 Respond ONLY with JSON matching:
 {

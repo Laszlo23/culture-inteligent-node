@@ -54,62 +54,100 @@ h1, h2, .font-display {
                     linear-gradient(to bottom, rgba(6, 182, 212, 0.04) 1px, transparent 1px);
 }
 
-/* Cinematic atmosphere — CSS fallback under video */
+/* Cinematic atmosphere — quiet CSS field under a soft video plate */
 .atmosphere-base {
   background-color: #050608;
 }
 .atmosphere-hero {
   background-image:
-    radial-gradient(ellipse 90% 70% at 50% -10%, rgba(34, 211, 238, 0.22), transparent 55%),
-    radial-gradient(ellipse 60% 50% at 90% 80%, rgba(245, 158, 11, 0.14), transparent 50%),
-    radial-gradient(ellipse 50% 40% at 10% 70%, rgba(16, 185, 129, 0.08), transparent 45%),
+    radial-gradient(ellipse 90% 70% at 50% -10%, rgba(34, 211, 238, 0.1), transparent 55%),
+    radial-gradient(ellipse 60% 50% at 90% 80%, rgba(245, 158, 11, 0.06), transparent 50%),
     linear-gradient(180deg, #070a10 0%, #050608 55%, #030406 100%);
-  animation: atmosphereBreathe 14s ease-in-out infinite;
+  animation: atmosphereBreathe 22s ease-in-out infinite;
 }
 .atmosphere-auth {
   background-image:
-    radial-gradient(ellipse 70% 55% at 35% 25%, rgba(34, 211, 238, 0.16), transparent 55%),
-    radial-gradient(ellipse 50% 40% at 85% 75%, rgba(245, 158, 11, 0.1), transparent 50%),
+    radial-gradient(ellipse 70% 55% at 35% 25%, rgba(34, 211, 238, 0.08), transparent 55%),
+    radial-gradient(ellipse 50% 40% at 85% 75%, rgba(245, 158, 11, 0.05), transparent 50%),
     linear-gradient(160deg, #06080e 0%, #050608 100%);
-  animation: atmosphereBreathe 18s ease-in-out infinite;
+  animation: atmosphereBreathe 26s ease-in-out infinite;
 }
 .atmosphere-facility {
   background-image:
-    radial-gradient(ellipse 80% 50% at 10% -10%, rgba(34, 211, 238, 0.08), transparent),
-    radial-gradient(ellipse 60% 40% at 90% 0%, rgba(245, 158, 11, 0.05), transparent),
+    radial-gradient(ellipse 80% 50% at 10% -10%, rgba(34, 211, 238, 0.05), transparent),
+    radial-gradient(ellipse 60% 40% at 90% 0%, rgba(245, 158, 11, 0.03), transparent),
     linear-gradient(180deg, #050608 0%, #050506 100%);
 }
 .atmosphere-ritual {
   background-image:
-    radial-gradient(ellipse 70% 60% at 50% 40%, rgba(34, 211, 238, 0.2), transparent 55%),
-    radial-gradient(ellipse 40% 35% at 70% 75%, rgba(245, 158, 11, 0.12), transparent 50%),
+    radial-gradient(ellipse 70% 60% at 50% 40%, rgba(34, 211, 238, 0.1), transparent 55%),
+    radial-gradient(ellipse 40% 35% at 70% 75%, rgba(245, 158, 11, 0.06), transparent 50%),
     linear-gradient(180deg, #060910 0%, #050608 100%);
-  animation: atmosphereBreathe 10s ease-in-out infinite;
+  animation: atmosphereBreathe 18s ease-in-out infinite;
+}
+.atmosphere-duality {
+  background-image:
+    radial-gradient(ellipse 50% 55% at 18% 45%, rgba(245, 158, 11, 0.08), transparent 55%),
+    radial-gradient(ellipse 50% 55% at 82% 50%, rgba(34, 211, 238, 0.08), transparent 55%),
+    linear-gradient(105deg, #080706 0%, #050608 50%, #04080c 100%);
+  animation: atmosphereBreathe 24s ease-in-out infinite;
+}
+.duality-split-wash {
+  background: linear-gradient(
+    90deg,
+    rgba(245, 158, 11, 0.04) 0%,
+    transparent 40%,
+    transparent 60%,
+    rgba(34, 211, 238, 0.04) 100%
+  );
 }
 .atmosphere-vignette {
-  background: radial-gradient(ellipse 75% 70% at 50% 45%, transparent 35%, rgba(0, 0, 0, 0.55) 100%);
-}
-.atmosphere-grain {
-  opacity: 0.045;
-  mix-blend-mode: overlay;
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-  background-size: 180px 180px;
-  animation: atmosphereGrain 0.4s steps(2) infinite;
+  background: radial-gradient(ellipse 80% 75% at 50% 45%, transparent 40%, rgba(0, 0, 0, 0.62) 100%);
 }
 @keyframes atmosphereBreathe {
-  0%, 100% { filter: brightness(1); transform: scale(1); }
-  50% { filter: brightness(1.06); transform: scale(1.02); }
-}
-@keyframes atmosphereGrain {
-  0% { transform: translate(0, 0); }
-  100% { transform: translate(-2%, 1%); }
+  0%, 100% { filter: brightness(1); }
+  50% { filter: brightness(1.025); }
 }
 @media (prefers-reduced-motion: reduce) {
   .atmosphere-hero,
   .atmosphere-auth,
   .atmosphere-ritual,
-  .atmosphere-grain {
+  .atmosphere-duality {
     animation: none !important;
+  }
+}
+
+/* Facility sector cards — matrix rain (quiet idle, brighter on hover) */
+.sector-matrix {
+  mask-image: linear-gradient(180deg, transparent 0%, #000 18%, #000 72%, transparent 100%),
+    linear-gradient(90deg, transparent 0%, #000 20%, #000 85%, transparent 100%);
+  mask-composite: intersect;
+  -webkit-mask-image: linear-gradient(180deg, transparent 0%, #000 18%, #000 72%, transparent 100%),
+    linear-gradient(90deg, transparent 0%, #000 20%, #000 85%, transparent 100%);
+  -webkit-mask-composite: source-in;
+}
+.sector-matrix-col {
+  position: absolute;
+  top: -140%;
+  width: 1em;
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 10px;
+  line-height: 1.2;
+  white-space: pre;
+  text-align: center;
+  animation: sectorMatrixFall linear infinite;
+  text-shadow: 0 0 10px currentColor;
+}
+@keyframes sectorMatrixFall {
+  0% { transform: translateY(0); opacity: 0.35; }
+  40% { opacity: 1; }
+  100% { transform: translateY(160%); opacity: 0.2; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sector-matrix-col {
+    animation: none;
+    top: 8%;
+    opacity: 0.4;
   }
 }
 
@@ -173,4 +211,60 @@ h1, h2, .font-display {
 @keyframes nft-particles {
   from { transform: translateY(0) scale(1); opacity: 0.55; }
   to { transform: translateY(-8%) scale(1.05); opacity: 0.95; }
+}
+
+/* Hardware Bay — module product art */
+.hw-pcb-traces {
+  background-image:
+    linear-gradient(90deg, transparent 48%, rgba(34, 211, 238, 0.12) 49%, transparent 51%),
+    linear-gradient(0deg, transparent 48%, rgba(245, 158, 11, 0.1) 49%, transparent 51%),
+    radial-gradient(circle at 30% 40%, rgba(34, 211, 238, 0.08), transparent 40%),
+    radial-gradient(circle at 70% 65%, rgba(217, 70, 239, 0.06), transparent 35%);
+  background-size: 24px 24px, 24px 24px, 100% 100%, 100% 100%;
+}
+
+.hw-gpu-die {
+  box-shadow: inset 0 0 24px rgba(34, 211, 238, 0.12);
+}
+
+.hw-fan-spin {
+  animation: hw-fan 2.8s linear infinite;
+}
+
+@keyframes hw-fan {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.hw-drone-hover {
+  animation: hw-hover 2.2s ease-in-out infinite;
+}
+
+@keyframes hw-hover {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
+
+.hw-cell-pulse {
+  background: linear-gradient(180deg, rgba(163, 230, 53, 0.85), rgba(132, 204, 22, 0.35));
+  animation: hw-cell 1.4s ease-in-out infinite alternate;
+}
+
+@keyframes hw-cell {
+  from { filter: brightness(0.85); }
+  to { filter: brightness(1.25); }
+}
+
+.hw-module-scan {
+  background: linear-gradient(
+    180deg,
+    transparent 0%,
+    rgba(34, 211, 238, 0.08) 45%,
+    rgba(245, 158, 11, 0.12) 50%,
+    rgba(34, 211, 238, 0.06) 55%,
+    transparent 100%
+  );
+  background-size: 100% 220%;
+  animation: nft-scan-y 2.4s linear infinite;
+  mix-blend-mode: screen;
 }

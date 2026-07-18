@@ -8,13 +8,15 @@ Culture Node
 
 ## Subtitle / short description (≤100 chars for Phantom)
 
-Proof of Attention OS — learn, fuel your Solana Devnet node, Mind ↔ Machine.
+Mine culture — Proof of Attention OS on Solana Devnet. Learn → fuel → node.
 
 ## Long description
 
-Culture Node is Building Culture’s Proof of Attention OS on Solana Devnet.
+It's about time to mine some culture.
 
-Operators connect a wallet, complete First Spark in Attention Academy, and earn on-chain knowledge fuel (`grant_energy`). Crystallize living attention (BCC) into digital cognition (CGT) in the Duality Exchange. Claim the free daily drip (`claim_daily`) with a program-enforced cooldown.
+Pokemon cards, pudgys, bonkers, apes — communities already proved we'll collect culture. Culture Node is Building Culture's Proof of Attention OS on Solana Devnet: the mine is attention that makes you sharper, not another empty print run.
+
+Operators connect a wallet, sign into Culture Club, complete First Spark in Attention Academy, and earn on-chain knowledge fuel (`grant_energy`). Crystallize living attention (BCC) into digital cognition (CGT) in the Duality Exchange. Claim the free daily drip (`claim_daily`) with a program-enforced cooldown.
 
 Honest Devnet product: real transactions on Solana explorers. Optional 1¢ Attention Tolls accelerate refills — First Spark and claim_daily stay free.
 
@@ -43,3 +45,18 @@ Solana (Devnet)
 
 - https://mining.buildingcultureid.space/privacy.html
 - https://mining.buildingcultureid.space/terms.html
+
+## Social / broadcast (paste anywhere)
+
+```
+Pokemon prints. Pudgys. Bonk. Apes.
+Communities already proved we'll collect culture.
+
+It's about time to mine some.
+
+Culture Node — Building Culture
+Sign the club oath. First Spark. Proof of Attention → fuel.
+Not empty hashes. Not gold-digger grades. Knowledge that works now.
+
+https://mining.buildingcultureid.space/
+```

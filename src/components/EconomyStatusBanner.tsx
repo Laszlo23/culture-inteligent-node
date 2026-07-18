@@ -41,7 +41,7 @@ export default function EconomyStatusBanner({
           On-chain mode
         </span>
         <span className="text-slate-400 font-sans text-xs">
-          Academy passes and miners settle on Solana Devnet.
+          Proof of Attention settles on Solana Devnet — attention first, chain second.
         </span>
         <a
           href={`https://solscan.io/account/${status.programId}?cluster=devnet`}
@@ -66,8 +66,8 @@ export default function EconomyStatusBanner({
                 Practice mode
               </p>
               <p className="text-xs text-slate-400 mt-1 leading-relaxed font-sans">
-                Progress stays in this browser until on-chain settlement is enabled. Dashboard /
-                wheel / NFT loops are practice — Academy fuel still works here.
+                We&apos;re here for attention. Proof of Attention still earns fuel here — settlement
+                can catch up. Dashboard / wheel / NFT loops are practice until on-chain is live.
               </p>
             </div>
             {onContinueAcademy && (

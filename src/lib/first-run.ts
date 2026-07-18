@@ -1,5 +1,5 @@
 /**
- * First-run onboarding flags — Knowledge → Energy → Node.
+ * First-run onboarding flags — Attention → Proof → Fuel → Node.
  */
 
 export const STORY_DISMISSED_KEY = 'solana_onboarding_dismissed';

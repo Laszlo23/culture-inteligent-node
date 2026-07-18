@@ -100,6 +100,23 @@ export interface MinerNFT {
   description: string;
 }
 
+/** ZK uniqueness provider for soulbound reputation (World ID reserved). */
+export type ZkIdProvider = 'zkpassport' | 'world_id';
+
+/** Human-bound reputation badge — only mintable after ZKPassport nullifier bind. */
+export interface SoulboundReputation {
+  zkProvider: ZkIdProvider;
+  /** Scoped uniqueIdentifier hash (hex); never PII. */
+  nullifierHash: string;
+  verifiedAt: string;
+  boundWallet: string;
+  mintAddress?: string;
+  mintSignature?: string;
+  /** Anchor SoulboundBadge PDA address when on-chain. */
+  badgePda?: string;
+  soulboundMinted: boolean;
+}
+
 export interface ProofOfAttention {
   id: string;
   walletAddress: string;
@@ -109,7 +126,15 @@ export interface ProofOfAttention {
   rewardEnergy: number;
   rewardBcc: number;
   timestamp: string;
+  /**
+   * @deprecated Prefer `attested` — historically meant memo attest, not soulbound mint.
+   */
   minted: boolean;
+  /** Devnet memo / activity receipt attested (not the reputation SBT). */
+  attested?: boolean;
+  /** True only after ZKPassport-gated Token-2022 NonTransferable mint. */
+  soulboundMinted?: boolean;
+  soulbound?: SoulboundReputation;
   sessionId?: string;
   score?: number;
   signature?: string;
@@ -214,6 +239,8 @@ export interface GameState {
   activeSkin?: string;
   unlockedSkins?: string[];
   proofOfAttentions?: ProofOfAttention[];
+  /** Facility-level soulbound reputation (ZKPassport-bound). */
+  soulboundReputation?: SoulboundReputation;
   pomodoroActive?: boolean;
   pomodoroTimeLeft?: number;
   sharedInsights?: string[];

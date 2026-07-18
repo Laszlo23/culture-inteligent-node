@@ -30,6 +30,7 @@ import {
 } from './solana-economy';
 import { resolveEconomyWallet } from './economy-wallet';
 import { energyPercentToBps } from './economy-rewards';
+import { buildMemoIx, formatAttentionMemo } from './poa-chain';
 import type { MinerNFT } from '../types';
 
 /** Accumulated UI energy decay awaiting drain_energy flush (percent points). */
@@ -193,14 +194,27 @@ export async function swapBccToCgtOnChain(bccAmount: number): Promise<string> {
   const ctx = resolveEconomyWallet();
   if (!ctx) throw new Error('No wallet');
   const owner = new PublicKey(ctx.walletAddress);
-  return sendIxs(await buildSwapIx(owner, bccAmount));
+  const ixs = await buildSwapIx(owner, bccAmount);
+  // PoA: Mind↔Machine crystallize — same signature as swap
+  ixs.push(
+    buildMemoIx(
+      owner,
+      formatAttentionMemo('duality_swap', { bcc: bccAmount, t: Date.now() })
+    )
+  );
+  return sendIxs(ixs);
 }
 
 export async function claimDailyOnChain(): Promise<string> {
   const ctx = resolveEconomyWallet();
   if (!ctx) throw new Error('No wallet');
   const owner = new PublicKey(ctx.walletAddress);
-  return sendIxs(await buildClaimDailyIx(owner));
+  const ixs = await buildClaimDailyIx(owner);
+  // PoA: daily attention refill receipt — bundled, one wallet signature
+  ixs.push(
+    buildMemoIx(owner, formatAttentionMemo('claim_daily', { energy: 15, bcc: 50, t: Date.now() }))
+  );
+  return sendIxs(ixs);
 }
 
 export async function mintMinerOnChain(opts: {
@@ -214,9 +228,19 @@ export async function mintMinerOnChain(opts: {
   const config = await fetchConfig();
   if (!config) throw new Error('Config PDA missing — run bootstrap');
   const assetId = config.minerCount;
-  const signature = await sendIxs(
-    await buildMintMinerIx(owner, assetId, opts.skin, opts.hashrate, opts.rarity)
+  const mintIxs = await buildMintMinerIx(owner, assetId, opts.skin, opts.hashrate, opts.rarity);
+  mintIxs.push(
+    buildMemoIx(
+      owner,
+      formatAttentionMemo('mint_miner', {
+        asset: assetId,
+        skin: opts.skin,
+        rarity: opts.rarity,
+        t: Date.now(),
+      })
+    )
   );
+  const signature = await sendIxs(mintIxs);
   return { signature, assetId, mintAddress: minerPda(assetId).toBase58() };
 }
 
