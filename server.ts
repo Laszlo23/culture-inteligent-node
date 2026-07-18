@@ -1208,7 +1208,7 @@ async function startServer() {
     }
   });
 
-  app.get("/api/curriculum", (req, res) => {
+  app.get("/api/curriculum", async (req, res) => {
     let wallet: string | undefined;
     const authHeader = req.headers.authorization;
     if (authHeader?.startsWith("Bearer ")) {
