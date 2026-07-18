@@ -19,6 +19,7 @@ import {
 import { GameState, ProofOfAttention } from '../types';
 import {
   CORE_ATTENTION_SESSIONS,
+  FIRST_SPARK_SESSION,
   AttentionSession,
   SessionQuizItem,
   mergeCatalog,
@@ -34,17 +35,25 @@ import {
   attestAttentionProof,
 } from '../lib/api.ts';
 import { Keypair } from '@solana/web3.js';
-import { markEnergySurge } from './fx';
+import { markEnergySurge, CinematicBackdrop } from './fx';
 import {
   verifyAttentionWithArcium,
   type ArciumThresholdResult,
 } from '../lib/arcium-poa';
+import {
+  completeFirstRitual,
+  isFirstRitualPending,
+} from '../lib/first-run';
+import { spendSparkCredit } from './AttentionTollShop';
 
 interface AttentionAcademyProps {
   state: GameState;
   setState: React.Dispatch<React.SetStateAction<GameState>>;
   addLog: (message: string, type: 'info' | 'success' | 'warn' | 'system') => void;
   onOpenRoadmap?: () => void;
+  onFirstRitualComplete?: (detail?: { from: number; to: number }) => void;
+  /** Open Treasury Attention Toll shop (e.g. academy_retake) */
+  onOpenTollShop?: (sku?: 'academy_retake' | 'spark_refill') => void;
 }
 
 export default function AttentionAcademy({
@@ -52,6 +61,8 @@ export default function AttentionAcademy({
   setState,
   addLog,
   onOpenRoadmap,
+  onFirstRitualComplete,
+  onOpenTollShop,
 }: AttentionAcademyProps) {
   const [published, setPublished] = useState<AttentionSession[]>([]);
   const [isAdmin, setIsAdmin] = useState(false);
@@ -71,12 +82,23 @@ export default function AttentionAcademy({
   const [exerciseReady, setExerciseReady] = useState(false);
   const [artifacts, setArtifacts] = useState('');
   const [justUpgraded, setJustUpgraded] = useState(false);
+  const [fuelProofToast, setFuelProofToast] = useState(false);
 
   const [activeQuizQuestions, setActiveQuizQuestions] = useState<SessionQuizItem[]>([]);
   const [currentQuizIdx, setCurrentQuizIdx] = useState(0);
   const [selectedQuizAnswer, setSelectedQuizAnswer] = useState<number | null>(null);
   const [quizScore, setQuizScore] = useState(0);
   const [quizState, setQuizState] = useState<'idle' | 'quiz' | 'passed' | 'failed'>('idle');
+  const [grantRetry, setGrantRetry] = useState<{
+    index: number;
+    agent?: {
+      verification: string;
+      score: number;
+      proof?: ProofOfAttention | null;
+      verificationId?: string;
+      arcium?: ArciumThresholdResult;
+    };
+  } | null>(null);
   const [isScanningOverlay, setIsScanningOverlay] = useState(false);
   const [agentVerifyMsg, setAgentVerifyMsg] = useState('');
   const [arciumStatus, setArciumStatus] = useState<{
@@ -87,6 +109,7 @@ export default function AttentionAcademy({
   }>({ state: 'idle' });
   const [pendingAttestId, setPendingAttestId] = useState<string | null>(null);
   const [pendingSessionIdx, setPendingSessionIdx] = useState<number | null>(null);
+  const [ritualPending, setRitualPending] = useState(() => isFirstRitualPending());
 
   const catalog = useMemo(() => mergeCatalog(published), [published]);
 
@@ -109,15 +132,25 @@ export default function AttentionAcademy({
   }, [completedSessions]);
 
   useEffect(() => {
-    const nextIncompleteIdx = catalog.findIndex((s) => !completedSessions.includes(s.id));
-    if (nextIncompleteIdx !== -1) {
-      const isCurrentLocked =
-        activeSessionIdx > 0 && !completedSessions.includes(catalog[activeSessionIdx - 1]?.id);
-      if (isCurrentLocked || activeSessionIdx >= catalog.length) {
-        setActiveSessionIdx(nextIncompleteIdx);
+    if (ritualPending) {
+      const sparkIdx = catalog.findIndex((s) => s.id === FIRST_SPARK_SESSION.id);
+      if (sparkIdx >= 0 && !completedSessions.includes(FIRST_SPARK_SESSION.id)) {
+        setActiveSessionIdx(sparkIdx);
+        return;
       }
     }
-  }, [completedSessions, catalog]);
+    const nextIncompleteIdx = catalog.findIndex((s) => !completedSessions.includes(s.id));
+    if (nextIncompleteIdx === -1) return;
+    if (ritualPending) {
+      setActiveSessionIdx(nextIncompleteIdx);
+      return;
+    }
+    const isCurrentLocked =
+      activeSessionIdx > 0 && !completedSessions.includes(catalog[activeSessionIdx - 1]?.id);
+    if (isCurrentLocked || activeSessionIdx >= catalog.length) {
+      setActiveSessionIdx(nextIncompleteIdx);
+    }
+  }, [completedSessions, catalog, ritualPending, activeSessionIdx]);
 
   const onReadyChange = useCallback((ready: boolean, art: string) => {
     setExerciseReady(ready);
@@ -129,12 +162,105 @@ export default function AttentionAcademy({
   const weekly = catalog.filter((s) => s.status === 'published');
 
   const recommendedIdx = useMemo(() => {
+    if (ritualPending) {
+      const sparkIdx = catalog.findIndex(
+        (s) => s.id === FIRST_SPARK_SESSION.id && !completedSessions.includes(s.id)
+      );
+      if (sparkIdx >= 0) return sparkIdx;
+    }
     const next = catalog.findIndex((s) => !completedSessions.includes(s.id));
     return next === -1 ? null : next;
-  }, [catalog, completedSessions]);
+  }, [catalog, completedSessions, ritualPending]);
   const recommendedSession = recommendedIdx != null ? catalog[recommendedIdx] : null;
   const showMentor =
-    !!recommendedSession && (state.energy < 55 || state.efficiency < 1.15);
+    ritualPending ||
+    (!!recommendedSession && (state.energy < 55 || state.efficiency < 1.15));
+
+  const settleSessionFuel = async (
+    index: number,
+    agent?: {
+      verification: string;
+      score: number;
+      proof?: ProofOfAttention | null;
+      verificationId?: string;
+      arcium?: ArciumThresholdResult;
+    },
+    opts?: { retryOnly?: boolean }
+  ) => {
+    const session = catalog[index];
+    if (!session) return;
+
+    const from = state.energy;
+    let fuelApplied = false;
+    let to = from;
+
+    try {
+      const { fetchEconomyStatus } = await import('../lib/api');
+      const { grantEnergyOnChain, syncLedgerToState } = await import('../lib/economy-actions');
+      const status = await fetchEconomyStatus();
+
+      if (!status.ready) {
+        to = Math.min(100, from + session.rewards.energy);
+        setState((prev) => ({
+          ...prev,
+          energy: Math.min(100, prev.energy + session.rewards.energy),
+          credits: prev.credits + session.rewards.cp,
+        }));
+        markEnergySurge();
+        fuelApplied = true;
+        addLog(
+          `ACADEMY [LOCAL PRACTICE]: +${session.rewards.energy}% fuel / +${session.rewards.cp} BCC — not on-chain settlement.`,
+          'warn'
+        );
+      } else {
+        const result = await grantEnergyOnChain({
+          energyPercent: session.rewards.energy,
+          bccReward: session.rewards.cp,
+          verificationId: agent?.verificationId,
+        });
+        if ('skipped' in result) {
+          setGrantRetry({ index, agent });
+          addLog(
+            `ACADEMY GRANT BLOCKED: ${result.reason}. Fuel not applied — tap Retry grant below.`,
+            'warn'
+          );
+        } else {
+          await syncLedgerToState(setState);
+          markEnergySurge();
+          to = Math.min(100, from + session.rewards.energy);
+          fuelApplied = true;
+          setGrantRetry(null);
+          addLog(`ACADEMY ON-CHAIN: grant_energy confirmed. ${result.solscan}`, 'success');
+        }
+      }
+    } catch (e: any) {
+      setGrantRetry({ index, agent });
+      addLog(
+        `ACADEMY GRANT FAILED: ${e?.message || e}. Tap Retry grant — stay here until fuel lands.`,
+        'warn'
+      );
+    }
+
+    if (isFirstRitualPending() || ritualPending) {
+      if (fuelApplied) {
+        completeFirstRitual();
+        setRitualPending(false);
+        setFuelProofToast(true);
+        onFirstRitualComplete?.({ from, to });
+        addLog('Proof accepted — your node has fuel.', 'success');
+      } else if (!opts?.retryOnly) {
+        addLog(
+          'First Spark quiz passed — finish the energy grant (Retry) so your node gets fuel.',
+          'warn'
+        );
+      }
+    }
+
+    if (fuelApplied && !opts?.retryOnly && index < catalog.length - 1) {
+      setActiveSessionIdx(index + 1);
+    }
+    setPendingSessionIdx(null);
+  };
 
   const applyPendingRewards = (
     index: number,
@@ -150,12 +276,13 @@ export default function AttentionAcademy({
     if (!session || completedSessions.includes(session.id)) return;
 
     setJustUpgraded(true);
-    setTimeout(() => setJustUpgraded(false), 4000);
+    setTimeout(() => {
+      setJustUpgraded(false);
+      setFuelProofToast(false);
+    }, 4000);
 
     setState((prev) => {
-      const nextEnergy = Math.min(100, prev.energy + session.rewards.energy);
       const nextEfficiency = parseFloat((prev.efficiency + session.rewards.efficiency).toFixed(3));
-      const nextCredits = prev.credits + session.rewards.cp;
       const proofs = [...(prev.proofOfAttentions || [])];
       const arciumFields = agent?.arcium
         ? {
@@ -173,7 +300,8 @@ export default function AttentionAcademy({
           id: `poa_local_${Date.now()}`,
           walletAddress:
             (typeof window !== 'undefined' &&
-              JSON.parse(localStorage.getItem('solana_current_user_session_v1') || '{}')?.walletAddress) ||
+              JSON.parse(localStorage.getItem('solana_current_user_session_v1') || '{}')
+                ?.walletAddress) ||
             'unknown',
           activity: session.title,
           duration: session.durationMin,
@@ -190,9 +318,7 @@ export default function AttentionAcademy({
       }
       return {
         ...prev,
-        energy: nextEnergy,
         efficiency: nextEfficiency,
-        credits: nextCredits,
         proofOfAttentions: proofs,
         dailyMissions: prev.dailyMissions.map((m) =>
           m.id === 'm_academy' ? { ...m, completed: true } : m
@@ -200,23 +326,21 @@ export default function AttentionAcademy({
       };
     });
 
-    markEnergySurge();
-
     if (agent?.verificationId) setPendingAttestId(agent.verificationId);
 
     setCompletedSessions((prev) => {
+      if (prev.includes(session.id)) return prev;
       const updated = [...prev, session.id];
       localStorage.setItem('kronos_academy_completed', JSON.stringify(updated));
       return updated;
     });
 
     addLog(
-      `CONFIDENTIAL PASS: ${session.title} — Arcium band ${agent?.arcium?.scoreBand ?? '?'} · ${agent?.verification || 'local'} → +${session.rewards.cp} CP.`,
+      `CONFIDENTIAL PASS: ${session.title} — Arcium band ${agent?.arcium?.scoreBand ?? '?'} · ${agent?.verification || 'local'}.`,
       'success'
     );
 
-    if (index < catalog.length - 1) setActiveSessionIdx(index + 1);
-    setPendingSessionIdx(null);
+    void settleSessionFuel(index, agent);
   };
 
   const runAgentVerification = async (index: number, quizScoreValue: number, quizTotal: number) => {
@@ -396,11 +520,24 @@ export default function AttentionAcademy({
   return (
     <div className="space-y-6">
       {showMentor && recommendedSession && recommendedIdx != null && (
-        <div className="rounded-2xl border border-cyan-400/30 bg-gradient-to-r from-cyan-500/10 via-[#0a0a0c] to-fuchsia-500/10 p-4 relative overflow-hidden">
-          <div className="absolute inset-0 bg-cyan-400/5 animate-pulse pointer-events-none" />
+        <div
+          className={`rounded-2xl border p-4 relative overflow-hidden ${
+            ritualPending
+              ? 'border-cyan-400/40 bg-[#080a10]/70'
+              : 'border-cyan-400/30 bg-gradient-to-r from-cyan-500/10 via-[#0a0a0c] to-emerald-500/10'
+          }`}
+        >
+          {ritualPending ? (
+            <div className="absolute inset-0 opacity-90">
+              <CinematicBackdrop variant="ritual" />
+            </div>
+          ) : (
+            <div className="absolute inset-0 bg-cyan-400/5 animate-pulse pointer-events-none" />
+          )}
           <div className="relative flex flex-wrap items-center gap-2 mb-1.5">
             <p className="text-[10px] font-mono text-cyan-400 tracking-[0.22em] uppercase flex items-center gap-1.5">
-              <Sparkles className="w-3.5 h-3.5" /> AI mentor · Knowledge fuel
+              <Sparkles className="w-3.5 h-3.5" />{' '}
+              {ritualPending ? 'First Spark · science you can feel' : 'AI mentor · Knowledge fuel'}
             </p>
             <span
               className={`text-[9px] font-mono uppercase tracking-wider px-2 py-0.5 rounded-md border ${
@@ -425,17 +562,40 @@ export default function AttentionAcademy({
             </span>
           </div>
           <p className="text-sm text-slate-100 mt-1.5 relative leading-relaxed">
-            Reserves at <span className="text-cyan-300 font-mono font-bold">{state.energy}%</span>.{' '}
-            <span className="text-fuchsia-300 font-semibold">{recommendedSession.title}</span> can restore ~
-            {recommendedSession.rewards.energy}% energy in ~{recommendedSession.durationMin} min.
+            {ritualPending ? (
+              <>
+                Don&apos;t take our word — run the bias check, leave one honest line, watch fuel
+                climb. Plasticity + attention control, compressed.{' '}
+                {recommendedSession ? (
+                  <>
+                    <span className="text-amber-300 font-semibold">{recommendedSession.title}</span>
+                    {' '}(~{recommendedSession.durationMin} min).
+                  </>
+                ) : null}
+              </>
+            ) : (
+              <>
+                Reserves at{' '}
+                <span className="text-cyan-300 font-mono font-bold">{state.energy}%</span>.{' '}
+                {recommendedSession ? (
+                  <>
+                    <span className="text-fuchsia-300 font-semibold">{recommendedSession.title}</span>{' '}
+                    can restore ~{recommendedSession.rewards.energy}% energy in ~
+                    {recommendedSession.durationMin} min.
+                  </>
+                ) : null}
+              </>
+            )}
           </p>
-          <button
-            type="button"
-            onClick={() => setActiveSessionIdx(recommendedIdx)}
-            className="mt-3 relative text-[10px] font-mono uppercase tracking-wider px-3 py-1.5 rounded-lg bg-cyan-500 text-black font-black hover:bg-cyan-400 cursor-pointer"
-          >
-            Start recommended session →
-          </button>
+          {recommendedIdx != null && (
+            <button
+              type="button"
+              onClick={() => setActiveSessionIdx(recommendedIdx)}
+              className="mt-3 relative text-[10px] font-mono uppercase tracking-wider px-3 py-1.5 rounded-lg bg-cyan-500 text-black font-black hover:bg-cyan-400 cursor-pointer"
+            >
+              {ritualPending ? 'Start First Spark →' : 'Start recommended session →'}
+            </button>
+          )}
         </div>
       )}
 
@@ -460,19 +620,21 @@ export default function AttentionAcademy({
         </div>
       )}
 
-      <button
-        type="button"
-        onClick={onOpenRoadmap}
-        className="w-full text-left rounded-xl border border-emerald-500/20 bg-gradient-to-r from-emerald-500/10 to-violet-500/10 px-4 py-3 flex items-center justify-between gap-3 hover:border-emerald-400/40 transition-colors"
-      >
-        <div>
-          <p className="text-[10px] font-mono text-emerald-400 tracking-widest uppercase">Roadmap</p>
-          <p className="text-sm text-slate-200">2D mining → weekly intelligence → creator labs → AR experiences</p>
-        </div>
-        <Map className="w-4 h-4 text-emerald-400 shrink-0" />
-      </button>
+      {!ritualPending && (
+        <button
+          type="button"
+          onClick={onOpenRoadmap}
+          className="w-full text-left rounded-xl border border-emerald-500/20 bg-gradient-to-r from-emerald-500/10 to-violet-500/10 px-4 py-3 flex items-center justify-between gap-3 hover:border-emerald-400/40 transition-colors"
+        >
+          <div>
+            <p className="text-[10px] font-mono text-emerald-400 tracking-widest uppercase">Roadmap</p>
+            <p className="text-sm text-slate-200">2D mining → weekly intelligence → creator labs → AR experiences</p>
+          </div>
+          <Map className="w-4 h-4 text-emerald-400 shrink-0" />
+        </button>
+      )}
 
-      {weekly.length > 0 && (
+      {!ritualPending && weekly.length > 0 && (
         <div className="rounded-xl border border-cyan-500/25 bg-cyan-500/5 p-4">
           <p className="text-[10px] font-mono text-cyan-400 tracking-widest uppercase mb-1 flex items-center gap-1.5">
             <Sparkles className="w-3.5 h-3.5" /> This week&apos;s drop
@@ -487,14 +649,15 @@ export default function AttentionAcademy({
         </div>
       )}
 
-      {isAdmin && (
+      {!ritualPending && isAdmin && (
         <CurriculumLabPanel
           addLog={addLog}
           onPublished={() => void refreshCurriculum()}
         />
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className={`grid grid-cols-1 gap-6 ${ritualPending ? '' : 'lg:grid-cols-3'}`}>
+        {!ritualPending && (
         <div className="space-y-3">
           <div className="rounded-2xl border border-white/5 bg-[#0a0a0c] p-4">
             <p className="text-[10px] font-mono text-fuchsia-400 tracking-widest mb-3">SERIES PROGRESS</p>
@@ -567,11 +730,14 @@ export default function AttentionAcademy({
             })}
           </div>
         </div>
+        )}
 
-        <div className="lg:col-span-2 rounded-2xl border border-white/5 bg-[#0a0a0c] p-5 relative overflow-hidden">
+        <div className={`${ritualPending ? '' : 'lg:col-span-2'} rounded-2xl border border-white/5 bg-[#0a0a0c] p-5 relative overflow-hidden`}>
           {justUpgraded && (
             <div className="absolute inset-x-0 top-0 bg-emerald-500/20 text-emerald-300 text-center text-[11px] font-mono py-1.5 z-10">
-              NEURAL REWIRE SECURED · ENERGY ROUTED TO REACTOR
+              {fuelProofToast
+                ? 'PROOF ACCEPTED — YOUR NODE HAS FUEL'
+                : 'NEURAL REWIRE SECURED · ENERGY ROUTED TO REACTOR'}
             </div>
           )}
 
@@ -705,6 +871,26 @@ export default function AttentionAcademy({
         )}
       </AnimatePresence>
 
+      {grantRetry && (
+        <div className="rounded-xl border border-amber-400/40 bg-amber-500/10 px-4 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <p className="text-sm text-amber-100 leading-relaxed">
+            Energy grant didn&apos;t land. Stay here — retry so your node gets fuel (don&apos;t leave
+            empty-handed).
+          </p>
+          <button
+            type="button"
+            onClick={() => {
+              const pending = grantRetry;
+              setGrantRetry(null);
+              void settleSessionFuel(pending.index, pending.agent, { retryOnly: true });
+            }}
+            className="px-4 py-2.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-black font-mono text-[10px] font-black uppercase tracking-wider cursor-pointer shrink-0"
+          >
+            Retry grant →
+          </button>
+        </div>
+      )}
+
       {(quizState === 'failed' || quizState === 'passed') && (
         <div
           className={`rounded-xl border px-4 py-3 text-sm flex items-start gap-2 ${
@@ -719,18 +905,57 @@ export default function AttentionAcademy({
             <Check className="w-4 h-4 shrink-0 mt-0.5" />
           )}
           <div>
-            <p>{agentVerifyMsg || (quizState === 'passed' ? 'Session verified.' : 'Retry Neural Snap.')}</p>
+            <p>
+              {agentVerifyMsg ||
+                (quizState === 'passed' ? 'Session verified.' : 'Retry Neural Snap — you are still here.')}
+            </p>
             {quizState === 'failed' && (
-              <button
-                type="button"
-                className="mt-2 text-xs underline"
-                onClick={() => {
-                  setQuizState('idle');
-                  setAgentVerifyMsg('');
-                }}
-              >
-                Dismiss
-              </button>
+              <div className="mt-2 flex flex-wrap gap-3">
+                <button
+                  type="button"
+                  className="px-3 py-1.5 rounded-lg bg-amber-500 text-black font-mono text-[10px] font-black uppercase tracking-wider cursor-pointer"
+                  onClick={() => {
+                    const spent = spendSparkCredit('retake');
+                    if (!spent.ok) {
+                      addLog(
+                        'RETAKE TOLL: First fail needs a 1¢ Academy Retake (or spark credit). Opening Penny Protocol…',
+                        'warn'
+                      );
+                      onOpenTollShop?.('academy_retake');
+                      return;
+                    }
+                    setState((prev) => ({
+                      ...prev,
+                      sparkCredits: spent.inv.sparkCredits,
+                      academyRetakeCredits: spent.inv.academyRetakeCredits,
+                      listSlotCredits: spent.inv.listSlotCredits,
+                    }));
+                    addLog('RETAKE UNLOCKED: 1¢ toll credit spent — Neural Snap retry armed.', 'success');
+                    setQuizState('quiz');
+                    setAgentVerifyMsg('');
+                    setArciumStatus({ state: 'idle' });
+                  }}
+                >
+                  Retry Neural Snap (1¢) →
+                </button>
+                <button
+                  type="button"
+                  className="px-3 py-1.5 rounded-lg border border-amber-400/40 text-amber-100 font-mono text-[10px] font-black uppercase tracking-wider cursor-pointer"
+                  onClick={() => onOpenTollShop?.('academy_retake')}
+                >
+                  Buy retake in Treasury
+                </button>
+                <button
+                  type="button"
+                  className="text-xs underline text-amber-200/80 cursor-pointer"
+                  onClick={() => {
+                    setQuizState('idle');
+                    setAgentVerifyMsg('');
+                  }}
+                >
+                  Dismiss
+                </button>
+              </div>
             )}
           </div>
         </div>

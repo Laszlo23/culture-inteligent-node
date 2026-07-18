@@ -3,15 +3,16 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   Zap, Battery, ShieldAlert, Cpu, Hammer, 
   Compass, Bot, Coins, Users, Calendar, 
-  Map, LogIn, LayoutGrid, Award, Volume2, VolumeX, RefreshCw, User, Trophy, HelpCircle, Bell, Rocket, Menu
+  Map, LogIn, LayoutGrid, Award, Volume2, VolumeX, RefreshCw, User, Trophy, HelpCircle, Bell, Rocket, Menu, Images, X
 } from 'lucide-react';
 
-import { clearWalletToken } from './lib/api';
+import { clearWalletToken, ensureWalletApiSession, getWalletToken } from './lib/api';
+import type { Keypair } from '@solana/web3.js';
 import { GameState, HardwareModule, AIWorker, FacilityRoom, Guild, DailyMission, InspectionLog } from './types';
 import MainReactor from './components/MainReactor';
 import Workshop from './components/Workshop';
@@ -23,31 +24,72 @@ import GuildHall from './components/GuildHall';
 import Treasury from './components/Treasury';
 import MemberProfile from './components/MemberProfile';
 import Leaderboard from './components/Leaderboard';
+import NftGallery from './components/nft/NftGallery';
+import { NFT_POSTERS } from './lib/nft-media';
 
 import OnboardingModal from './components/OnboardingModal';
-import AuthPortal from './components/AuthPortal';
+import AuthPortal, { AuthAutoStart } from './components/AuthPortal';
+import EconomyStatusBanner, { EconomyStatus } from './components/EconomyStatusBanner';
 import AdminPanel from './components/AdminPanel';
 import FeedbackPortal from './components/FeedbackPortal';
 import PartnerProgram from './components/PartnerProgram';
 import OnboardingHub from './components/OnboardingHub';
-import NavMenu, { NavDestination } from './components/NavMenu';
+import NavMenu, { NavDestination, NavPhase } from './components/NavMenu';
 import LegalPages, { LegalPageId } from './components/LegalPages';
 import {
   AmbientField,
   AttentionBriefStrip,
+  CinematicBackdrop,
+  ClaimBurst,
   EnergyFlow,
+  GlowPulse,
   RoomEnter,
   buildAttentionBrief,
 } from './components/fx';
 import { CORE_ATTENTION_SESSIONS } from './content/attention-intelligence';
+import {
+  dismissStory,
+  ensureFirstRitualPending,
+  isFirstRitualPending,
+  isStoryDismissed,
+} from './lib/first-run';
 
-const INITIAL_NOTIFICATIONS = [
-  { id: 'n_1', title: 'Welcome to Culture Node', message: 'Fuel your node with verified attention. Knowledge becomes energy.', timestamp: '12:00:00 PM', read: false, type: 'info' as const },
-  { id: 'n_2', title: 'Core reserves warning', message: 'Knowledge fuel depleted to 38%. Academy can restore energy.', timestamp: '12:15:00 PM', read: false, type: 'warn' as const },
-  { id: 'n_3', title: 'Daily fortune channel open', message: 'Spin the ops wheel for BCC and energy capsules.', timestamp: '12:30:00 PM', read: false, type: 'success' as const },
-  { id: 'n_4', title: 'New Message from System Admin', message: 'Admin broadcast: "Network Optimization" is waiting in your inbox.', timestamp: '12:35:00 PM', read: false, type: 'message' as const, relatedId: 'msg_1', relatedType: 'message' as const },
-  { id: 'n_5', title: 'Support Ticket Resolved!', message: 'Admin responded to your Postgres Sync ticket. Read the response.', timestamp: '12:40:00 PM', read: false, type: 'success' as const, relatedId: 'fb_1', relatedType: 'ticket' as const }
-];
+/** Demo seed IDs — stripped on hydrate so the bell isn't permanently "5 unread". */
+const LEGACY_SEED_NOTIFICATION_IDS = new Set(['n_1', 'n_2', 'n_3', 'n_4', 'n_5']);
+const INITIAL_NOTIFICATIONS: GameState['notifications'] = [];
+const TOAST_ONCE_KEY = 'culture_toast_seen_v1';
+
+function toastFingerprint(message: string): string {
+  return message.replace(/\d+(\.\d+)?%/g, '%').replace(/\s+/g, ' ').trim().slice(0, 140);
+}
+
+function hasSeenToastOnce(fp: string): boolean {
+  try {
+    const raw = localStorage.getItem(TOAST_ONCE_KEY);
+    if (!raw) return false;
+    return (JSON.parse(raw) as string[]).includes(fp);
+  } catch {
+    return false;
+  }
+}
+
+function markToastSeenOnce(fp: string) {
+  try {
+    const raw = localStorage.getItem(TOAST_ONCE_KEY);
+    const list: string[] = raw ? JSON.parse(raw) : [];
+    if (list.includes(fp)) return;
+    list.push(fp);
+    localStorage.setItem(TOAST_ONCE_KEY, JSON.stringify(list.slice(-40)));
+  } catch {
+    // ignore
+  }
+}
+
+function stripLegacySeedNotifications(
+  list: GameState['notifications'] | undefined
+): NonNullable<GameState['notifications']> {
+  return (list || []).filter((n) => !LEGACY_SEED_NOTIFICATION_IDS.has(n.id));
+}
 
 const INITIAL_MESSAGES = [
   { id: 'msg_1', sender: 'System Admin', recipient: 'All Operators', subject: 'Network Optimization', content: 'Greeting Operator! Keep your attention channel warm to maximize daily BCC yield. Report any verification anomalies.', timestamp: '10:00:00 AM', isRead: false },
@@ -109,7 +151,7 @@ export default function App() {
   const [state, setState] = useState<GameState>({
     credits: 1200,
     miningPower: 154.8, // Base (4.8) + Initial owned Miner NFT (150)
-    energy: 38, // Starts at 38% low as requested!
+    energy: 0, // Empty until First Spark / Academy earn
     efficiency: 1.0,
     facilityLevel: 1,
     currentSeason: 'Season 8: Artificial Intelligence',
@@ -191,6 +233,9 @@ export default function App() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [showNotificationsDropdown, setShowNotificationsDropdown] = useState<boolean>(false);
   const [notificationTarget, setNotificationTarget] = useState<{ type: 'message' | 'ticket'; id: string } | null>(null);
+  const notificationsMenuRef = useRef<HTMLDivElement | null>(null);
+  const shownToastsRef = useRef<Set<string>>(new Set());
+  const flowToastTimerRef = useRef<number | null>(null);
 
   // Auth Session State (wallet-only — no Firebase email/password gate)
   const [currentUser, setCurrentUser] = useState<{
@@ -205,6 +250,174 @@ export default function App() {
     }
     return null;
   });
+
+  /** Cold-start story before wallet; GUIDE can reopen as replay. */
+  const [showStory, setShowStory] = useState<boolean>(() => {
+    if (typeof window !== 'undefined' && localStorage.getItem('solana_current_user_session_v1')) {
+      return false;
+    }
+    return !isStoryDismissed();
+  });
+  const [storyDismissed, setStoryDismissed] = useState<boolean>(() => isStoryDismissed());
+  const [firstRitualPending, setFirstRitualPending] = useState<boolean>(() =>
+    isFirstRitualPending()
+  );
+  const [guideReplay, setGuideReplay] = useState(false);
+  const [authAutoStart, setAuthAutoStart] = useState<AuthAutoStart>(null);
+  const [economyStatus, setEconomyStatus] = useState<EconomyStatus | null>(null);
+  const [economyStatusLoading, setEconomyStatusLoading] = useState(true);
+  const [showMintMinerCta, setShowMintMinerCta] = useState(false);
+  /** After First Spark: show from→to fuel strip before economy CTAs */
+  const [fuelWin, setFuelWin] = useState<{ from: number; to: number } | null>(null);
+  /** Attention Toll shop deep-link highlight */
+  const [tollHighlightSku, setTollHighlightSku] = useState<
+    'spark_refill' | 'academy_retake' | 'claim_turbo' | 'list_slot' | 'spark_pack_100' | null
+  >(null);
+  /** Surface warn/fail where members actually look (not only Reactor logs) */
+  const [flowToast, setFlowToast] = useState<{
+    id: number;
+    message: string;
+    tone: 'warn' | 'success' | 'info';
+  } | null>(null);
+  const [apiSessionMissing, setApiSessionMissing] = useState(false);
+  const [retryingApiSession, setRetryingApiSession] = useState(false);
+
+  const dismissStoryToAuth = (auto: AuthAutoStart = null) => {
+    dismissStory();
+    setStoryDismissed(true);
+    setShowStory(false);
+    setGuideReplay(false);
+    setAuthAutoStart(auto);
+  };
+
+  useEffect(() => {
+    if (!currentUser) return;
+    ensureFirstRitualPending();
+    setFirstRitualPending(isFirstRitualPending());
+  }, [currentUser]);
+
+  useEffect(() => {
+    if (!currentUser?.walletAddress) {
+      setApiSessionMissing(false);
+      return;
+    }
+    setApiSessionMissing(!getWalletToken());
+  }, [currentUser?.walletAddress]);
+
+  // Drop legacy demo alerts once so the bell badge isn't stuck at 5
+  useEffect(() => {
+    setState((prev) => {
+      const current = prev.notifications || [];
+      if (!current.some((n) => LEGACY_SEED_NOTIFICATION_IDS.has(n.id))) return prev;
+      return { ...prev, notifications: stripLegacySeedNotifications(current) };
+    });
+  }, []);
+
+  // Notifications panel: outside click / Escape closes — no second bell press required
+  useEffect(() => {
+    if (!showNotificationsDropdown) return;
+    const onPointerDown = (e: MouseEvent) => {
+      const el = notificationsMenuRef.current;
+      if (el && !el.contains(e.target as Node)) {
+        setShowNotificationsDropdown(false);
+      }
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setShowNotificationsDropdown(false);
+    };
+    document.addEventListener('mousedown', onPointerDown);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onPointerDown);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [showNotificationsDropdown]);
+
+  const retryFacilityApiSession = async () => {
+    if (!currentUser?.walletAddress) return;
+    setRetryingApiSession(true);
+    try {
+      let localKeypair: Keypair | null = null;
+      if (currentUser.walletType === 'local') {
+        const raw = localStorage.getItem('solana_local_secret');
+        if (raw) {
+          const { Keypair } = await import('@solana/web3.js');
+          localKeypair = Keypair.fromSecretKey(Uint8Array.from(JSON.parse(raw)));
+        }
+      }
+      await ensureWalletApiSession({
+        walletAddress: currentUser.walletAddress,
+        walletType: currentUser.walletType === 'extension' ? 'extension' : 'local',
+        localKeypair,
+      });
+      setApiSessionMissing(false);
+      addLog('API SESSION: restored — Academy proofs can attach.', 'success');
+    } catch (e: any) {
+      addLog(`API SESSION RETRY FAILED: ${e?.message || e}`, 'warn');
+    } finally {
+      setRetryingApiSession(false);
+    }
+  };
+
+  // Economy status + hydrate Player PDA / miners when configured
+  useEffect(() => {
+    if (!currentUser?.walletAddress) {
+      setEconomyStatus(null);
+      setEconomyStatusLoading(false);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      setEconomyStatusLoading(true);
+      try {
+        const { fetchEconomyStatus } = await import('./lib/api');
+        const {
+          ensurePlayerOnChain,
+          syncLedgerToState,
+          syncMinersToState,
+        } = await import('./lib/economy-actions');
+        const status = await fetchEconomyStatus();
+        if (cancelled) return;
+        setEconomyStatus(status);
+        if (!status.ready) {
+          addLog(
+            'ECONOMY: Not configured — Academy/fuel settle locally until bootstrap (see banner).',
+            'warn'
+          );
+          return;
+        }
+        await ensurePlayerOnChain();
+        if (cancelled) return;
+        await syncLedgerToState(setState);
+        if (cancelled) return;
+        const miners = await syncMinersToState(setState);
+        if (!cancelled) {
+          addLog(
+            `ECONOMY SYNC: On-chain ledger + ${(miners?.owned || []).length} miner(s) (program ${status.programId.slice(0, 8)}…).`,
+            'success'
+          );
+          const hasOnchain = (miners?.owned || []).length > 0;
+          setShowMintMinerCta(!hasOnchain && !isFirstRitualPending());
+        }
+      } catch (e: any) {
+        if (!cancelled) {
+          setEconomyStatus({
+            ready: false,
+            programId: 'unknown',
+            bccMint: null,
+            cgtMint: null,
+            reasons: [e?.message || 'Failed to reach /api/economy/status'],
+          });
+          addLog(`ECONOMY SYNC deferred: ${e?.message || e}`, 'warn');
+        }
+      } finally {
+        if (!cancelled) setEconomyStatusLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [currentUser?.walletAddress]);
 
   const handleLoginSuccess = (user: {
     username: string;
@@ -233,7 +446,7 @@ export default function App() {
         setState({
           ...parsed,
           rooms,
-          notifications: parsed.notifications || INITIAL_NOTIFICATIONS,
+          notifications: stripLegacySeedNotifications(parsed.notifications),
           messages: parsed.messages || INITIAL_MESSAGES,
           feedback: parsed.feedback || INITIAL_FEEDBACK,
           partners: parsed.partners || INITIAL_PARTNERS
@@ -247,10 +460,17 @@ export default function App() {
       addLog(`DATA SECURED: Progress linked to wallet "${user.walletAddress?.slice(0, 8)}…".`, "info");
     }
 
+    ensureFirstRitualPending();
+    setFirstRitualPending(isFirstRitualPending());
+    setShowStory(false);
+
     const walletHint = user.walletAddress
       ? ` (${user.walletAddress.slice(0, 4)}…${user.walletAddress.slice(-4)})`
       : '';
-    addLog(`WALLET GATE AUTHORIZED: Session for "${user.username}"${walletHint}. Open Ecosystem Vault for Solana Portal.`, "success");
+    addLog(
+      `WALLET LINKED: "${user.username}"${walletHint}. First Spark next — pass the snap, watch fuel move.`,
+      'success'
+    );
   };
 
   const handleLogout = () => {
@@ -272,13 +492,6 @@ export default function App() {
     }
   };
 
-  const [showOnboarding, setShowOnboarding] = useState<boolean>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('solana_onboarding_dismissed');
-      return saved !== 'true';
-    }
-    return true;
-  });
   const [logs, setLogs] = useState<InspectionLog[]>([]);
   const [soundOn, setSoundOn] = useState<boolean>(true);
   const [showSaveToast, setShowSaveToast] = useState<boolean>(false);
@@ -301,13 +514,24 @@ export default function App() {
   }, [state.energy, state.dailyMissions, state.notifications]);
 
 
-  // Helper log function
+  // Helper log function — warn/success surface as toasts once (auto-dismiss, no second press)
   const addLog = (message: string, type: 'info' | 'success' | 'warn' | 'system') => {
     const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-    setLogs(prev => [
-      ...prev,
-      { timestamp: timeStr, message, type }
-    ]);
+    setLogs((prev) => [...prev, { timestamp: timeStr, message, type }]);
+    if (type !== 'warn' && type !== 'success') return;
+
+    const fp = toastFingerprint(message);
+    if (shownToastsRef.current.has(fp) || hasSeenToastOnce(fp)) return;
+    shownToastsRef.current.add(fp);
+    markToastSeenOnce(fp);
+
+    const id = Date.now();
+    setFlowToast({ id, message, tone: type === 'warn' ? 'warn' : 'success' });
+    if (flowToastTimerRef.current) window.clearTimeout(flowToastTimerRef.current);
+    flowToastTimerRef.current = window.setTimeout(() => {
+      setFlowToast((prev) => (prev?.id === id ? null : prev));
+      flowToastTimerRef.current = null;
+    }, 4500);
   };
 
   // Hydrate state from localStorage on mount
@@ -358,7 +582,7 @@ export default function App() {
             }
             return next;
           }),
-          notifications: parsed.notifications || INITIAL_NOTIFICATIONS,
+          notifications: stripLegacySeedNotifications(parsed.notifications),
           messages: parsed.messages || INITIAL_MESSAGES,
           feedback: parsed.feedback || INITIAL_FEEDBACK,
           partners: parsed.partners || INITIAL_PARTNERS
@@ -368,9 +592,14 @@ export default function App() {
       }
     }
 
-    // Add introductory greeting logs
-    addLog("Facility online. Attention channel stable.", "system");
-    addLog("NOTICE: Knowledge fuel at 38%. Academy can restore core reserves.", "warn");
+    // Quiet boot — fuel warning toast only once per browser (not every reload)
+    addLog('Facility online. Attention channel stable.', 'system');
+    if (state.energy < 40) {
+      addLog(
+        `NOTICE: Knowledge fuel at ${state.energy}%. First Spark in Academy restores reserves.`,
+        'warn'
+      );
+    }
   }, []);
 
   // Save state to localStorage whenever it modifies
@@ -416,7 +645,7 @@ export default function App() {
     } else if (roomId === 'partners') {
       roomName = "Cooperative Node Alliances";
     } else if (roomId === 'onboarding') {
-      roomName = "Ecosystem Hub & Onboarding Portal";
+      roomName = 'Ecosystem Hub';
     } else if (roomId === 'missions') {
       roomName = "Daily Missions & Lucky Wheel";
     } else if (roomId === 'legal-privacy') {
@@ -441,9 +670,93 @@ export default function App() {
         document.getElementById('lucky-wheel')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
       }, 350);
     }
+    if (roomId === 'treasury') {
+      setTimeout(() => {
+        document.getElementById('attention-toll-shop')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 350);
+    }
   };
 
+  const openTollShop = (
+    sku?: 'spark_refill' | 'academy_retake' | 'claim_turbo' | 'list_slot' | 'spark_pack_100'
+  ) => {
+    setTollHighlightSku(sku || 'spark_refill');
+    changeRoom('treasury');
+  };
+
+  const academyCompletedCount = (() => {
+    try {
+      return (JSON.parse(localStorage.getItem('kronos_academy_completed') || '[]') as string[])
+        .length;
+    } catch {
+      return 0;
+    }
+  })();
+
+  const navPhase: NavPhase = firstRitualPending
+    ? 'ritual'
+    : academyCompletedCount < 2 || state.energy < 40
+      ? 'guided'
+      : 'open';
+
+  const navNextStep = (() => {
+    if (firstRitualPending) {
+      return {
+        id: 'lab' as NavDestination,
+        label: 'Ignite First Spark',
+        reason: 'Pass one short Attention session — then the rest of the facility opens.',
+      };
+    }
+    if (fuelWin) {
+      return {
+        id: 'map' as NavDestination,
+        label: 'See your fuel',
+        reason: 'Proof landed. Confirm the energy strip, then decide mint or daily.',
+      };
+    }
+    if (showMintMinerCta && (state.credits > 0 || (state.bccTokens ?? 0) > 0)) {
+      return {
+        id: 'profile' as NavDestination,
+        label: 'Mint your first miner',
+        reason: 'You have fuel/credits — turn them into an on-chain miner when ready.',
+      };
+    }
+    if (state.energy < 35) {
+      return {
+        id: 'lab' as NavDestination,
+        label: 'Refuel in Academy',
+        reason: 'Knowledge fuel is low. Another short session restores the node.',
+      };
+    }
+    if (economyStatus?.ready) {
+      return {
+        id: 'treasury' as NavDestination,
+        label: 'Open the Vault',
+        reason: 'Claim daily, swap BCC→CGT, or check Devnet balances.',
+      };
+    }
+    return {
+      id: 'reactor' as NavDestination,
+      label: 'Check the Reactor',
+      reason: 'Your node is warm — see output and keep the loop going.',
+    };
+  })();
+
   const handleNavNavigate = (id: NavDestination) => {
+    if (firstRitualPending) {
+      const allowed: NavDestination[] = [
+        'lab',
+        'map',
+        'legal-privacy',
+        'legal-terms',
+        'legal-disclaimer',
+      ];
+      if (!allowed.includes(id)) {
+        addLog('FIRST SPARK: Finish the Academy ritual before exploring other rooms.', 'warn');
+        changeRoom('lab');
+        return;
+      }
+    }
     changeRoom(id);
   };
 
@@ -507,7 +820,7 @@ export default function App() {
       setState({
         credits: 1200,
         miningPower: 4.8,
-        energy: 38,
+        energy: 0,
         efficiency: 1.0,
         facilityLevel: 1,
         currentSeason: 'Season 8: Artificial Intelligence',
@@ -590,22 +903,50 @@ export default function App() {
     }
   };
 
+  // Cold start: landing / auth only — no mining dashboard behind the gate
+  if (!currentUser) {
+    return (
+      <div className="min-h-screen bg-[#050608] text-slate-300 font-sans selection:bg-cyan-500/30 selection:text-cyan-300 relative overflow-hidden">
+        <AnimatePresence mode="wait">
+          {showStory ? (
+            <OnboardingModal
+              key="cold-story"
+              replay={false}
+              onClose={() => {
+                dismissStoryToAuth(null);
+                addLog('ONBOARDING: Connect a wallet — then prove the loop in First Spark.', 'info');
+              }}
+              onEnterLocal={() => {
+                dismissStoryToAuth('local');
+                addLog('ONBOARDING: Entering with local Devnet wallet…', 'info');
+              }}
+              onEnterPhantom={() => {
+                dismissStoryToAuth('phantom');
+                addLog('ONBOARDING: Phantom path…', 'info');
+              }}
+            />
+          ) : (
+            <AuthPortal
+              key="cold-auth"
+              autoStart={authAutoStart}
+              onLoginSuccess={handleLoginSuccess}
+            />
+          )}
+        </AnimatePresence>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-[#050506] text-slate-300 flex flex-col justify-between font-sans selection:bg-cyan-500/30 selection:text-cyan-300 relative overflow-hidden">
-      
-      <AnimatePresence>
-        {!currentUser && (
-          <AuthPortal onLoginSuccess={handleLoginSuccess} />
-        )}
-      </AnimatePresence>
 
-      {/* Background Atmosphere — living ambient field */}
+      {/* Background Atmosphere — cinematic video field */}
       <div className="absolute inset-0 pointer-events-none z-0 overflow-hidden">
-        <AmbientField />
+        <AmbientField variant={firstRitualPending ? 'ritual' : 'facility'} dim={!firstRitualPending} />
       </div>
 
       {/* Top Main Navigation Bar */}
-      <header className="border border-white/5 bg-[#0a0a0c]/90 backdrop-blur-md sticky top-2 z-40 mx-4 mt-2 px-6 py-4 rounded-2xl flex flex-wrap items-center justify-between gap-4 shadow-xl">
+      <header className="border border-white/8 bg-[#0a0a0c]/75 backdrop-blur-xl sticky top-2 z-40 mx-4 mt-2 px-6 py-4 rounded-2xl flex flex-wrap items-center justify-between gap-4 shadow-[0_12px_40px_rgba(0,0,0,0.45)]">
         {/* Left branding */}
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-cyan-500/20 border border-cyan-500/30 flex items-center justify-center relative overflow-hidden">
@@ -620,14 +961,16 @@ export default function App() {
           </div>
         </div>
 
-        {/* Global Facility Live Metrics */}
+        {/* Global Facility Live Metrics — ritual: fuel only */}
         <div className="flex flex-wrap items-center gap-4 lg:gap-8 font-mono text-xs">
-          <div className="flex flex-col">
-            <span className="text-[9px] font-mono tracking-widest uppercase text-cyan-400">NODE OUTPUT</span>
-            <span className="text-lg font-black text-white italic">
-              {state.miningPower.toFixed(1)} <span className="text-[10px] text-cyan-500 font-normal not-italic">PH/s</span>
-            </span>
-          </div>
+          {!firstRitualPending && (
+            <div className="flex flex-col">
+              <span className="text-[9px] font-mono tracking-widest uppercase text-cyan-400">NODE OUTPUT</span>
+              <span className="text-lg font-black text-white italic">
+                {state.miningPower.toFixed(1)} <span className="text-[10px] text-cyan-500 font-normal not-italic">PH/s</span>
+              </span>
+            </div>
+          )}
 
           <div className="flex flex-col min-w-[120px]">
             <span className="text-[9px] font-mono tracking-widest uppercase text-orange-500">KNOWLEDGE FUEL</span>
@@ -641,15 +984,19 @@ export default function App() {
             </div>
           </div>
 
-          <div className="flex flex-col">
-            <span className="text-[9px] font-mono tracking-widest uppercase text-slate-500">EFFICIENCY</span>
-            <span className="text-base font-bold text-cyan-400">x{state.efficiency.toFixed(2)}</span>
-          </div>
+          {!firstRitualPending && (
+            <>
+              <div className="flex flex-col">
+                <span className="text-[9px] font-mono tracking-widest uppercase text-slate-500">EFFICIENCY</span>
+                <span className="text-base font-bold text-cyan-400">x{state.efficiency.toFixed(2)}</span>
+              </div>
 
-          <div className="flex flex-col">
-            <span className="text-[9px] font-mono tracking-widest uppercase text-amber-500 font-bold">WALLET ($BCC)</span>
-            <span className="text-base font-black text-amber-400" title="Building Culture Coins">{state.credits} <span className="text-[10px] font-normal">BCC</span></span>
-          </div>
+              <div className="flex flex-col">
+                <span className="text-[9px] font-mono tracking-widest uppercase text-amber-500 font-bold">WALLET ($BCC)</span>
+                <span className="text-base font-black text-amber-400" title="Building Culture Coins">{state.credits} <span className="text-[10px] font-normal">BCC</span></span>
+              </div>
+            </>
+          )}
         </div>
 
         {/* Global Season / Reset controls */}
@@ -666,73 +1013,73 @@ export default function App() {
             </div>
           )}
 
+          {firstRitualPending ? (
+            <button
+              type="button"
+              onClick={() => changeRoom('lab')}
+              title="Continue First Spark"
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-cyan-500 text-black rounded-lg font-mono text-[10px] tracking-wider uppercase font-black transition-all cursor-pointer hover:bg-cyan-400"
+            >
+              <Compass className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">First Spark</span>
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => handleNavNavigate(navNextStep.id)}
+              title={navNextStep.reason}
+              className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 bg-cyan-600/15 border border-cyan-500/40 hover:bg-cyan-600/25 text-cyan-300 rounded-lg font-mono text-[10px] tracking-wider uppercase font-black transition-all cursor-pointer max-w-[9rem] sm:max-w-[11rem]"
+            >
+              <span className="truncate">{navNextStep.label}</span>
+            </button>
+          )}
+
           <button
             type="button"
             onClick={() => setMenuOpen(true)}
-            title="Open navigation menu"
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-cyan-600/15 border border-cyan-500/40 hover:bg-cyan-600/25 text-cyan-300 rounded-lg font-mono text-[10px] tracking-wider uppercase font-black transition-all cursor-pointer"
+            title="Open navigation"
+            className="flex items-center gap-1.5 px-2.5 py-1.5 bg-white/5 border border-white/10 hover:border-white/20 text-slate-400 hover:text-slate-200 rounded-lg font-mono text-[10px] tracking-wider uppercase font-black transition-all cursor-pointer"
           >
             <Menu className="w-4 h-4" />
-            <span className="hidden sm:inline">MENU</span>
+            <span className="hidden md:inline">More</span>
           </button>
 
-          <button
-            onClick={() => setShowOnboarding(true)}
-            title="Open Operational Handbook / Onboarding Guide"
-            className="hidden md:flex items-center gap-1.5 px-3 py-1.5 bg-white/5 border border-white/10 hover:border-cyan-500/30 hover:bg-cyan-950/10 text-slate-400 hover:text-cyan-400 rounded-lg font-mono text-[10px] tracking-wider uppercase font-black transition-all cursor-pointer"
-          >
-            <HelpCircle className="w-3.5 h-3.5 text-cyan-400" />
-            <span>GUIDE</span>
-          </button>
-
-          <button
-            onClick={() => changeRoom('missions')}
-            title="Daily Missions & Lucky Wheel"
-            className={`hidden lg:flex items-center gap-1.5 px-3 py-1.5 border rounded-lg font-mono text-[10px] tracking-wider uppercase font-black transition-all cursor-pointer ${
-              activeRoom === 'missions'
-                ? 'bg-emerald-600/20 border-emerald-500/50 text-emerald-400'
-                : 'bg-white/5 border-white/10 hover:border-emerald-500/30 text-slate-400 hover:text-emerald-400'
-            }`}
-          >
-            <Calendar className="w-3.5 h-3.5 text-emerald-400" />
-            <span>WHEEL</span>
-          </button>
-
-          <button
-            onClick={() => changeRoom('profile')}
-            className={`hidden md:flex items-center gap-2 px-3 py-1.5 border rounded-lg font-mono text-[10px] tracking-wider uppercase font-black transition-all cursor-pointer ${
-              activeRoom === 'profile'
-                ? 'bg-fuchsia-600/20 border-fuchsia-500/50 text-fuchsia-400 shadow-[0_0_12px_rgba(217,70,239,0.15)] animate-pulse'
-                : 'bg-white/5 border-white/10 hover:border-fuchsia-500/30 hover:bg-fuchsia-950/10 text-slate-400 hover:text-fuchsia-400'
-            }`}
-          >
-            <User className="w-3.5 h-3.5 text-fuchsia-400" />
-            <span>PROFILE</span>
-          </button>
-
-          <div className="hidden lg:flex items-center gap-2 px-3 py-1.5 bg-white/5 border border-white/10 rounded-lg font-mono text-[10px] tracking-tight text-slate-400">
-            <Calendar className="w-3 h-3 text-cyan-400" />
-            <span>{state.currentSeason.toUpperCase()}</span>
-          </div>
+          {!firstRitualPending && navPhase === 'open' && (
+            <button
+              type="button"
+              onClick={() => {
+                setGuideReplay(true);
+                setShowStory(true);
+              }}
+              title="Replay guide"
+              className="hidden lg:flex items-center gap-1.5 px-2.5 py-1.5 text-slate-500 hover:text-cyan-400 rounded-lg font-mono text-[10px] tracking-wider uppercase font-black transition-all cursor-pointer"
+            >
+              <HelpCircle className="w-3.5 h-3.5" />
+            </button>
+          )}
 
           {/* Notifications Bell Center */}
-          <div className="relative">
+          <div className="relative" ref={notificationsMenuRef}>
             <button
+              type="button"
               onClick={() => {
-                setShowNotificationsDropdown(!showNotificationsDropdown);
-                if (!showNotificationsDropdown) {
-                  setState(prev => ({
-                    ...prev,
-                    notifications: (prev.notifications || []).map(n => ({ ...n, read: true }))
-                  }));
-                }
+                setShowNotificationsDropdown((open) => {
+                  const next = !open;
+                  if (next) {
+                    setState((prev) => ({
+                      ...prev,
+                      notifications: (prev.notifications || []).map((n) => ({ ...n, read: true })),
+                    }));
+                  }
+                  return next;
+                });
               }}
               title="Notifications Center"
               className="w-9 h-9 rounded-xl bg-white/5 border border-white/10 hover:border-cyan-500/40 hover:bg-cyan-950/10 text-slate-400 hover:text-cyan-400 flex items-center justify-center transition-all cursor-pointer relative"
             >
               <Bell className="w-4 h-4" />
               {(state.notifications || []).filter(n => !n.read).length > 0 && (
-                <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-red-500 border-2 border-[#0a0a0c] text-[8px] font-black font-mono text-white flex items-center justify-center animate-bounce">
+                <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-red-500 border-2 border-[#0a0a0c] text-[8px] font-black font-mono text-white flex items-center justify-center">
                   {(state.notifications || []).filter(n => !n.read).length}
                 </span>
               )}
@@ -746,21 +1093,32 @@ export default function App() {
                   exit={{ opacity: 0, y: 8 }}
                   className="absolute right-0 mt-2 w-72 bg-[#0a0a0c]/95 border border-white/10 rounded-2xl shadow-2xl p-4 z-50 font-mono text-xs space-y-3 backdrop-blur-md"
                 >
-                  <div className="flex justify-between items-center pb-2 border-b border-white/5">
+                  <div className="flex justify-between items-center pb-2 border-b border-white/5 gap-2">
                     <span className="font-bold text-slate-200 uppercase tracking-widest text-[9px] flex items-center gap-1">
-                      <Bell className="w-3.5 h-3.5 text-cyan-400" /> Notifications Centre
+                      <Bell className="w-3.5 h-3.5 text-cyan-400" /> Notifications
                     </span>
-                    <button
-                      onClick={() => {
-                        setState(prev => ({
-                          ...prev,
-                          notifications: []
-                        }));
-                      }}
-                      className="text-[8px] text-slate-500 hover:text-red-400 uppercase font-black"
-                    >
-                      Clear All
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setState((prev) => ({
+                            ...prev,
+                            notifications: [],
+                          }));
+                        }}
+                        className="text-[8px] text-slate-500 hover:text-red-400 uppercase font-black cursor-pointer"
+                      >
+                        Clear
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setShowNotificationsDropdown(false)}
+                        title="Close"
+                        className="w-6 h-6 rounded-lg flex items-center justify-center text-slate-500 hover:text-slate-200 hover:bg-white/5 cursor-pointer"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
                   </div>
 
                   <div className="space-y-2 max-h-60 overflow-y-auto divide-y divide-white/[0.03]">
@@ -837,89 +1195,407 @@ export default function App() {
           </motion.div>
         )}
 
+        <div className="px-4 mb-4 space-y-2">
+          {apiSessionMissing && (
+            <div className="rounded-xl border border-amber-400/35 bg-amber-500/10 px-4 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <p className="text-xs text-amber-100/90 font-sans leading-relaxed">
+                <span className="font-mono text-[10px] font-black uppercase tracking-wider text-amber-200 block mb-0.5">
+                  API session missing
+                </span>
+                Wallet is linked but proofs may fail until the API session lands. Retry here — stay in
+                the loop.
+              </p>
+              <button
+                type="button"
+                onClick={() => void retryFacilityApiSession()}
+                disabled={retryingApiSession}
+                className="px-3.5 py-2 rounded-lg bg-amber-500 hover:bg-amber-400 text-black font-mono text-[10px] font-black uppercase tracking-wider cursor-pointer shrink-0 disabled:opacity-60 inline-flex items-center gap-1.5"
+              >
+                <RefreshCw className={`w-3 h-3 ${retryingApiSession ? 'animate-spin' : ''}`} />
+                Retry session
+              </button>
+            </div>
+          )}
+          <EconomyStatusBanner
+            status={economyStatus}
+            loading={economyStatusLoading}
+            onContinueAcademy={
+              economyStatus && !economyStatus.ready ? () => changeRoom('lab') : undefined
+            }
+          />
+        </div>
+
         <AnimatePresence mode="wait">
           {activeRoom === 'map' ? (
             <RoomEnter key="map-view" roomKey="map-view">
               <div className="space-y-6">
-              <AttentionBriefStrip
-                items={attentionBrief}
-                onNavigate={(room) => changeRoom(room)}
-              />
-
-              {/* Dynamic Warning Alert on blueprint map screen if Reactor Low */}
-              {state.energy < 40 && (
-                <div className="bg-orange-500/5 border border-orange-500/30 p-5 rounded-2xl flex flex-col md:flex-row items-center justify-between gap-4 shadow-lg">
-                  <div className="flex items-center gap-3.5">
-                    <div className="w-10 h-10 rounded-xl bg-orange-500/10 flex items-center justify-center text-orange-500 border border-orange-500/40 animate-pulse">
-                      <ShieldAlert className="w-5 h-5" />
-                    </div>
-                    <div>
-                      <span className="text-[10px] font-mono font-bold text-orange-400 block tracking-widest uppercase">⚠ Knowledge fuel critical</span>
-                      <h4 className="text-sm font-semibold font-mono text-slate-200 mt-0.5">Core reserves at {state.energy}%.</h4>
-                      <p className="text-xs text-slate-400 mt-1 max-w-2xl font-sans leading-relaxed">
-                        Refuel in the <span className="text-cyan-400 font-bold font-mono">Attention Academy</span> — learning becomes energy for your node.
-                      </p>
-                    </div>
+              {firstRitualPending ? (
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="relative overflow-hidden rounded-2xl border border-cyan-400/40 bg-[#07080c]/80 p-5 md:p-6"
+                >
+                  <div className="absolute inset-0">
+                    <CinematicBackdrop variant="ritual" />
                   </div>
-                  <div className="flex flex-wrap gap-2">
+                  <GlowPulse energy={8} color="cyan" className="absolute -right-8 -top-8 w-40 h-40 z-[1]" />
+                  <GlowPulse energy={12} color="amber" className="absolute -left-10 bottom-0 w-36 h-36 z-[1]" />
+                  <div className="relative z-10 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-5">
+                    <div className="flex items-start gap-3.5 min-w-0">
+                      <div className="w-12 h-12 rounded-2xl bg-cyan-500/15 flex items-center justify-center text-cyan-300 border border-cyan-400/50 shrink-0 shadow-[0_0_24px_rgba(34,211,238,0.25)]">
+                        <Compass className="w-5 h-5" />
+                      </div>
+                      <div className="min-w-0">
+                        <span className="text-[10px] font-mono font-bold text-cyan-400 block tracking-widest uppercase">
+                          First Spark · fuel starts empty on purpose
+                        </span>
+                        <h4 className="font-display text-xl font-extrabold italic text-white mt-1 tracking-tight">
+                          Prove attention moves energy
+                        </h4>
+                        <p className="text-xs text-slate-400 mt-2 max-w-xl font-sans leading-relaxed">
+                          Neuroplasticity isn&apos;t a slogan — pass a short Attention Intelligence snap
+                          (~2 min). Watch knowledge fuel fill. Science first, then the facility.
+                        </p>
+                        <div className="mt-3 flex flex-wrap gap-2 text-[9px] font-mono uppercase tracking-wider">
+                          <span className="px-2 py-1 rounded-md border border-cyan-400/25 bg-cyan-500/10 text-cyan-200">
+                            Plasticity
+                          </span>
+                          <span className="px-2 py-1 rounded-md border border-amber-400/25 bg-amber-500/10 text-amber-100">
+                            Bias check
+                          </span>
+                          <span className="px-2 py-1 rounded-md border border-white/10 bg-white/5 text-slate-300">
+                            Proof of Attention
+                          </span>
+                        </div>
+                        <div className="mt-4 max-w-xs">
+                          <span className="text-[9px] font-mono text-slate-500 uppercase tracking-widest">
+                            Core fuel
+                          </span>
+                          <EnergyFlow energy={state.energy} className="mt-1.5 h-2" />
+                          <span className="text-[10px] font-mono text-orange-400/90 mt-1 block">
+                            {Math.round(state.energy)}% — empty until you earn it
+                          </span>
+                        </div>
+                      </div>
+                    </div>
                     <button
+                      type="button"
                       onClick={() => changeRoom('lab')}
-                      className="px-5 py-2.5 bg-cyan-600 hover:bg-cyan-500 text-black font-black font-mono text-xs rounded-xl tracking-wider transition-colors cursor-pointer"
+                      className="px-6 py-3.5 bg-cyan-500 hover:bg-cyan-400 text-black font-black font-mono text-xs rounded-xl tracking-wider transition-all cursor-pointer shrink-0 shadow-[0_0_32px_rgba(34,211,238,0.35)] hover:shadow-[0_0_40px_rgba(34,211,238,0.5)]"
                     >
-                      GO TO ACADEMY
-                    </button>
-                    <button
-                      onClick={() => changeRoom('missions')}
-                      className="px-5 py-2.5 bg-orange-600 hover:bg-orange-500 text-black font-black font-mono text-xs rounded-xl tracking-wider transition-colors cursor-pointer"
-                    >
-                      DAILY DIRECTIVES
+                      Ignite First Spark →
                     </button>
                   </div>
-                </div>
+                </motion.div>
+              ) : (
+                <>
+                  <ClaimBurst
+                    show={!!fuelWin}
+                    label={
+                      fuelWin
+                        ? `FUEL +${Math.max(0, fuelWin.to - fuelWin.from)}% · PROOF ACCEPTED`
+                        : ''
+                    }
+                  />
+                  {fuelWin && (
+                    <motion.div
+                      initial={{ opacity: 0, scale: 0.98 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      className="relative overflow-hidden rounded-2xl border border-emerald-400/45 bg-[#060a08] p-5 md:p-6"
+                    >
+                      <GlowPulse energy={fuelWin.to} color="emerald" className="absolute -right-6 -top-6 w-44 h-44" />
+                      <div className="relative z-10 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-5">
+                        <div className="min-w-0 flex-1">
+                          <span className="text-[10px] font-mono font-bold text-emerald-400 block tracking-widest uppercase">
+                            Proof accepted — your node has fuel
+                          </span>
+                          <h4 className="font-display text-xl font-extrabold italic text-white mt-1">
+                            Attention → energy · live
+                          </h4>
+                          <div className="mt-3 flex items-end gap-3 font-mono">
+                            <span className="text-2xl font-black text-slate-500">{fuelWin.from}%</span>
+                            <span className="text-emerald-400/80 text-sm pb-1">→</span>
+                            <span className="text-3xl font-black text-emerald-300">{fuelWin.to}%</span>
+                          </div>
+                          <EnergyFlow energy={fuelWin.to} className="mt-3 h-2.5 max-w-sm" />
+                          <p className="text-xs text-slate-400 mt-2.5 max-w-xl font-sans leading-relaxed">
+                            That&apos;s Attention Intelligence in one beat. Pick your next move — stay
+                            in the loop.
+                          </p>
+                        </div>
+                        <div className="flex flex-col gap-2 shrink-0 w-full sm:w-auto">
+                          {economyStatus?.ready ? (
+                            <>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setFuelWin(null);
+                                  changeRoom('profile');
+                                }}
+                                className="px-6 py-3.5 bg-emerald-500 hover:bg-emerald-400 text-black font-black font-mono text-xs rounded-xl tracking-wider cursor-pointer shadow-[0_0_28px_rgba(52,211,153,0.35)]"
+                              >
+                                Mint first rig →
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setFuelWin(null);
+                                  changeRoom('treasury');
+                                }}
+                                className="px-6 py-2.5 border border-emerald-400/40 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-200 font-mono text-[10px] font-bold uppercase tracking-wider rounded-xl cursor-pointer"
+                              >
+                                Claim daily refill
+                              </button>
+                            </>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setFuelWin(null);
+                                changeRoom('lab');
+                              }}
+                              className="px-6 py-3.5 bg-emerald-500 hover:bg-emerald-400 text-black font-black font-mono text-xs rounded-xl tracking-wider cursor-pointer"
+                            >
+                              Keep going in Academy →
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => setFuelWin(null)}
+                            className="text-[10px] font-mono text-slate-500 hover:text-slate-300 uppercase tracking-wider cursor-pointer"
+                          >
+                            Stay on map
+                          </button>
+                        </div>
+                      </div>
+                    </motion.div>
+                  )}
+
+                  {!fuelWin &&
+                    economyStatus?.ready &&
+                    (showMintMinerCta ||
+                      !(state.minerNFTs || []).some((n) =>
+                        String(n.id).startsWith('onchain_')
+                      )) && (
+                    <div className="rounded-2xl border border-amber-400/35 bg-gradient-to-r from-amber-500/10 via-[#0a0a0c] to-cyan-500/10 p-5 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
+                      <div>
+                        <span className="text-[10px] font-mono font-bold text-amber-400 block tracking-widest uppercase">
+                          Earn → own · 100 CGT
+                        </span>
+                        <h4 className="text-sm font-semibold font-mono text-slate-100 mt-0.5">
+                          Mint your first rig
+                        </h4>
+                        <p className="text-xs text-slate-400 mt-1.5 max-w-xl font-sans leading-relaxed">
+                          Swap BCC → CGT in the Vault if needed, then mint an ownable miner you can
+                          list.
+                        </p>
+                      </div>
+                      <div className="flex flex-wrap gap-2 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => changeRoom('treasury')}
+                          className="px-4 py-3 bg-white/5 hover:bg-white/10 border border-white/15 text-slate-200 font-black font-mono text-xs rounded-xl tracking-wider cursor-pointer"
+                        >
+                          Vault / swap
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShowMintMinerCta(false);
+                            changeRoom('profile');
+                          }}
+                          className="px-5 py-3 bg-amber-500 hover:bg-amber-400 text-black font-black font-mono text-xs rounded-xl tracking-wider cursor-pointer"
+                        >
+                          Mint first rig →
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {!fuelWin && economyStatus?.ready && (
+                  <div className="rounded-xl border border-cyan-400/20 bg-cyan-500/5 px-4 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <p className="text-xs text-slate-300 font-sans leading-relaxed">
+                      <span className="font-mono text-[10px] font-bold text-cyan-400 uppercase tracking-wider block mb-0.5">
+                        Free daily refill (~20h)
+                      </span>
+                      On-chain claim_daily — +15% energy + 50 BCC. Lucky Wheel stays practice.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => changeRoom('treasury')}
+                      className="px-4 py-2 bg-cyan-500 hover:bg-cyan-400 text-black font-mono text-[10px] font-black uppercase tracking-wider rounded-lg cursor-pointer shrink-0"
+                    >
+                      Claim refill →
+                    </button>
+                  </div>
+                  )}
+
+                  {!fuelWin && economyStatus && !economyStatus.ready && !firstRitualPending && (
+                    <div className="rounded-xl border border-amber-400/25 bg-amber-500/5 px-4 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      <p className="text-xs text-slate-300 font-sans leading-relaxed">
+                        <span className="font-mono text-[10px] font-bold text-amber-300 uppercase tracking-wider block mb-0.5">
+                          Practice mode — stay in the loop
+                        </span>
+                        Mint / claim_daily wait for settlement. Academy fuel still works here.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => changeRoom('lab')}
+                        className="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-black font-mono text-[10px] font-black uppercase tracking-wider rounded-lg cursor-pointer shrink-0"
+                      >
+                        Continue Academy →
+                      </button>
+                    </div>
+                  )}
+
+                  {navPhase === 'open' && (
+                    <AttentionBriefStrip
+                      items={attentionBrief}
+                      onNavigate={(room) => handleNavNavigate(room as NavDestination)}
+                    />
+                  )}
+
+                  {!firstRitualPending && state.energy < 40 && (
+                    <div className="bg-orange-500/5 border border-orange-500/30 p-5 rounded-2xl flex flex-col md:flex-row items-center justify-between gap-4 shadow-lg">
+                      <div className="flex items-center gap-3.5">
+                        <div className="w-10 h-10 rounded-xl bg-orange-500/10 flex items-center justify-center text-orange-500 border border-orange-500/40 animate-pulse">
+                          <ShieldAlert className="w-5 h-5" />
+                        </div>
+                        <div>
+                          <span className="text-[10px] font-mono font-bold text-orange-400 block tracking-widest uppercase">
+                            Knowledge fuel low
+                          </span>
+                          <h4 className="text-sm font-semibold font-mono text-slate-200 mt-0.5">
+                            Core reserves at {state.energy}%.
+                          </h4>
+                          <p className="text-xs text-slate-400 mt-1 max-w-2xl font-sans leading-relaxed">
+                            Refuel in the{' '}
+                            <span className="text-cyan-400 font-bold font-mono">Attention Academy</span>{' '}
+                            — learning becomes energy for your node.
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          onClick={() => changeRoom('lab')}
+                          className="px-5 py-2.5 bg-cyan-600 hover:bg-cyan-500 text-black font-black font-mono text-xs rounded-xl tracking-wider transition-colors cursor-pointer"
+                        >
+                          GO TO ACADEMY
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => changeRoom('missions')}
+                          className="px-5 py-2.5 bg-orange-600 hover:bg-orange-500 text-black font-black font-mono text-xs rounded-xl tracking-wider transition-colors cursor-pointer"
+                        >
+                          DAILY DIRECTIVES
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </>
               )}
 
-              {/* Blueprint map Hero */}
-              <div className="p-8 bg-[#0a0a0c] border border-white/5 rounded-2xl relative overflow-hidden shadow-2xl">
-                <div className="absolute inset-0 bg-cyber-grid bg-[size:24px_24px] opacity-[0.03]" />
-                <div className="absolute top-0 right-0 w-80 h-80 bg-cyan-500/5 rounded-full blur-3xl pointer-events-none" />
+              {/* Blueprint map Hero — quiet until First Spark fuels the node */}
+              {!firstRitualPending && (
+              <div className="p-6 md:p-8 bg-[#0a0a0c] border border-cyan-500/15 rounded-2xl relative overflow-hidden shadow-2xl">
+                <div className="absolute inset-0 bg-cyber-grid bg-[size:24px_24px] opacity-[0.06]" />
+                <div className="absolute top-0 right-0 w-96 h-96 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none" />
+                <div className="absolute bottom-0 left-1/3 w-72 h-72 bg-amber-500/8 rounded-full blur-3xl pointer-events-none" />
 
-                <div className="relative z-10 max-w-2xl">
-                  <span className="text-[10px] font-mono text-cyan-400 tracking-[0.2em] block uppercase font-bold">PROOF OF ATTENTION PROTOCOL</span>
-                  <h2 className="text-3xl lg:text-4xl font-black italic text-white leading-none mt-2 mb-3">
-                    FUEL YOUR NODE<br />WITH KNOWLEDGE
-                  </h2>
-                  <p className="text-xs lg:text-sm text-slate-400 font-sans mt-3.5 leading-relaxed max-w-xl">
-                    Operate a living AI facility where focused learning generates Proof of Attention. Knowledge becomes energy. Energy powers your node.
-                  </p>
+                <div className="relative z-10 grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
+                  <div className="lg:col-span-7 max-w-2xl">
+                    <span className="text-[10px] font-mono text-cyan-400 tracking-[0.2em] block uppercase font-bold">
+                      Culture Node · Proof of Attention
+                    </span>
+                    <h2 className="font-display text-3xl lg:text-5xl font-extrabold italic text-white leading-[0.95] mt-2 mb-3">
+                      Fuel your node<br />
+                      <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-300 to-amber-300">
+                        with knowledge
+                      </span>
+                    </h2>
+                    <p className="text-sm text-slate-400 font-sans mt-3.5 leading-relaxed max-w-xl">
+                      Learn in the Academy → energy fills your reactor → owned NFTs wake up and loop their mining feed.
+                      Idle art stays still until you earn fuel.
+                    </p>
 
-                  <div className="flex flex-wrap gap-3 mt-6 font-mono text-xs">
+                    <div className="flex flex-wrap gap-3 mt-6 font-mono text-xs">
+                      <button
+                        type="button"
+                        onClick={() => changeRoom('reactor')}
+                        className="px-5 py-3 bg-cyan-500 hover:bg-cyan-400 text-black font-black uppercase tracking-wider rounded-xl cursor-pointer transition-all"
+                      >
+                        Enter Reactor
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => changeRoom('gallery')}
+                        className="px-5 py-3 bg-amber-500/15 hover:bg-amber-500/25 border border-amber-400/35 text-amber-100 font-black uppercase tracking-wider rounded-xl cursor-pointer inline-flex items-center gap-2"
+                      >
+                        <Images className="w-3.5 h-3.5" />
+                        NFT Gallery
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="lg:col-span-5">
                     <button
-                      onClick={() => changeRoom('reactor')}
-                      className="px-5 py-3 bg-cyan-600 hover:bg-cyan-500 text-black font-black uppercase tracking-wider rounded-xl cursor-pointer transition-all"
+                      type="button"
+                      onClick={() => changeRoom('gallery')}
+                      className="w-full group cursor-pointer text-left"
                     >
-                      Enter Reactor Core
-                    </button>
-                    <button
-                      onClick={() => changeRoom('workshop')}
-                      className="px-5 py-3 bg-[#0a0a0c] hover:bg-[#111115] border border-white/10 text-slate-300 font-black uppercase tracking-wider rounded-xl cursor-pointer"
-                    >
-                      Upgrade Hardware
+                      <div className="grid grid-cols-2 gap-2.5">
+                        {(Object.entries(NFT_POSTERS) as [string, string][]).map(([key, src], i) => (
+                          <div
+                            key={key}
+                            className={`relative aspect-square rounded-xl overflow-hidden border border-white/10 bg-black/40 ${
+                              i === 0 && state.energy > 0 ? 'ring-1 ring-cyan-400/50' : ''
+                            }`}
+                          >
+                            <img
+                              src={src}
+                              alt={`${key} miner`}
+                              className={`h-full w-full object-cover transition duration-700 group-hover:scale-105 ${
+                                state.energy > 0 ? 'brightness-110' : 'brightness-75'
+                              }`}
+                              draggable={false}
+                            />
+                            {state.energy > 0 && (
+                              <div className="nft-mining-feed absolute inset-0 pointer-events-none opacity-80">
+                                <div className="nft-mining-scan" />
+                              </div>
+                            )}
+                            <span className="absolute bottom-1.5 left-1.5 text-[8px] font-mono uppercase tracking-wider text-white/80 bg-black/50 px-1.5 py-0.5 rounded">
+                              {key}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                      <p className="mt-2.5 text-[10px] font-mono text-slate-500 uppercase tracking-widest text-center group-hover:text-cyan-400 transition-colors">
+                        {state.energy > 0 ? 'Mining feeds live · open gallery' : 'Static until you refuel · open gallery'}
+                      </p>
                     </button>
                   </div>
                 </div>
               </div>
+              )}
 
               {/* The living blueprints of "My Facility" Expandable rooms */}
               <div>
                 <h3 className="font-mono text-[10px] font-bold text-slate-500 tracking-[0.2em] uppercase mb-4 flex items-center gap-2">
                   <LayoutGrid className="w-4 h-4 text-cyan-400" />
-                  FACILITY SCHEMATIC
+                  {firstRitualPending ? 'NEXT STEP · ACADEMY' : 'FACILITY SCHEMATIC'}
                 </h3>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {state.rooms.map((room, idx) => {
+                  {state.rooms
+                    .filter((room) => !firstRitualPending || room.id === 'lab')
+                    .map((room, idx) => {
                     const getRoomStatus = () => {
                       if (!room.unlocked) return { text: 'DECRYPTED / LOCKED', color: 'text-slate-500 border-white/5 bg-white/[0.02]' };
+                      if (firstRitualPending && room.id === 'lab') {
+                        return { text: 'FIRST SPARK READY', color: 'text-cyan-300 border-cyan-400/40 bg-cyan-950/20' };
+                      }
                       if (room.id === 'reactor' && state.energy < 40) return { text: 'REACTOR EMERGENCY', color: 'text-orange-400 animate-pulse border-orange-500/40 bg-orange-950/10' };
                       return { text: `LEVEL ${room.level} NOMINAL`, color: 'text-cyan-400 border-cyan-500/20 bg-cyan-950/5' };
                     };
@@ -933,7 +1609,9 @@ export default function App() {
                         transition={{ type: 'spring', stiffness: 400, damping: 28 }}
                         className={`bg-[#0a0a0c]/90 border rounded-2xl p-5 shadow-xl flex flex-col justify-between overflow-hidden relative min-h-[210px] backdrop-blur-sm ${
                           room.unlocked 
-                            ? 'border-white/5 hover:border-cyan-500/40 hover:shadow-[0_0_28px_rgba(34,211,238,0.08)]' 
+                            ? firstRitualPending
+                              ? 'border-cyan-400/40 shadow-[0_0_28px_rgba(34,211,238,0.12)]'
+                              : 'border-white/5 hover:border-cyan-500/40 hover:shadow-[0_0_28px_rgba(34,211,238,0.08)]' 
                             : 'border-white/5 opacity-50'
                         }`}
                       >
@@ -997,6 +1675,43 @@ export default function App() {
                       </motion.div>
                     );
                   })}
+
+                  {!firstRitualPending && (
+                    <>
+                  {/* NFT Gallery */}
+                  <div className="bg-gradient-to-br from-[#0c100a] to-[#080605] border border-amber-500/25 hover:border-amber-400/50 rounded-2xl p-5 shadow-xl flex flex-col justify-between overflow-hidden relative min-h-[210px] transition-all duration-300">
+                    <div className="absolute inset-0 pointer-events-none opacity-30">
+                      <img src={NFT_POSTERS.obsidian} alt="" className="absolute -right-6 -bottom-8 w-40 h-40 object-cover rounded-2xl rotate-6 opacity-60" />
+                    </div>
+                    <span className="absolute top-4 right-4 font-mono text-[9px] text-amber-500/60">SECTOR_NFT</span>
+                    <div className="relative z-10">
+                      <div className="flex items-center gap-2 mb-3">
+                        <Images className="w-4 h-4 text-amber-400" />
+                        <h4 className="font-sans text-sm font-bold text-white tracking-tight">
+                          NFT Rig Gallery
+                        </h4>
+                      </div>
+                      <p className="text-xs text-slate-400 font-sans leading-relaxed">
+                        Collectible posters stay still until knowledge fuel is live — then mining loops kick in on owned rigs.
+                      </p>
+                    </div>
+                    <div className="relative z-10 mt-5 pt-3.5 border-t border-white/5 flex items-center justify-between gap-3 font-mono text-[11px]">
+                      <span className={`border px-2 py-0.5 rounded-lg text-[9px] font-bold tracking-widest uppercase ${
+                        state.energy > 0
+                          ? 'border-cyan-500/30 bg-cyan-950/20 text-cyan-300'
+                          : 'border-amber-500/20 bg-amber-950/20 text-amber-400'
+                      }`}>
+                        {state.energy > 0 ? 'FEEDS LIVE' : 'IDLE ART'}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => changeRoom('gallery')}
+                        className="px-3.5 py-1.5 bg-amber-500 hover:bg-amber-400 text-black font-black rounded-lg text-[10px] cursor-pointer tracking-wider"
+                      >
+                        OPEN GALLERY
+                      </button>
+                    </div>
+                  </div>
 
                   {/* Daily Missions — always available from map */}
                   <div
@@ -1096,6 +1811,8 @@ export default function App() {
                       </button>
                     </div>
                   </div>
+                    </>
+                  )}
                 </div>
               </div>
               </div>
@@ -1104,7 +1821,25 @@ export default function App() {
             // Room viewport render
             <RoomEnter key={`room-${activeRoom}`} roomKey={`room-${activeRoom}`}>
 
-              {activeRoom === 'reactor' && <MainReactor state={state} setState={setState} addLog={addLog} logs={logs} />}
+              {activeRoom === 'reactor' && (
+                <MainReactor
+                  state={state}
+                  setState={setState}
+                  addLog={addLog}
+                  logs={logs}
+                  onOpenTollShop={() => openTollShop('spark_refill')}
+                />
+              )}
+              {activeRoom === 'gallery' && (
+                <NftGallery
+                  state={state}
+                  setState={setState}
+                  addLog={addLog}
+                  miningLive={state.energy > 0}
+                  onOpenReactor={() => changeRoom('reactor')}
+                  onOpenProfile={() => changeRoom('profile')}
+                />
+              )}
               {activeRoom === 'workshop' && <Workshop state={state} setState={setState} addLog={addLog} />}
               {activeRoom === 'lab' && (
                 <ResearchLab
@@ -1112,6 +1847,17 @@ export default function App() {
                   setState={setState}
                   addLog={addLog}
                   onOpenRoadmap={() => changeRoom('roadmap')}
+                  onOpenTollShop={(sku) => openTollShop(sku || 'academy_retake')}
+                  onFirstRitualComplete={(detail) => {
+                    setFirstRitualPending(false);
+                    setShowMintMinerCta(Boolean(economyStatus?.ready));
+                    setFuelWin({
+                      from: detail?.from ?? 0,
+                      to: detail?.to ?? Math.min(100, state.energy + 18),
+                    });
+                    changeRoom('map');
+                    addLog('Proof accepted — your node has fuel. Next step is on the map.', 'success');
+                  }}
                 />
               )}
               {activeRoom === 'roadmap' && (
@@ -1120,8 +1866,25 @@ export default function App() {
               {activeRoom === 'ai' && <AICore state={state} setState={setState} addLog={addLog} />}
               {activeRoom === 'missions' && <DailyMissions state={state} setState={setState} addLog={addLog} />}
               {activeRoom === 'guild' && <GuildHall state={state} setState={setState} addLog={addLog} />}
-              {activeRoom === 'treasury' && <Treasury state={state} setState={setState} addLog={addLog} />}
-              {activeRoom === 'profile' && <MemberProfile state={state} setState={setState} addLog={addLog} currentUser={currentUser} onLogout={handleLogout} />}
+              {activeRoom === 'treasury' && (
+                <Treasury
+                  state={state}
+                  setState={setState}
+                  addLog={addLog}
+                  onOpenAcademy={() => changeRoom('lab')}
+                  tollHighlightSku={tollHighlightSku}
+                />
+              )}
+              {activeRoom === 'profile' && (
+                <MemberProfile
+                  state={state}
+                  setState={setState}
+                  addLog={addLog}
+                  currentUser={currentUser}
+                  onLogout={handleLogout}
+                  onOpenTreasury={(sku) => (sku ? openTollShop(sku) : changeRoom('treasury'))}
+                />
+              )}
               {activeRoom === 'leaderboard' && <Leaderboard state={state} setState={setState} addLog={addLog} />}
               {activeRoom === 'admin' && <AdminPanel state={state} setState={setState} addLog={addLog} currentUser={currentUser} />}
               {activeRoom === 'feedback' && (
@@ -1150,6 +1913,8 @@ export default function App() {
         onClose={() => setMenuOpen(false)}
         activeRoom={activeRoom}
         onNavigate={handleNavNavigate}
+        phase={navPhase}
+        nextStep={navNextStep}
         showAdmin={
           !!(currentUser as { isAdmin?: boolean } | null)?.isAdmin ||
           (typeof window !== 'undefined' && localStorage.getItem('building_culture_admin') === '1')
@@ -1157,81 +1922,96 @@ export default function App() {
         onAdmin={() => changeRoom('admin')}
       />
 
-      {/* Futuristic Cyber-Footer */}
-      <footer className="border-t border-white/5 bg-[#0a0a0c] py-4 px-6 mx-4 mb-2 rounded-2xl text-slate-500 flex flex-col gap-3 shadow-lg z-10 relative">
-        <div className="flex flex-col md:flex-row justify-between items-center gap-2 font-mono text-[9px] tracking-widest">
+      <footer className="border-t border-white/5 bg-[#0a0a0c]/80 py-3 px-5 mx-4 mb-2 rounded-2xl text-slate-500 flex flex-col gap-2 shadow-lg z-10 relative backdrop-blur-md">
+        <div className="flex flex-col sm:flex-row justify-between items-center gap-2 font-mono text-[9px] tracking-widest">
           <div className="flex items-center gap-2">
-            <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-ping"></div>
-            <span>ATTENTION OS ONLINE // NODE SYNC ACTIVE</span>
+            <div className="w-1.5 h-1.5 bg-green-500 rounded-full" />
+            <span>{firstRitualPending ? 'FIRST SPARK OPEN' : 'NODE ONLINE · DEVNET'}</span>
           </div>
           <div className="flex flex-wrap gap-3 justify-center items-center">
             <button
               type="button"
-              onClick={() => setMenuOpen(true)}
-              className="hover:text-cyan-400 transition-colors cursor-pointer uppercase"
+              onClick={() => handleNavNavigate(navNextStep.id)}
+              className="hover:text-cyan-400 transition-colors cursor-pointer uppercase text-cyan-500/80"
             >
-              Menu
+              {navNextStep.label}
             </button>
-            <span className="text-white/10">·</span>
-            <button
-              onClick={() => changeRoom('missions')}
-              className={`hover:text-emerald-400 transition-colors cursor-pointer uppercase ${activeRoom === 'missions' ? 'text-emerald-400 font-bold' : ''}`}
-            >
-              Lucky Wheel
-            </button>
-            <span className="text-white/10">·</span>
-            <button
-              onClick={() => changeRoom('onboarding')}
-              className={`hover:text-cyan-400 transition-colors cursor-pointer uppercase ${activeRoom === 'onboarding' ? 'text-cyan-400 font-bold' : ''}`}
-            >
-              Ecosystem
-            </button>
-            <span className="text-white/10">·</span>
-            <button
-              onClick={() => changeRoom('feedback')}
-              className={`hover:text-cyan-400 transition-colors cursor-pointer uppercase ${activeRoom === 'feedback' ? 'text-cyan-400 font-bold' : ''}`}
-            >
-              Feedback
-            </button>
-            {((currentUser as { isAdmin?: boolean } | null)?.isAdmin ||
-              (typeof window !== 'undefined' && localStorage.getItem('building_culture_admin') === '1')) && (
+            {!firstRitualPending && (
               <>
                 <span className="text-white/10">·</span>
                 <button
-                  onClick={() => changeRoom('admin')}
-                  className="hover:text-red-400 font-bold transition-colors cursor-pointer uppercase"
+                  type="button"
+                  onClick={() => setMenuOpen(true)}
+                  className="hover:text-cyan-400 transition-colors cursor-pointer uppercase"
                 >
-                  Admin
+                  More
                 </button>
               </>
             )}
           </div>
         </div>
-        <div className="flex flex-wrap justify-center gap-x-4 gap-y-1 border-t border-white/[0.04] pt-3 text-[10px] font-sans tracking-normal text-slate-600">
-          <button
-            type="button"
-            onClick={() => changeRoom('legal-privacy')}
-            className={`hover:text-slate-400 transition-colors cursor-pointer ${activeRoom === 'legal-privacy' ? 'text-slate-400' : ''}`}
-          >
-            Privacy
-          </button>
-          <button
-            type="button"
-            onClick={() => changeRoom('legal-terms')}
-            className={`hover:text-slate-400 transition-colors cursor-pointer ${activeRoom === 'legal-terms' ? 'text-slate-400' : ''}`}
-          >
-            Terms
-          </button>
-          <button
-            type="button"
-            onClick={() => changeRoom('legal-disclaimer')}
-            className={`hover:text-slate-400 transition-colors cursor-pointer ${activeRoom === 'legal-disclaimer' ? 'text-slate-400' : ''}`}
-          >
-            Disclaimer
-          </button>
-          <span className="text-slate-700">Building Culture · Solana Devnet</span>
-        </div>
+        {navPhase === 'open' && (
+          <div className="flex flex-wrap justify-center gap-x-4 gap-y-1 border-t border-white/[0.04] pt-2 text-[10px] font-sans tracking-normal text-slate-600">
+            <button
+              type="button"
+              onClick={() => changeRoom('legal-privacy')}
+              className="hover:text-slate-400 transition-colors cursor-pointer"
+            >
+              Privacy
+            </button>
+            <button
+              type="button"
+              onClick={() => changeRoom('legal-terms')}
+              className="hover:text-slate-400 transition-colors cursor-pointer"
+            >
+              Terms
+            </button>
+            <button
+              type="button"
+              onClick={() => changeRoom('legal-disclaimer')}
+              className="hover:text-slate-400 transition-colors cursor-pointer"
+            >
+              Disclaimer
+            </button>
+            <span className="text-slate-700">Building Culture · Solana Devnet</span>
+          </div>
+        )}
       </footer>
+
+      <AnimatePresence>
+        {flowToast && (
+          <motion.div
+            key={flowToast.id}
+            role="status"
+            initial={{ opacity: 0, y: -12 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            onClick={() => setFlowToast(null)}
+            className={`fixed top-20 left-1/2 -translate-x-1/2 z-[90] max-w-lg w-[calc(100%-2rem)] px-4 py-3 rounded-xl border backdrop-blur-md shadow-xl pointer-events-auto cursor-pointer ${
+              flowToast.tone === 'warn'
+                ? 'bg-amber-950/95 border-amber-400/40 text-amber-100'
+                : flowToast.tone === 'success'
+                  ? 'bg-emerald-950/95 border-emerald-400/40 text-emerald-100'
+                  : 'bg-[#0a0a0c]/95 border-white/15 text-slate-200'
+            }`}
+          >
+            <div className="flex items-start gap-3">
+              <p className="text-[11px] font-sans leading-relaxed flex-1">{flowToast.message}</p>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setFlowToast(null);
+                }}
+                aria-label="Dismiss"
+                className="opacity-60 hover:opacity-100 cursor-pointer shrink-0 p-0.5"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Subtle 'System State Saved' Toast Notification */}
       <AnimatePresence>
@@ -1260,18 +2040,14 @@ export default function App() {
         )}
       </AnimatePresence>
 
-      {/* Onboarding Handbook Modal Overlay */}
       <AnimatePresence>
-        {showOnboarding && (
+        {showStory && (
           <OnboardingModal
-            onClose={(dontShowAgain) => {
-              setShowOnboarding(false);
-              if (dontShowAgain) {
-                localStorage.setItem('solana_onboarding_dismissed', 'true');
-                addLog("ONBOARDING: Handbook permanently dismissed from startup.", "system");
-              } else {
-                addLog("ONBOARDING: Handbook completed. Safe travels!", "info");
-              }
+            replay
+            onClose={() => {
+              setShowStory(false);
+              setGuideReplay(false);
+              addLog('GUIDE: Knowledge → Energy → Node closed.', 'info');
             }}
           />
         )}

@@ -54,3 +54,17 @@ export const kpiProofs = pgTable('kpi_proofs', {
   slot: text('slot'),
   createdAt: timestamp('created_at').defaultNow(),
 });
+
+export const tollPayments = pgTable('toll_payments', {
+  id: text('id').primaryKey(),
+  uid: text('uid').notNull(),
+  walletAddress: text('wallet_address').notNull(),
+  signature: text('signature').notNull().unique(),
+  sku: text('sku').notNull(),
+  quantity: integer('quantity').notNull(),
+  amountMicro: integer('amount_micro').notNull(),
+  priceCents: integer('price_cents').notNull(),
+  verified: boolean('verified').notNull(),
+  slot: text('slot'),
+  createdAt: timestamp('created_at').defaultNow(),
+});

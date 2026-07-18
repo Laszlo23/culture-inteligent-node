@@ -198,6 +198,12 @@ export interface GameState {
     creditsAwarded: number;
     energyAwarded: number;
   };
+
+  /** Attention Toll inventory (1¢ USDC / practice packs) */
+  sparkCredits?: number;
+  academyRetakeCredits?: number;
+  listSlotCredits?: number;
+  claimTurboActive?: boolean;
   
   // Living Miner NFT & Personality Extensions
   nodeArchetype?: 'Researcher' | 'Creator' | 'Builder' | 'Environmentalist' | 'AI Explorer';

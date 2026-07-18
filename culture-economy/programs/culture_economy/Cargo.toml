@@ -1,0 +1,22 @@
+[package]
+name = "culture_economy"
+version = "0.1.0"
+description = "Building Culture facility ledger — energy, BCC/CGT, miner assets"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "lib"]
+name = "culture_economy"
+
+[features]
+default = []
+cpi = ["no-entrypoint"]
+no-entrypoint = []
+no-idl = []
+no-log-ix-name = []
+idl-build = ["anchor-lang/idl-build", "anchor-spl/idl-build"]
+anchor-debug = []
+
+[dependencies]
+anchor-lang = { version = "0.30.1", features = ["init-if-needed"] }
+anchor-spl = "0.30.1"

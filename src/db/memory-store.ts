@@ -66,6 +66,10 @@ export function getKpiBySignature(signature: string) {
   return kpiStore.find((k) => k.signature === signature) || null;
 }
 
+export function getKpiByWallet(walletAddress: string) {
+  return kpiStore.filter((k) => k.walletAddress === walletAddress && k.verified);
+}
+
 const curriculumDrafts: AttentionSession[] = [];
 const curriculumPublished: AttentionSession[] = [];
 
@@ -108,4 +112,83 @@ export function rejectCurriculumDraft(id: string) {
 
 export function listPublishedCurriculum() {
   return [...curriculumPublished];
+}
+
+export type StoredTollPayment = {
+  id: string;
+  uid: string;
+  walletAddress: string;
+  signature: string;
+  sku: string;
+  quantity: number;
+  amountMicro: number;
+  priceCents: number;
+  verified: boolean;
+  slot?: string;
+  createdAt: string;
+};
+
+const tollStore: StoredTollPayment[] = [];
+
+export function saveTollPayment(
+  row: Omit<StoredTollPayment, 'createdAt'> & { createdAt?: string }
+) {
+  const existing = tollStore.find((t) => t.signature === row.signature);
+  if (existing) return existing;
+  const full: StoredTollPayment = {
+    ...row,
+    createdAt: row.createdAt || new Date().toISOString(),
+  };
+  tollStore.unshift(full);
+  return full;
+}
+
+export function getTollBySignature(signature: string) {
+  return tollStore.find((t) => t.signature === signature) || null;
+}
+
+export function listTollPayments() {
+  return [...tollStore];
+}
+
+export function getTollStats() {
+  const now = Date.now();
+  const dayAgo = now - 24 * 60 * 60 * 1000;
+  let allTimeCents = 0;
+  let todayCents = 0;
+  let todayCount = 0;
+  const bySku: Record<string, { count: number; cents: number }> = {};
+
+  for (const t of tollStore) {
+    if (!t.verified) continue;
+    const cents = t.priceCents * Math.max(1, t.quantity);
+    allTimeCents += cents;
+    const ts = Date.parse(t.createdAt);
+    if (!Number.isNaN(ts) && ts >= dayAgo) {
+      todayCents += cents;
+      todayCount += 1;
+    }
+    const bucket = bySku[t.sku] || { count: 0, cents: 0 };
+    bucket.count += 1;
+    bucket.cents += cents;
+    bySku[t.sku] = bucket;
+  }
+
+  const topSkus = Object.entries(bySku)
+    .map(([sku, v]) => ({ sku, count: v.count, cents: v.cents }))
+    .sort((a, b) => b.cents - a.cents)
+    .slice(0, 8);
+
+  const dailyRate = todayCents;
+  const extrapolatedAnnualCents = dailyRate * 365;
+
+  return {
+    allTimeCents,
+    todayCents,
+    todayCount,
+    allTimeCount: tollStore.filter((t) => t.verified).length,
+    topSkus,
+    extrapolatedAnnualCents,
+    note: 'Extrapolated annual is a model from the last 24h rate — not a guarantee.',
+  };
 }

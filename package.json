@@ -10,10 +10,13 @@
     "preview": "vite preview",
     "clean": "rm -rf dist server.js",
     "lint": "tsc --noEmit",
-    "test:arcium-mirror": "tsx --test src/lib/arcium-poa.test.ts"
+    "test:arcium-mirror": "tsx --test src/lib/arcium-poa.test.ts",
+    "test:economy": "tsx --test src/lib/solana-economy.test.ts",
+    "economy:bootstrap": "tsx scripts/devnet-bootstrap.ts"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",
+    "@solana/spl-token": "^0.4.15",
     "@solana/web3.js": "^1.98.4",
     "@tailwindcss/vite": "^4.1.14",
     "@vitejs/plugin-react": "^5.0.4",

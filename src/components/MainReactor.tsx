@@ -12,15 +12,18 @@ import {
 } from 'lucide-react';
 import { GameState, HardwareModule } from '../types';
 import { GlowPulse, EnergyFlow, consumeEnergySurge } from './fx';
+import NftCard from './nft/NftCard';
 
 interface MainReactorProps {
   state: GameState;
   setState: React.Dispatch<React.SetStateAction<GameState>>;
   addLog: (message: string, type: 'info' | 'success' | 'warn' | 'system') => void;
   logs: { timestamp: string; message: string; type: 'info' | 'success' | 'warn' | 'system' }[];
+  /** Open Penny Protocol Spark Refill in Treasury */
+  onOpenTollShop?: () => void;
 }
 
-export default function MainReactor({ state, setState, addLog, logs }: MainReactorProps) {
+export default function MainReactor({ state, setState, addLog, logs, onOpenTollShop }: MainReactorProps) {
   const [isOverclocked, setIsOverclocked] = useState(false);
   const [temperature, setTemperature] = useState(42); // in celsius
   const [venting, setVenting] = useState(false);
@@ -59,6 +62,9 @@ export default function MainReactor({ state, setState, addLog, logs }: MainReact
   const [spinDirections, setSpinDirections] = useState<boolean[]>([true, false, true, false]); // For Lesson 2 alignment
   const [hashProgress, setHashProgress] = useState(0); // For Lesson 3 hashing
 
+  const featuredNft = (state.minerNFTs || []).find((n) => n.owner === 'Me');
+  const miningLive = state.energy > 0;
+
   // Find installed modules for custom visual highlights
   const hasGpu = state.hardware.some(h => h.type === 'gpu' && h.installed);
   const hasMemory = state.hardware.some(h => h.type === 'memory' && h.installed);
@@ -86,18 +92,28 @@ export default function MainReactor({ state, setState, addLog, logs }: MainReact
         return prev;
       });
 
-      // Passive Energy decay simulation (overclocking burns faster)
-      setState(prev => {
+      // Passive energy decay — when settlement is ready, flush drain_energy to Player PDA
+      setState((prev) => {
         if (prev.energy <= 0) return prev;
         const decayRate = isOverclocked ? 1.5 : 0.2;
         const nextEnergy = Math.max(0, prev.energy - decayRate);
-        
+        const drained = prev.energy - nextEnergy;
+
+        if (drained > 0) {
+          void import('../lib/economy-actions')
+            .then(({ queueEnergyDrainPercent }) => queueEnergyDrainPercent(drained))
+            .catch(() => undefined);
+        }
+
         if (nextEnergy === 0 && prev.energy > 0) {
-          addLog("CRITICAL FAILURE: Energy depleted! Facility has entered SAFE MODE. Operations halted.", "warn");
+          addLog(
+            'CRITICAL FAILURE: Energy depleted! Facility has entered SAFE MODE. Operations halted.',
+            'warn'
+          );
         }
         return {
           ...prev,
-          energy: parseFloat(nextEnergy.toFixed(1))
+          energy: parseFloat(nextEnergy.toFixed(1)),
         };
       });
     }, 3000);
@@ -596,6 +612,11 @@ export default function MainReactor({ state, setState, addLog, logs }: MainReact
                     addLog("MOBILE DECK: Core already at maximum capacity.", "info");
                     return;
                   }
+                  if (onOpenTollShop) {
+                    addLog("PENNY PROTOCOL: 1¢ Spark Refill — opening Treasury toll shop.", "info");
+                    onOpenTollShop();
+                    return;
+                  }
                   setState(prev => ({
                     ...prev,
                     energy: Math.min(100, prev.energy + 30)
@@ -604,9 +625,18 @@ export default function MainReactor({ state, setState, addLog, logs }: MainReact
                 }}
                 className="py-2.5 bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 text-[10px] rounded-xl font-bold uppercase tracking-wider cursor-pointer"
               >
-                REFUEL RIG
+                1¢ SPARK REFUEL
               </button>
             </div>
+            {state.energy < 20 && onOpenTollShop && (
+              <button
+                type="button"
+                onClick={() => onOpenTollShop()}
+                className="w-full mt-2 py-2 rounded-xl bg-amber-400 text-slate-950 text-[10px] font-black font-mono uppercase tracking-wider cursor-pointer"
+              >
+                Critical fuel — buy 1¢ Spark Refill
+              </button>
+            )}
           </div>
 
           {/* Dynamic Check-in Rewards Card */}
@@ -1015,91 +1045,41 @@ export default function MainReactor({ state, setState, addLog, logs }: MainReact
             <div className="absolute top-0 right-0 w-32 h-32 bg-teal-500/5 rounded-full blur-2xl pointer-events-none" />
             
             <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-stretch flex-1">
-              {/* Evolving Visual Avatar Frame */}
-              <div className="md:col-span-5 bg-[#0a0a0f] border border-white/5 rounded-2xl p-4 flex flex-col justify-between items-center relative overflow-hidden min-h-[300px]">
-                <div className="absolute inset-0 bg-cyber-grid bg-[size:16px_16px] opacity-10 pointer-events-none" />
-                
-                {/* Aura depending on selected skin */}
-                <div className={`absolute w-36 h-36 rounded-full blur-3xl opacity-30 animate-pulse pointer-events-none ${
-                  state.activeSkin === 'Obsidian Gold' ? 'bg-amber-400' :
-                  state.activeSkin === 'Holographic Fusion' ? 'bg-fuchsia-500' :
-                  state.activeSkin === 'Cosmic Stardust' ? 'bg-indigo-500' : 'bg-teal-500'
-                }`} />
-
-                <div className="w-full flex justify-between text-[9px] text-slate-500">
-                  <span>NFT SPECIFICATION</span>
-                  <span>NODE ID: #{(state.nodeName || '48392').length * 7 + 41200}</span>
+              {/* Featured miner NFT — static idle / looping when fuel is live */}
+              <div className="md:col-span-5 flex flex-col gap-3 min-h-[300px]">
+                <div className="flex items-center justify-between text-[9px] text-slate-500 font-mono uppercase tracking-wider px-0.5">
+                  <span>Featured rig NFT</span>
+                  <span>
+                    {miningLive
+                      ? isOverclocked
+                        ? 'Boost mining loop'
+                        : 'Mining loop'
+                      : 'Idle · refuel to animate'}
+                  </span>
                 </div>
-
-                {/* Evolving Avatar Graphic Representation */}
-                <div className="my-6 relative w-40 h-40 flex items-center justify-center">
-                  {/* Outer spinning aura rings */}
-                  <motion.div
-                    animate={{ rotate: 360 }}
-                    transition={{ duration: state.activeSkin === 'Cosmic Stardust' ? 15 : 8, repeat: Infinity, ease: "linear" }}
-                    className={`absolute inset-2 rounded-full border border-dashed ${
-                      state.activeSkin === 'Obsidian Gold' ? 'border-amber-500/40' :
-                      state.activeSkin === 'Holographic Fusion' ? 'border-fuchsia-500/40' :
-                      state.activeSkin === 'Cosmic Stardust' ? 'border-indigo-500/40' : 'border-teal-500/40'
-                    }`}
+                {featuredNft ? (
+                  <NftCard
+                    nft={featuredNft}
+                    miningActive={miningLive}
+                    boosted={isOverclocked}
+                    footer={
+                      <div className="flex items-center justify-between gap-2 text-[10px] font-mono">
+                        <span className="text-slate-400">
+                          Node LVL {state.nodeLevel || 1} · {state.activeSkin || 'Genesis Slate'}
+                        </span>
+                        <span className={miningLive ? 'text-cyan-400' : 'text-amber-400'}>
+                          Fuel {Math.round(state.energy)}%
+                        </span>
+                      </div>
+                    }
                   />
-                  
-                  {/* Extra orbital helices for higher levels */}
-                  {(state.nodeLevel || 1) >= 4 && (
-                    <motion.div
-                      animate={{ rotate: -360 }}
-                      transition={{ duration: 6, repeat: Infinity, ease: "linear" }}
-                      className={`absolute inset-6 rounded-full border border-dotted ${
-                        state.activeSkin === 'Obsidian Gold' ? 'border-amber-400/50' :
-                        state.activeSkin === 'Holographic Fusion' ? 'border-fuchsia-400/50' :
-                        state.activeSkin === 'Cosmic Stardust' ? 'border-indigo-400/50' : 'border-teal-400/50'
-                      }`}
-                    />
-                  )}
-
-                  {/* Level Evolution Title Badge */}
-                  <div className="absolute top-0 bg-black/80 border border-white/10 px-2 py-0.5 rounded text-[8px] font-black tracking-widest text-slate-300">
-                    {(state.nodeLevel || 1) <= 3 ? "SEED CORE" :
-                     (state.nodeLevel || 1) <= 6 ? "HELIX NEXUS" :
-                     (state.nodeLevel || 1) <= 9 ? "SINGULARITY" : "CELESTIAL MATRIX"}
+                ) : (
+                  <div className="flex-1 rounded-2xl border border-dashed border-white/15 bg-[#0a0a0f] p-6 flex flex-col items-center justify-center text-center">
+                    <Cpu className="w-8 h-8 text-slate-600 mb-3" />
+                    <p className="text-sm text-slate-400">No owned miner NFT yet.</p>
+                    <p className="text-[11px] text-slate-500 mt-1">Mint one in Profile to see the mining feed here.</p>
                   </div>
-
-                  {/* Ultimate Singularity lightning bars */}
-                  {(state.nodeLevel || 1) >= 10 && (
-                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                      <motion.div animate={{ opacity: [0, 1, 0], scale: [0.8, 1.3, 0.8] }} transition={{ duration: 0.8, repeat: Infinity }} className="absolute w-full h-[1px] bg-cyan-400" />
-                      <motion.div animate={{ opacity: [0, 1, 0], scale: [0.8, 1.3, 0.8] }} transition={{ duration: 1.1, repeat: Infinity, delay: 0.2 }} className="absolute h-full w-[1px] bg-fuchsia-400" />
-                    </div>
-                  )}
-
-                  {/* Custom SVG node rendering */}
-                  <div className="w-24 h-24 rounded-3xl bg-black/60 border border-white/10 flex items-center justify-center relative overflow-hidden shadow-2xl">
-                    <div className="absolute inset-1 rounded-2xl bg-gradient-to-tr from-slate-950 to-slate-900 opacity-80" />
-                    <motion.div
-                      animate={{ 
-                        scale: (state.nodeLevel || 1) >= 10 ? [0.95, 1.12, 0.95] : [0.95, 1.04, 0.95],
-                        rotate: (state.nodeLevel || 1) >= 7 ? [0, 90, 180, 270, 360] : 0
-                      }}
-                      transition={{ duration: 10, repeat: Infinity, ease: "linear" }}
-                      className={`w-12 h-12 rounded-xl flex items-center justify-center border-2 z-10 ${
-                        state.activeSkin === 'Obsidian Gold' ? 'border-amber-400 bg-amber-950/20 shadow-[0_0_20px_rgba(245,158,11,0.4)]' :
-                        state.activeSkin === 'Holographic Fusion' ? 'border-fuchsia-400 bg-fuchsia-950/20 shadow-[0_0_20px_rgba(236,72,153,0.4)]' :
-                        state.activeSkin === 'Cosmic Stardust' ? 'border-indigo-400 bg-indigo-950/20 shadow-[0_0_20px_rgba(99,102,241,0.4)]' :
-                        'border-teal-400 bg-teal-950/20 shadow-[0_0_20px_rgba(20,184,166,0.4)]'
-                      }`}
-                    >
-                      {(state.nodePersonality === 'Scholar AI' || !state.nodePersonality) && <Brain className="w-6 h-6 text-slate-100" />}
-                      {state.nodePersonality === 'Rogue Agent' && <Wind className="w-6 h-6 text-slate-100 animate-pulse" />}
-                      {state.nodePersonality === 'Zen Master' && <Activity className="w-6 h-6 text-slate-100" />}
-                      {state.nodePersonality === 'Industrial Matrix' && <Cpu className="w-6 h-6 text-slate-100" />}
-                    </motion.div>
-                  </div>
-                </div>
-
-                <div className="text-center font-mono z-10">
-                  <span className="text-[10px] text-teal-400 font-bold block tracking-widest">LEVEL {state.nodeLevel || 1} EVOLUTION</span>
-                  <span className="text-xs text-slate-300 font-bold tracking-wide mt-1 uppercase block">{state.activeSkin || 'Genesis Slate'}</span>
-                </div>
+                )}
               </div>
 
               {/* Character Attributes Panel */}

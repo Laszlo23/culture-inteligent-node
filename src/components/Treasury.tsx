@@ -12,15 +12,26 @@ import {
 } from 'lucide-react';
 import { GameState } from '../types';
 import SolanaPortal from './SolanaPortal';
+import AttentionTollShop from './AttentionTollShop';
 import { fetchMarketPulse, MarketPulseResponse } from '../lib/api';
 
 interface TreasuryProps {
   state: GameState;
   setState: React.Dispatch<React.SetStateAction<GameState>>;
   addLog: (message: string, type: 'info' | 'success' | 'warn' | 'system') => void;
+  /** When claim_daily is unavailable, keep members in Academy fuel loop */
+  onOpenAcademy?: () => void;
+  /** Deep-link highlight for Attention Toll SKU */
+  tollHighlightSku?: 'spark_refill' | 'academy_retake' | 'claim_turbo' | 'list_slot' | 'spark_pack_100' | null;
 }
 
-export default function Treasury({ state, setState, addLog }: TreasuryProps) {
+export default function Treasury({
+  state,
+  setState,
+  addLog,
+  onOpenAcademy,
+  tollHighlightSku = null,
+}: TreasuryProps) {
   const [ticker, setTicker] = useState(0);
 
   // Daily Streak Claim states
@@ -50,6 +61,9 @@ export default function Treasury({ state, setState, addLog }: TreasuryProps) {
   const [marketPulse, setMarketPulse] = useState<MarketPulseResponse | null>(null);
   const [pulseLoading, setPulseLoading] = useState(true);
 
+  const [economyReady, setEconomyReady] = useState(false);
+  const [cooldownHint, setCooldownHint] = useState<string>('');
+
   useEffect(() => {
     let cancelled = false;
     const load = async () => {
@@ -77,92 +91,136 @@ export default function Treasury({ state, setState, addLog }: TreasuryProps) {
     };
   }, []);
 
-  const executeSwap = () => {
+  // Sync claim_daily cooldown from Player PDA when economy is live
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const { fetchEconomyStatus } = await import('../lib/api');
+        const { resolveEconomyWallet } = await import('../lib/economy-wallet');
+        const { fetchPlayer, getConnection } = await import('../lib/solana-economy');
+        const { PublicKey } = await import('@solana/web3.js');
+        const status = await fetchEconomyStatus();
+        if (cancelled) return;
+        setEconomyReady(!!status.ready);
+        if (!status.ready) return;
+        const ctx = resolveEconomyWallet();
+        if (!ctx) return;
+        const player = await fetchPlayer(new PublicKey(ctx.walletAddress), getConnection());
+        if (!player || cancelled) return;
+        setStreak(Math.max(1, player.streak || 1));
+        if (player.lastDailyTs > 0) {
+          const nextAt = player.lastDailyTs * 1000 + 20 * 3600 * 1000;
+          const remaining = nextAt - Date.now();
+          if (remaining > 0) {
+            setClaimedToday(true);
+            setLastClaimTime(String(player.lastDailyTs * 1000));
+            const hrs = Math.ceil(remaining / 3600000);
+            setCooldownHint(`Program cooldown ~${hrs}h remaining (20h window)`);
+          } else {
+            setClaimedToday(false);
+            setCooldownHint('claim_daily available — 20h program cooldown');
+          }
+        } else {
+          setClaimedToday(false);
+          setCooldownHint('First claim_daily — +15% energy + 50 BCC on-chain');
+        }
+      } catch {
+        /* ignore */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const executeSwap = async () => {
     const cpVal = Number(swapCpAmount);
     if (isNaN(cpVal) || cpVal <= 0) {
-      addLog("SWAP REFUSED: Please enter a valid number of Credits (CP).", "warn");
+      addLog("SWAP REFUSED: Please enter a valid number of BCC to swap.", "warn");
       return;
     }
     if (state.credits < cpVal) {
-      addLog(`SWAP REFUSED: Insufficient Credits balance. Need ${cpVal} CP, but you only have ${state.credits} CP.`, "warn");
+      addLog(`SWAP REFUSED: Need ${cpVal} BCC, have ${state.credits}.`, "warn");
       return;
     }
 
     setIsSwapping(true);
-    setSwapStep("Drafting on-chain Token Mint instructions...");
-
-    setTimeout(() => {
-      setSwapStep("Requesting signature authorization from secure wallet...");
-
-      setTimeout(() => {
-        setSwapStep("Broadcasting liquidity exchange to COGNITIVE Token program...");
-
-        setTimeout(() => {
-          const cgtGained = Math.floor(cpVal / 5);
-          setState(prev => ({
-            ...prev,
-            credits: prev.credits - cpVal,
-            cognitiveTokens: (prev.cognitiveTokens || 0) + cgtGained
-          }));
-          setIsSwapping(false);
-          setSwapStep('');
-          addLog(`DEX [SIMULATED]: Local swap ${cpVal} CP → ${cgtGained} CGT. Not an on-chain SPL transfer.`, "success");
-        }, 800);
-      }, 800);
-    }, 800);
+    setSwapStep("Building swap_bcc_to_cgt…");
+    try {
+      const { swapBccToCgtOnChain, syncLedgerToState } = await import('../lib/economy-actions');
+      const { fetchEconomyStatus } = await import('../lib/api');
+      const status = await fetchEconomyStatus();
+      if (!status.ready) {
+        const { swapBccToCgt } = await import('../lib/economy-rewards');
+        // Practice rate when not bootstrapped (not the on-chain 1:1)
+        const cgtGained = swapBccToCgt(cpVal, 2000);
+        setState((prev) => ({
+          ...prev,
+          credits: prev.credits - cpVal,
+          cognitiveTokens: (prev.cognitiveTokens || 0) + cgtGained,
+        }));
+        addLog(
+          `DEX [PRACTICE]: ${cpVal} BCC → ${cgtGained} CGT at practice rate (economy not configured).`,
+          'warn'
+        );
+      } else {
+        setSwapStep("Awaiting wallet signature…");
+        const sig = await swapBccToCgtOnChain(cpVal);
+        await syncLedgerToState(setState);
+        addLog(
+          `DEX ON-CHAIN: swap_bcc_to_cgt ${cpVal} BCC. https://solscan.io/tx/${sig}?cluster=devnet`,
+          'success'
+        );
+      }
+    } catch (e: any) {
+      addLog(`SWAP FAILED: ${e?.message || e}`, 'warn');
+    } finally {
+      setIsSwapping(false);
+      setSwapStep('');
+    }
   };
 
-  const triggerDailyClaim = () => {
+  const triggerDailyClaim = async () => {
     if (claimedToday) {
-      addLog("CLAIM BLOCKED: Daily streak reward already claimed for today.", "warn");
+      addLog('CLAIM BLOCKED: claim_daily still in 20h program cooldown.', 'warn');
       return;
     }
 
     setIsSigning(true);
-    setSigStep("1/3 [SIMULATED] Drafting local streak claim...");
-    
-    setTimeout(() => {
-      setSigStep("2/3 [SIMULATED] Generating display-only hex (not a Solana sig)...");
-      
-      const characters = 'ABCDEFabcdef0123456789';
-      let randomSig = 'sim_';
-      for (let i = 0; i < 40; i++) {
-        randomSig += characters.charAt(Math.floor(Math.random() * characters.length));
+    setSigStep('Building claim_daily…');
+    try {
+      const { fetchEconomyStatus } = await import('../lib/api');
+      const { claimDailyOnChain, syncLedgerToState } = await import('../lib/economy-actions');
+      const status = await fetchEconomyStatus();
+      if (!status.ready) {
+        addLog(
+          'CLAIM BLOCKED: Economy not configured — no local fake drip. Bootstrap mints to enable claim_daily (+15% energy + 50 BCC, 20h cooldown).',
+          'warn'
+        );
+        return;
       }
-      setGeneratedSignature(randomSig);
-      
-      setTimeout(() => {
-        setSigStep("3/3 [SIMULATED] Applying local facility credits...");
-        
-        setTimeout(() => {
-          const reward = streak * 75;
-          const nextStreak = streak >= 7 ? 1 : streak + 1;
-          const now = Date.now().toString();
-
-          localStorage.setItem('solana_daily_streak_v1', nextStreak.toString());
-          localStorage.setItem('solana_daily_last_claim_v1', now);
-
-          setState(prev => ({
-            ...prev,
-            credits: prev.credits + reward
-          }));
-
-          setStreak(nextStreak);
-          setLastClaimTime(now);
-          setClaimedToday(true);
-          setIsSigning(false);
-          setSigStep('');
-
-          addLog(`STREAK [SIMULATED]: Local daily claim +${reward} CP for Day ${streak}. Not a Solana signature — use Academy attest for on-chain proof.`, "success");
-        }, 800);
-      }, 800);
-    }, 800);
-  };
-
-  const overrideCooldown = () => {
-    localStorage.removeItem('solana_daily_last_claim_v1');
-    setClaimedToday(false);
-    addLog("QA DIAGNOSTICS: Daily cooldown timer reset manually. You can claim again!", "system");
+      setSigStep('Awaiting wallet signature…');
+      const sig = await claimDailyOnChain();
+      setGeneratedSignature(sig);
+      await syncLedgerToState(setState);
+      const now = Date.now().toString();
+      localStorage.setItem('solana_daily_last_claim_v1', now);
+      setLastClaimTime(now);
+      setClaimedToday(true);
+      setStreak((s) => s + 1);
+      localStorage.setItem('solana_daily_streak_v1', String(streak + 1));
+      setCooldownHint('Program cooldown ~20h — next claim_daily after window');
+      addLog(
+        `CLAIM ON-CHAIN: claim_daily (+15% energy + 50 BCC). https://solscan.io/tx/${sig}?cluster=devnet`,
+        'success'
+      );
+    } catch (e: any) {
+      addLog(`CLAIM FAILED: ${e?.message || e}`, 'warn');
+    } finally {
+      setIsSigning(false);
+      setSigStep('');
+    }
   };
 
   // Passive real-time rewards accumulation engine
@@ -192,19 +250,22 @@ export default function Treasury({ state, setState, addLog }: TreasuryProps) {
 
   const claimRewards = () => {
     if (state.accumulatedRewards <= 0) {
-      addLog("CLAIM DENIED: Zero balances in the secure compiler buffer.", "warn");
+      addLog('CLAIM DENIED: Practice buffer empty.', 'warn');
       return;
     }
 
     const claimedVal = Math.floor(state.accumulatedRewards);
-    setState(prev => ({
+    setState((prev) => ({
       ...prev,
       credits: prev.credits + claimedVal,
       ecosystemRewards: prev.ecosystemRewards + claimedVal,
-      accumulatedRewards: parseFloat((prev.accumulatedRewards - claimedVal).toFixed(4))
+      accumulatedRewards: parseFloat((prev.accumulatedRewards - claimedVal).toFixed(4)),
     }));
 
-    addLog(`TREASURY TRANSFERRED: claimed ${claimedVal} tokens into active asset balances. Core updated.`, "success");
+    addLog(
+      `PRACTICE BUFFER: +${claimedVal} local BCC (not claim_daily / not on-chain). Sole free drip is claim_daily below.`,
+      'warn'
+    );
   };
 
   // Projections
@@ -221,11 +282,18 @@ export default function Treasury({ state, setState, addLog }: TreasuryProps) {
           <div>
             <div className="flex items-center gap-2 mb-4">
               <Coins className="w-5 h-5 text-emerald-400" />
-              <h3 className="font-mono text-sm font-semibold text-slate-100 tracking-wider">ECOSYSTEM REWARDS VAULT</h3>
+              <h3 className="font-mono text-sm font-semibold text-slate-100 tracking-wider">
+                PRACTICE YIELD BUFFER
+              </h3>
+              <span className="text-[8px] font-mono uppercase tracking-wider px-2 py-0.5 rounded border border-amber-400/30 text-amber-300">
+                Not settlement
+              </span>
             </div>
 
             <p className="text-xs text-slate-400 font-sans mb-8 leading-relaxed">
-              Your active cyber operations generate passive ecosystem rewards continuously. Claims can be made instantly into your credit balance to upgrade components or enlist AI assistants.
+              Simulated dashboard yield. The only free on-chain drip is{' '}
+              <span className="text-cyan-300 font-mono">claim_daily</span> (20h program cooldown) —
+              Lucky Wheel stays practice RNG.
             </p>
 
             {/* Huge ticking number display */}
@@ -298,138 +366,120 @@ export default function Treasury({ state, setState, addLog }: TreasuryProps) {
 
       </div>
 
-      {/* Daily Streak Signature Portal */}
-      <div className="bg-[#0a0a0c] border border-white/5 rounded-2xl p-6 relative overflow-hidden flex flex-col justify-between shadow-xl">
-        <div className="absolute top-0 right-0 w-48 h-48 bg-amber-500/5 rounded-full blur-3xl pointer-events-none" />
+      {/* claim_daily — sole free on-chain drip */}
+      <div className="bg-[#0a0a0c] border border-cyan-400/25 rounded-2xl p-6 relative overflow-hidden flex flex-col justify-between shadow-xl">
+        <div className="absolute top-0 right-0 w-48 h-48 bg-cyan-500/5 rounded-full blur-3xl pointer-events-none" />
         
         <div>
           <div className="flex items-center justify-between mb-4 pb-3 border-b border-white/5">
             <div className="flex items-center gap-2">
-              <Trophy className="w-5 h-5 text-amber-400" />
-              <h3 className="font-mono text-sm font-semibold text-slate-100 tracking-wider">DAILY STREAK SIGNATURE PORTAL</h3>
+              <Trophy className="w-5 h-5 text-cyan-400" />
+              <h3 className="font-mono text-sm font-semibold text-slate-100 tracking-wider">
+                CLAIM_DAILY · SOLE FREE DRIP
+              </h3>
             </div>
-            <span className="text-[9px] font-mono bg-amber-950/40 border border-amber-500/20 text-amber-400 px-2.5 py-0.5 rounded-lg font-black tracking-widest uppercase">
-              SMART CONTRACT SIGN-IN
+            <span
+              className={`text-[9px] font-mono px-2.5 py-0.5 rounded-lg font-black tracking-widest uppercase border ${
+                economyReady
+                  ? 'bg-emerald-950/40 border-emerald-500/30 text-emerald-400'
+                  : 'bg-amber-950/40 border-amber-500/20 text-amber-400'
+              }`}
+            >
+              {economyReady ? 'ON-CHAIN READY' : 'NEEDS BOOTSTRAP'}
             </span>
           </div>
 
-          <p className="text-xs text-slate-400 font-sans mb-6 leading-relaxed">
-            Consistently log in daily and verify your stasis node identity. Executing standard cryptographic signatures on the Solana Devnet verifies your consecutive streak to release scaling reward Credits (CP).
+          <p className="text-xs text-slate-400 font-sans mb-2 leading-relaxed">
+            Program instruction <span className="text-cyan-300 font-mono">claim_daily</span>: +15%
+            energy + 50 BCC, enforced ~20h cooldown on your Player PDA — not the browser. Fair for
+            everyone; no fake local drip when economy is live.
           </p>
+          {cooldownHint && (
+            <p className="text-[10px] font-mono text-slate-500 mb-6">{cooldownHint}</p>
+          )}
+          {!cooldownHint && <div className="mb-6" />}
 
-          {/* Interactive Streak Grid tracker */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3 mb-6">
-            {[1, 2, 3, 4, 5, 6, 7].map((dayNum) => {
-              const isCurrent = dayNum === streak;
-              const isPassed = dayNum < streak;
-              const bonusAmt = dayNum * 75;
-
-              return (
-                <div 
-                  key={dayNum}
-                  className={`p-3 rounded-xl border font-mono text-center flex flex-col justify-between relative transition-all ${
-                    isCurrent 
-                      ? 'bg-amber-950/10 border-amber-500/40 shadow-[0_0_12px_rgba(245,158,11,0.08)]' 
-                      : isPassed 
-                        ? 'bg-[#050506]/80 border-amber-500/10 opacity-60' 
-                        : 'bg-[#050506]/40 border-white/5 opacity-40'
-                  }`}
-                >
-                  {isPassed && (
-                    <div className="absolute top-1.5 right-1.5">
-                      <CheckCircle className="w-3.5 h-3.5 text-amber-500" />
-                    </div>
-                  )}
-
-                  <span className="text-[8px] text-slate-500 uppercase tracking-widest block">DAY {dayNum}</span>
-                  <span className={`text-sm font-black my-1.5 block ${isCurrent ? 'text-amber-400 font-black' : 'text-slate-300'}`}>
-                    +{bonusAmt}
-                  </span>
-                  <span className="text-[8px] text-slate-400 block font-bold">CP REWARD</span>
-
-                  {isCurrent && (
-                    <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 text-[7px] bg-amber-500 text-slate-950 px-1 py-0.5 rounded font-black tracking-widest uppercase leading-none whitespace-nowrap">
-                      ACTIVE
-                    </span>
-                  )}
-                </div>
-              );
-            })}
+          <div className="rounded-xl border border-white/8 bg-[#050506] p-4 mb-6 font-mono text-[10px] text-slate-400 space-y-1">
+            <div>
+              <span className="text-cyan-400 font-bold">Program:</span>{' '}
+              <span className="text-slate-300">AS7E1nsK…zbqpZ</span> (culture_economy)
+            </div>
+            <div>
+              <span className="text-cyan-400 font-bold">Instruction:</span>{' '}
+              <span className="text-emerald-300">claim_daily</span>
+            </div>
+            <div>
+              <span className="text-cyan-400 font-bold">Reward:</span>{' '}
+              <span className="text-slate-300">+1500 energy bps (+15%) · +50 BCC · streak++</span>
+            </div>
+            <div>
+              <span className="text-cyan-400 font-bold">Cooldown:</span> streak {streak}
+              {lastClaimTime
+                ? ` · last ${new Date(Number(lastClaimTime)).toLocaleString()}`
+                : ' · never claimed'}
+            </div>
+            {generatedSignature && (
+              <div className="pt-2 border-t border-white/5 mt-2 break-all text-emerald-300/90">
+                tx: {generatedSignature}
+              </div>
+            )}
+            {isSigning && (
+              <div className="flex items-center gap-2 text-amber-400 pt-2">
+                <RefreshCw className="w-3 h-3 animate-spin" />
+                {sigStep}
+              </div>
+            )}
           </div>
 
-          {/* Smart Contract Interaction Segment */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-stretch">
-            
-            {/* Left: Interactive contract detail HUD */}
-            <div className="md:col-span-2 bg-[#050506] border border-white/5 rounded-xl p-4 flex flex-col justify-between">
-              <div>
-                <span className="text-[8px] text-slate-500 font-mono tracking-widest block uppercase mb-2">CRYPTOGRAPHIC LEDGER DATA</span>
-                
-                <div className="font-mono text-[10px] text-slate-400 space-y-1 bg-black/40 p-3 rounded-lg border border-white/[0.02]">
-                  <div><span className="text-purple-400 font-bold">Program ID:</span> <span className="text-slate-300">StrkH4b1tD777777777777777777777777777777</span></div>
-                  <div><span className="text-purple-400 font-bold">Instruction:</span> <span className="text-cyan-400">verify_consecutive_days_v1</span></div>
-                  <div><span className="text-purple-400 font-bold">Accounts:</span> <span className="text-slate-300">Signer (You), NodeRegistry, TreasuryVault</span></div>
-                  <div className="pt-2 border-t border-white/5 mt-2">
-                    <span className="text-slate-500 block uppercase text-[8px] mb-1">SIGNATURE PAYLOAD</span>
-                    <p className="text-[9px] text-amber-300/80 leading-relaxed italic break-all">
-                      "I hereby certify consecutive operation check-in for Day {streak} at timestamp {lastClaimTime ? new Date(Number(lastClaimTime)).toLocaleDateString() : 'INITIAL'}. Release corresponding +{streak * 75} CP to operational reserve ledger."
-                    </p>
-                  </div>
-                  {generatedSignature && (
-                    <div className="pt-2 border-t border-white/5 mt-2">
-                      <span className="text-emerald-400 block uppercase text-[8px] mb-0.5">TRANSACTION SIGNED:</span>
-                      <span className="text-[9px] text-slate-400 break-all bg-emerald-950/10 px-1 py-0.5 rounded border border-emerald-500/10 block">{generatedSignature}</span>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Status / Step indicator */}
-              {isSigning && (
-                <div className="mt-3 bg-[#0a0a0c] border border-amber-500/20 p-2.5 rounded-lg font-mono text-[9px] space-y-1">
-                  <div className="flex items-center gap-2 text-amber-400">
-                    <RefreshCw className="w-3 h-3 animate-spin" />
-                    <span className="font-black">CONTRACT BROADCAST ACTIVE:</span>
-                  </div>
-                  <span className="text-slate-300">{sigStep}</span>
-                </div>
-              )}
+            <div className="md:col-span-2 bg-[#050506] border border-white/5 rounded-xl p-4 flex flex-col justify-center">
+              <p className="text-xs text-slate-400 leading-relaxed">
+                Cooldown is enforced by the program (~20 hours from{' '}
+                <span className="font-mono text-slate-300">last_daily_ts</span>). Browser reset
+                cannot bypass it when economy is live. Wheel / practice buffer ≠ this drip.
+              </p>
             </div>
 
-            {/* Right: Interaction buttons & indicators */}
             <div className="bg-[#050506] border border-white/5 rounded-xl p-4 flex flex-col justify-between text-center relative overflow-hidden">
-              <div className="absolute inset-0 bg-gradient-to-b from-white/[0.01] to-transparent pointer-events-none" />
-
               <div>
-                <span className="text-[8px] text-slate-500 font-mono tracking-widest block uppercase">STREAK STATUS</span>
-                
+                <span className="text-[8px] text-slate-500 font-mono tracking-widest block uppercase">
+                  claim_daily status
+                </span>
                 <div className="my-4 flex flex-col items-center justify-center">
-                  {claimedToday ? (
+                  {!economyReady ? (
                     <>
-                      <div className="w-12 h-12 rounded-full bg-emerald-950/40 border border-emerald-500/30 flex items-center justify-center text-emerald-400 mb-2 shadow-[0_0_15px_rgba(16,185,129,0.15)]">
+                      <div className="w-12 h-12 rounded-full bg-amber-950/40 border border-amber-500/30 flex items-center justify-center text-amber-400 mb-2">
+                        <Lock className="w-5 h-5" />
+                      </div>
+                      <span className="font-mono text-xs font-black text-amber-300 uppercase tracking-widest">
+                        Settlement offline
+                      </span>
+                      <span className="font-sans text-[10px] text-slate-400 mt-1 px-2">
+                        claim_daily needs on-chain mode — Academy fuel still works
+                      </span>
+                    </>
+                  ) : claimedToday ? (
+                    <>
+                      <div className="w-12 h-12 rounded-full bg-emerald-950/40 border border-emerald-500/30 flex items-center justify-center text-emerald-400 mb-2">
                         <Lock className="w-5 h-5" />
                       </div>
                       <span className="font-mono text-xs font-black text-emerald-400 uppercase tracking-widest">
-                        SECURED & ACTIVE
+                        Cooldown active
                       </span>
-                      <span className="font-sans text-[10px] text-slate-400 mt-1 leading-normal px-2">
-                        You claimed Day {streak === 1 ? 7 : streak - 1} reward! Cooldown lifts in:
+                      <span className="font-sans text-[10px] text-slate-400 mt-1 px-2">
+                        {cooldownHint || 'Wait for the 20h program window'}
                       </span>
-                      <div className="mt-2 text-xs font-mono font-bold bg-white/5 border border-white/5 px-2.5 py-1 rounded text-slate-300 flex items-center gap-1.5 justify-center">
-                        <Clock className="w-3.5 h-3.5 text-slate-400" />
-                        <span>NEXT DAILY CLAIM</span>
-                      </div>
                     </>
                   ) : (
                     <>
-                      <div className="w-12 h-12 rounded-full bg-amber-950/40 border border-amber-500/30 flex items-center justify-center text-amber-400 mb-2 shadow-[0_0_15px_rgba(245,158,11,0.15)] animate-pulse">
+                      <div className="w-12 h-12 rounded-full bg-cyan-950/40 border border-cyan-500/30 flex items-center justify-center text-cyan-400 mb-2 animate-pulse">
                         <Unlock className="w-5 h-5" />
                       </div>
-                      <span className="font-mono text-xs font-black text-amber-400 uppercase tracking-widest animate-pulse">
-                        CLAIM AVAILABLE
+                      <span className="font-mono text-xs font-black text-cyan-400 uppercase tracking-widest">
+                        Ready to claim
                       </span>
-                      <span className="font-sans text-[10px] text-slate-400 mt-1 leading-normal px-2">
-                        Verify Day {streak} on-chain check-in for <strong className="text-amber-400 font-bold">+{streak * 75} CP</strong>!
+                      <span className="font-sans text-[10px] text-slate-400 mt-1 px-2">
+                        +15% energy · +50 BCC on Devnet
                       </span>
                     </>
                   )}
@@ -438,34 +488,37 @@ export default function Treasury({ state, setState, addLog }: TreasuryProps) {
 
               <div className="space-y-2">
                 <button
+                  type="button"
                   onClick={triggerDailyClaim}
-                  disabled={claimedToday || isSigning}
+                  disabled={!economyReady || claimedToday || isSigning}
                   className={`w-full py-2.5 rounded-lg font-mono text-xs font-black tracking-wider flex items-center justify-center gap-1.5 transition-all cursor-pointer uppercase ${
-                    !claimedToday && !isSigning
-                      ? 'bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-slate-950 font-black shadow-lg shadow-amber-950/40'
+                    economyReady && !claimedToday && !isSigning
+                      ? 'bg-gradient-to-r from-cyan-500 to-teal-600 hover:from-cyan-400 hover:to-teal-500 text-slate-950 shadow-lg'
                       : 'bg-white/[0.02] border border-white/5 text-slate-600 cursor-not-allowed'
                   }`}
                 >
                   <FileText className="w-3.5 h-3.5" />
-                  {isSigning ? 'SIGNING...' : claimedToday ? 'CLAIM SECURED' : 'SIGN & CLAIM'}
+                  {isSigning
+                    ? 'SIGNING…'
+                    : !economyReady
+                      ? 'UNAVAILABLE'
+                      : claimedToday
+                        ? 'COOLDOWN'
+                        : 'CLAIM_DAILY'}
                 </button>
-
-                {/* QA Tester Manual Bypass button */}
-                <button
-                  onClick={overrideCooldown}
-                  className="w-full py-1 text-[8px] font-mono font-bold border border-white/5 hover:border-red-500/20 hover:bg-red-950/10 text-slate-500 hover:text-red-400 rounded transition-colors uppercase tracking-widest cursor-pointer"
-                  title="Testing help: Skip the daily claim cooldown immediately"
-                >
-                  QA Cooldown Reset
-                </button>
+                {!economyReady && onOpenAcademy && (
+                  <button
+                    type="button"
+                    onClick={onOpenAcademy}
+                    className="w-full py-2 rounded-lg bg-amber-500 hover:bg-amber-400 text-black font-mono text-[10px] font-black uppercase tracking-wider cursor-pointer"
+                  >
+                    Get fuel in Academy →
+                  </button>
+                )}
               </div>
-
             </div>
-
           </div>
-
         </div>
-
       </div>
 
       {/* Live Solana market pulse — OKX OnchainOS (mainnet); facility CP/CGT stays simulated */}
@@ -589,9 +642,14 @@ export default function Treasury({ state, setState, addLog }: TreasuryProps) {
               <div>
                 <div className="flex items-center gap-3 bg-cyan-950/10 p-3 rounded-lg border border-cyan-500/10">
                   <div className="flex-1">
-                    <span className="text-[8px] text-cyan-500 block font-bold">YOU RECEIVE (ESTIMATED)</span>
+                    <span className="text-[8px] text-cyan-500 block font-bold">
+                      YOU RECEIVE ({economyReady ? 'ON-CHAIN 1:1' : 'PRACTICE ~1:5'})
+                    </span>
                     <span className="text-sm font-black text-cyan-400 block mt-1">
-                      {Math.max(0, Math.floor(Number(swapCpAmount) / 5)) || 0} CGT
+                      {economyReady
+                        ? Math.max(0, Math.floor(Number(swapCpAmount) || 0))
+                        : Math.max(0, Math.floor(Number(swapCpAmount) / 5) || 0)}{' '}
+                      CGT
                     </span>
                   </div>
                   <span className="text-[10px] text-cyan-400 font-bold">CGT</span>
@@ -645,6 +703,13 @@ export default function Treasury({ state, setState, addLog }: TreasuryProps) {
           )}
         </div>
       </div>
+
+      <AttentionTollShop
+        state={state}
+        setState={setState}
+        addLog={addLog}
+        highlightSku={tollHighlightSku}
+      />
 
       {/* Solana Web3 Connector portal */}
       <SolanaPortal state={state} setState={setState} addLog={addLog} />

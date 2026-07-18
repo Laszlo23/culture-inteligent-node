@@ -18,12 +18,15 @@ import {
 } from 'lucide-react';
 import { GameState } from '../types';
 import AttentionAcademy from './AttentionAcademy';
+import { isFirstRitualPending } from '../lib/first-run';
 
 interface ResearchLabProps {
   state: GameState;
   setState: React.Dispatch<React.SetStateAction<GameState>>;
   addLog: (message: string, type: 'info' | 'success' | 'warn' | 'system') => void;
   onOpenRoadmap?: () => void;
+  onFirstRitualComplete?: (detail?: { from: number; to: number }) => void;
+  onOpenTollShop?: (sku?: 'academy_retake' | 'spark_refill') => void;
 }
 
 interface SavedSession {
@@ -35,7 +38,14 @@ interface SavedSession {
   timestamp: string;
 }
 
-export default function ResearchLab({ state, setState, addLog, onOpenRoadmap }: ResearchLabProps) {
+export default function ResearchLab({
+  state,
+  setState,
+  addLog,
+  onOpenRoadmap,
+  onFirstRitualComplete,
+  onOpenTollShop,
+}: ResearchLabProps) {
   const [topic, setTopic] = useState('');
   const [summary, setSummary] = useState('');
   const [category, setCategory] = useState('Rust & Solana');
@@ -43,6 +53,7 @@ export default function ResearchLab({ state, setState, addLog, onOpenRoadmap }: 
   const [scanStep, setScanStep] = useState(0);
   const [successResult, setSuccessResult] = useState(false);
   const [activeTab, setActiveTab] = useState<'verify' | 'academy'>('academy');
+  const ritualPending = isFirstRitualPending();
 
   const [history, setHistory] = useState<SavedSession[]>([
     {
@@ -116,17 +127,59 @@ export default function ResearchLab({ state, setState, addLog, onOpenRoadmap }: 
 
   return (
     <div id="research-room" className="space-y-6">
+      <div
+        className={`relative overflow-hidden rounded-2xl border p-5 mb-2 ${
+          ritualPending
+            ? 'border-cyan-400/40 bg-[#06080e] shadow-[0_0_40px_rgba(34,211,238,0.08)]'
+            : 'border-cyan-500/20 bg-[#08090c]'
+        }`}
+      >
+        <div className="absolute inset-0 bg-cyber-grid opacity-40" />
+        <div className="absolute -right-10 -top-10 w-40 h-40 rounded-full bg-cyan-500/15 blur-3xl" />
+        <div className="absolute left-1/3 -bottom-12 w-36 h-36 rounded-full bg-amber-500/10 blur-3xl" />
+        {ritualPending && (
+          <div className="absolute inset-y-0 left-0 w-1 bg-gradient-to-b from-cyan-400 via-amber-400/80 to-transparent" />
+        )}
+        <div className="relative z-10">
+          <p className="text-[10px] font-mono uppercase tracking-[0.25em] text-cyan-400">
+            {ritualPending ? 'Attention Intelligence · cold start' : 'Knowledge → Energy → Node'}
+          </p>
+          <h2 className="font-display mt-1 text-xl md:text-2xl font-extrabold italic text-white">
+            {ritualPending ? 'First Spark' : 'Attention Academy'}
+          </h2>
+          <p className="mt-1.5 text-sm text-slate-400 max-w-xl">
+            {ritualPending
+              ? 'Bias check + one artifact line. Same science stack as the full series — just the first charge. Watch fuel move when you pass.'
+              : 'Complete a verified session to refill knowledge fuel. When fuel is live, your NFT mining feeds wake up.'}
+          </p>
+          {ritualPending && (
+            <div className="mt-3 flex flex-wrap gap-2 text-[9px] font-mono uppercase tracking-wider">
+              <span className="px-2 py-1 rounded-md border border-cyan-400/30 bg-cyan-500/10 text-cyan-200">
+                Why empty hashes fail
+              </span>
+              <span className="px-2 py-1 rounded-md border border-white/12 bg-white/5 text-slate-300">
+                Focused attention → fuel
+              </span>
+              <span className="px-2 py-1 rounded-md border border-amber-400/25 bg-amber-500/10 text-amber-100">
+                ~2 min
+              </span>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {!ritualPending && (
       <div className="flex border-b border-white/5 gap-6 font-mono text-xs">
         <button
           type="button"
           onClick={() => setActiveTab('academy')}
           className={`pb-3 px-1 transition-all relative cursor-pointer font-bold tracking-wider flex items-center gap-1.5 ${
             activeTab === 'academy'
-              ? 'text-fuchsia-400 border-b-2 border-fuchsia-500'
+              ? 'text-cyan-400 border-b-2 border-cyan-500'
               : 'text-slate-500 hover:text-slate-300'
           }`}
         >
-          <Brain className="w-4 h-4 text-fuchsia-400" />
+          <Brain className="w-4 h-4 text-cyan-400" />
           ATTENTION INTELLIGENCE MODULE
         </button>
         <button
@@ -142,9 +195,10 @@ export default function ResearchLab({ state, setState, addLog, onOpenRoadmap }: 
           VERIFICATION TERMINAL
         </button>
       </div>
+      )}
 
       <AnimatePresence mode="wait">
-        {activeTab === 'academy' ? (
+        {(ritualPending || activeTab === 'academy') ? (
           <motion.div
             key="academy-pane"
             initial={{ opacity: 0, y: 10 }}
@@ -156,6 +210,8 @@ export default function ResearchLab({ state, setState, addLog, onOpenRoadmap }: 
               setState={setState}
               addLog={addLog}
               onOpenRoadmap={onOpenRoadmap}
+              onFirstRitualComplete={onFirstRitualComplete}
+              onOpenTollShop={onOpenTollShop}
             />
           </motion.div>
         ) : (

@@ -19,6 +19,12 @@ import {
   Keypair 
 } from '@solana/web3.js';
 import { GameState } from '../types';
+import {
+  KPI_CONTRIBUTION_SOL,
+  KPI_BCC_REWARD,
+  KPI_ENERGY_PERCENT,
+  KPI_EFFICIENCY_BOOST,
+} from '../lib/economy-rewards';
 
 // Ensure Buffer is polyfilled globally for @solana/web3.js
 if (typeof window !== 'undefined' && !window.Buffer) {
@@ -44,10 +50,8 @@ const DEVNET_RPC = 'https://api.devnet.solana.com';
 const DESTINATION_PUBLIC_KEY = new PublicKey('9Wz5979GjujvG8qAJE9bdfGAvXPMYFCZks3fQ17Y3f2F');
 
 /** Fixed Primary KPI: confirmed Devnet contribution → facility credit */
-const KPI_CONTRIBUTION_SOL = 0.05;
-const KPI_CREDIT_REWARD = 300;
-const KPI_ENERGY_REWARD = 25;
-const KPI_EFFICIENCY_BOOST = 0.15;
+const KPI_CREDIT_REWARD = KPI_BCC_REWARD;
+const KPI_ENERGY_REWARD = KPI_ENERGY_PERCENT;
 const KPI_PROOF_STORAGE_KEY = 'building_culture_kpi_proof_v1';
 const KPI_MISSION_ID = 'm_kpi';
 
@@ -243,8 +247,12 @@ export default function SolanaPortal({ state, setState, addLog }: SolanaPortalPr
     setWalletType(null);
     setLocalKeypair(null);
     setSolBalance(null);
-    localStorage.removeItem('solana_local_secret');
-    addLog('SOLANA WALLET: disconnected successfully.', 'info');
+    // Soft disconnect: keep local Devnet secret so members can reconnect without orphaning the wallet.
+    // Full wipe only happens when they explicitly create a new local wallet / clear browser data.
+    addLog(
+      'SOLANA WALLET: session cleared. Local Devnet key kept in this browser — reconnect anytime.',
+      'info'
+    );
   };
 
   // Request a Devnet SOL Airdrop from the on-chain faucet
@@ -409,18 +417,59 @@ export default function SolanaPortal({ state, setState, addLog }: SolanaPortalPr
           `KPI SERVER VERIFIED: ${serverRes.solscan || signature.slice(0, 16)}…`,
           'success'
         );
+
+        const settlementReady = Boolean(serverRes.economyReady);
+        if (serverRes.economyTx) {
+          try {
+            const { sendPartialEconomyTx } = await import('../lib/api.ts');
+            const { syncLedgerToState } = await import('../lib/economy-actions');
+            const econSig = await sendPartialEconomyTx({
+              serializedBase64: serverRes.economyTx,
+              walletType: walletType || 'local',
+              localKeypair,
+            });
+            await syncLedgerToState(setState);
+            addLog(
+              `KPI ECONOMY MINT: ${econSig.slice(0, 16)}… → https://solscan.io/tx/${econSig}?cluster=devnet`,
+              'success'
+            );
+          } catch (econErr: any) {
+            if (settlementReady) {
+              addLog(
+                `KPI economy mint failed — no local fuel/BCC credit while on-chain mode is ready: ${econErr?.message || econErr}`,
+                'warn'
+              );
+            } else {
+              setState((prev) => ({
+                ...prev,
+                credits: prev.credits + KPI_CREDIT_REWARD,
+                energy: Math.min(100, prev.energy + KPI_ENERGY_REWARD),
+              }));
+              addLog(`KPI practice credit applied (economy not ready): ${econErr?.message || econErr}`, 'warn');
+            }
+          }
+        } else if (settlementReady) {
+          addLog(
+            'KPI SOL confirmed, but economy reward tx missing — no local fuel/BCC while on-chain mode is ready.',
+            'warn'
+          );
+        } else {
+          setState((prev) => ({
+            ...prev,
+            credits: prev.credits + KPI_CREDIT_REWARD,
+            energy: Math.min(100, prev.energy + KPI_ENERGY_REWARD),
+          }));
+          addLog('KPI practice credit applied (economy not bootstrapped).', 'info');
+        }
       } catch (kpiErr: any) {
         addLog(
-          `KPI on-chain confirmed locally; server verify deferred: ${kpiErr?.message || kpiErr}`,
+          `KPI on-chain SOL confirmed; server verify deferred — no automatic fuel credit: ${kpiErr?.message || kpiErr}`,
           'warn'
         );
       }
 
-      // Awards ONLY after on-chain confirmation — this is the fixed Primary KPI
       setState((prev) => ({
         ...prev,
-        credits: prev.credits + KPI_CREDIT_REWARD,
-        energy: Math.min(100, prev.energy + KPI_ENERGY_REWARD),
         efficiency: parseFloat((prev.efficiency + KPI_EFFICIENCY_BOOST).toFixed(2)),
         kpiProof: proof,
         dailyMissions: prev.dailyMissions.map((m) =>
@@ -429,7 +478,7 @@ export default function SolanaPortal({ state, setState, addLog }: SolanaPortalPr
       }));
 
       addLog(
-        `KPI PROVED ON-CHAIN: ${KPI_CONTRIBUTION_SOL} SOL confirmed. Sig ${signature.slice(0, 16)}… → +${KPI_CREDIT_REWARD} CP, +${KPI_ENERGY_REWARD}% energy. Solscan: https://solscan.io/tx/${signature}?cluster=devnet`,
+        `KPI PROVED ON-CHAIN: ${KPI_CONTRIBUTION_SOL} SOL confirmed. Sig ${signature.slice(0, 16)}… Solscan: https://solscan.io/tx/${signature}?cluster=devnet`,
         'success'
       );
       setTxStep('KPI CONFIRMED');

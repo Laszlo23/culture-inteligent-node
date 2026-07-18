@@ -141,6 +141,172 @@ export async function verifyKpiOnServer(signature: string) {
   return response.json();
 }
 
+export type TollCatalogResponse = {
+  skus: Array<{
+    id: string;
+    name: string;
+    description: string;
+    priceCents: number;
+    priceMicroUsdc: number;
+    energyPercent?: number;
+    sparkCredits?: number;
+    academyRetakeCredits?: number;
+    listSlotCredits?: number;
+    claimTurbo?: boolean;
+  }>;
+  usdcMint: string;
+  treasury: string | null;
+  configured: boolean;
+  note?: string;
+};
+
+export async function fetchTollCatalog(): Promise<TollCatalogResponse> {
+  const response = await fetch('/api/toll/catalog');
+  if (!response.ok) throw new Error('Toll catalog failed');
+  return response.json();
+}
+
+export type TollStatsResponse = {
+  ok: boolean;
+  allTimeCents: number;
+  todayCents: number;
+  todayCount: number;
+  allTimeCount: number;
+  topSkus: Array<{ sku: string; count: number; cents: number }>;
+  extrapolatedAnnualCents: number;
+  note?: string;
+  marketplaceFeeBps?: number;
+};
+
+export async function fetchTollStats(): Promise<TollStatsResponse> {
+  const response = await fetch('/api/toll/stats');
+  if (!response.ok) throw new Error('Toll stats failed');
+  return response.json();
+}
+
+export async function verifyTollOnServer(opts: {
+  signature?: string;
+  sku: string;
+  quantity?: number;
+  practice?: boolean;
+}) {
+  const headers = await authHeaders();
+  const response = await fetch('/api/toll/verify', {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(opts),
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(data.error || 'Toll verify failed');
+  }
+  return data as {
+    ok: true;
+    alreadyVerified?: boolean;
+    practice?: boolean;
+    payment: unknown;
+    entitlement: {
+      sku: string;
+      quantity: number;
+      energyPercent: number;
+      sparkCredits: number;
+      academyRetakeCredits: number;
+      listSlotCredits: number;
+      claimTurbo: boolean;
+      energyBps: number;
+    };
+    economyTx?: string;
+    economyReady?: boolean;
+    solscan?: string | null;
+  };
+}
+
+/** Fetch economy program status (mints configured + authority ready). */
+export async function fetchEconomyStatus() {
+  const response = await fetch('/api/economy/status');
+  if (!response.ok) throw new Error('Economy status failed');
+  return response.json() as Promise<{
+    ready: boolean;
+    configured?: boolean;
+    hasAuthority?: boolean;
+    programId: string;
+    bccMint: string | null;
+    cgtMint: string | null;
+    reasons?: string[];
+    bootstrapHint?: string;
+  }>;
+}
+
+/** Request authority-cosigned grant_energy (+ optional BCC). */
+export async function requestGrantEnergy(opts: {
+  energyBps: number;
+  bccReward?: number;
+  verificationId?: string;
+}) {
+  const headers = await authHeaders();
+  const response = await fetch('/api/economy/grant-energy', {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(opts),
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(data.error || 'grant-energy failed');
+  }
+  return data as { ok: true; serialized: string; energyBps: number; bccReward: number };
+}
+
+/** Request authority-cosigned BCC/CGT/energy reward. */
+export async function requestEconomyReward(opts: {
+  bcc?: number;
+  cgt?: number;
+  energyBps?: number;
+  reason?: string;
+}) {
+  const headers = await authHeaders();
+  const response = await fetch('/api/economy/reward', {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(opts),
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(data.error || 'economy reward failed');
+  }
+  return data as { ok: true; serialized: string; reason: string };
+}
+
+/** Sign (as fee payer) and send a partially-signed economy tx from the server. */
+export async function sendPartialEconomyTx(opts: {
+  serializedBase64: string;
+  walletType: 'extension' | 'local';
+  localKeypair?: Keypair | null;
+}): Promise<string> {
+  const connection = new Connection(DEVNET_RPC, 'confirmed');
+  const tx = Transaction.from(Buffer.from(opts.serializedBase64, 'base64'));
+
+  let signature: string;
+  if (opts.walletType === 'local' && opts.localKeypair) {
+    tx.partialSign(opts.localKeypair);
+    signature = await connection.sendRawTransaction(tx.serialize(), {
+      skipPreflight: false,
+      preflightCommitment: 'confirmed',
+    });
+  } else {
+    const provider = (window as any).solana;
+    if (!provider) throw new Error('Phantom provider missing');
+    const signed = await provider.signTransaction(tx);
+    signature = await connection.sendRawTransaction(signed.serialize(), {
+      skipPreflight: false,
+      preflightCommitment: 'confirmed',
+    });
+  }
+
+  const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash();
+  await connection.confirmTransaction({ signature, blockhash, lastValidBlockHeight }, 'confirmed');
+  return signature;
+}
+
 export async function fetchCurriculum() {
   const headers = await authHeaders();
   const response = await fetch('/api/curriculum', { headers });

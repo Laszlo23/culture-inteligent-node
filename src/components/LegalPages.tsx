@@ -70,11 +70,15 @@ const COPY: Record<
     sections: [
       {
         h: 'What is real on-chain (Devnet)',
-        p: 'Wallet connect, Devnet SOL faucet requests, KPI contribution transfers (SystemProgram), optional PoA memo attestations, and Solscan links for those signatures.',
+        p: 'Wallet connect, Devnet SOL faucet, KPI 0.05 SOL transfer, PoA memo attestations, and — when bootstrapped — the culture_economy program: Player PDA energy, SPL BCC/CGT mints, swap_bcc_to_cgt, claim_daily, PDA miner assets, listing escrow, and a 2.5% marketplace fee to fee_treasury on buy_miner. See docs/SOLANA_ECONOMY.md.',
       },
       {
-        h: 'What is simulated',
-        p: 'Facility CP economy, CGT DEX playground, daily streak hex display, AI worker “NFT” marketplace, and practice missions labeled [Practice].',
+        h: 'Attention Toll (Penny Protocol)',
+        p: 'Optional ~1¢ SPL USDC micropayments to VITE_TOLL_TREASURY for Spark Refills, Academy Retakes, List Slots, and packs. When the treasury env is unset, the shop may credit practice entitlements for demo only. Devnet USDC is not mainnet cash; printer stats and annual extrapolations are models, not revenue guarantees or investment advice.',
+      },
+      {
+        h: 'What remains client-side',
+        p: 'Room unlock cosmetics, hardware/AI worker UI, Lucky Wheel presentation, guild selection, practice missions labeled [Practice], and NFT gallery CSS mining loops. If economy mints are not configured, energy/BCC fall back locally with an honesty log.',
       },
       {
         h: 'AI verification',

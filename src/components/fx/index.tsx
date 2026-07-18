@@ -1,51 +1,25 @@
 /**
- * Living OS FX primitives — lightweight CSS + motion helpers.
- * Prefer CSS ambient loops for 60fps; use motion for short beats.
+ * Living OS FX primitives — cinematic video atmosphere + motion helpers.
  */
 
 import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
+import { CinematicBackdrop, type AtmosphereVariant } from './CinematicBackdrop';
 
-/** Slow drifting gradients + sparse CSS particles behind facility chrome. */
-export function AmbientField({ className = '' }: { className?: string }) {
-  return (
-    <div
-      className={`pointer-events-none absolute inset-0 overflow-hidden ${className}`}
-      aria-hidden
-    >
-      <div className="absolute -top-1/4 -left-1/4 w-[70%] h-[70%] rounded-full bg-cyan-500/[0.04] blur-3xl ambient-drift" />
-      <div className="absolute -bottom-1/4 -right-1/4 w-[60%] h-[60%] rounded-full bg-fuchsia-500/[0.035] blur-3xl ambient-drift-slow" />
-      <div className="absolute top-1/3 left-1/2 w-[40%] h-[40%] -translate-x-1/2 rounded-full bg-emerald-500/[0.025] blur-3xl ambient-drift-mid" />
-      <div className="ambient-particles absolute inset-0 opacity-40" />
-      <style>{`
-        @keyframes ambientDrift {
-          0%, 100% { transform: translate(0, 0) scale(1); }
-          50% { transform: translate(2%, 3%) scale(1.05); }
-        }
-        @keyframes ambientDriftSlow {
-          0%, 100% { transform: translate(0, 0) scale(1); }
-          50% { transform: translate(-3%, -2%) scale(1.08); }
-        }
-        @keyframes ambientDriftMid {
-          0%, 100% { transform: translate(-50%, 0); }
-          50% { transform: translate(-48%, 4%); }
-        }
-        .ambient-drift { animation: ambientDrift 18s ease-in-out infinite; }
-        .ambient-drift-slow { animation: ambientDriftSlow 28s ease-in-out infinite; }
-        .ambient-drift-mid { animation: ambientDriftMid 22s ease-in-out infinite; }
-        .ambient-particles {
-          background-image:
-            radial-gradient(1px 1px at 10% 20%, rgba(165,243,252,0.35), transparent),
-            radial-gradient(1px 1px at 30% 70%, rgba(232,121,249,0.25), transparent),
-            radial-gradient(1.5px 1.5px at 70% 40%, rgba(110,231,183,0.3), transparent),
-            radial-gradient(1px 1px at 85% 15%, rgba(165,243,252,0.2), transparent),
-            radial-gradient(1px 1px at 55% 85%, rgba(251,191,36,0.2), transparent);
-          background-size: 100% 100%;
-          animation: ambientDrift 40s linear infinite;
-        }
-      `}</style>
-    </div>
-  );
+export { CinematicBackdrop } from './CinematicBackdrop';
+export type { AtmosphereVariant } from './CinematicBackdrop';
+
+/** Facility-wide atmosphere (video + CSS field). */
+export function AmbientField({
+  className = '',
+  variant = 'facility',
+  dim = false,
+}: {
+  className?: string;
+  variant?: AtmosphereVariant;
+  dim?: boolean;
+}) {
+  return <CinematicBackdrop variant={variant} className={className} dim={dim} />;
 }
 
 /** Soft glow intensity from energy (0–100) or mining power. */
@@ -198,9 +172,18 @@ export function buildAttentionBrief(input: {
       id: 'energy-high',
       tone: 'success',
       title: 'Node fully charged',
-      body: 'Attention reserves are strong. Push output or claim daily directives.',
-      actionLabel: 'Open Reactor',
-      actionRoom: 'reactor',
+      body: 'Fuel is live — your NFT mining feeds should be looping. Check the gallery or push reactor output.',
+      actionLabel: 'Open Gallery',
+      actionRoom: 'gallery',
+    });
+  } else if (input.energy > 0) {
+    items.push({
+      id: 'nft-live',
+      tone: 'success',
+      title: 'Mining feeds awake',
+      body: 'Owned rigs animate while fuel lasts. Open the gallery to watch the loop.',
+      actionLabel: 'NFT Gallery',
+      actionRoom: 'gallery',
     });
   }
 

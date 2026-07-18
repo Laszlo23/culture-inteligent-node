@@ -47,8 +47,27 @@ import {
   publishCurriculumDraft,
   rejectCurriculumDraft,
   listPublishedCurriculum,
+  saveTollPayment,
+  getTollBySignature,
+  getTollStats,
 } from "./src/db/memory-store.ts";
 import { getMarketPulse } from "./src/lib/market-pulse.ts";
+import {
+  buildGrantEnergyTransaction,
+  buildRewardTransaction,
+  economyReady,
+} from "./src/lib/economy-server.ts";
+import { listAttentionForUid, getKpiByWallet } from "./src/db/memory-store.ts";
+import { KPI_BCC_REWARD, KPI_ENERGY_BPS } from "./src/lib/economy-rewards.ts";
+import {
+  TOLL_SKUS,
+  getTollSku,
+  tollPriceMicroUsdc,
+  resolveTollEnv,
+} from "./src/lib/toll-catalog.ts";
+import { verifyUsdcTollTransfer, entitlementFromSku } from "./src/lib/toll-verify.ts";
+
+const SERVER_STARTED_AT = Date.now();
 
 function curriculumAdminWallets(): Set<string> {
   const raw = process.env.CURRICULUM_ADMIN_WALLETS || "";
@@ -413,13 +432,338 @@ async function startServer() {
         slot: check.slot != null ? String(check.slot) : undefined,
       });
 
+      let economyTx: string | undefined;
+      if (economyReady()) {
+        const grant = await buildRewardTransaction({
+          walletAddress: wallet,
+          bcc: KPI_BCC_REWARD,
+          energyBps: KPI_ENERGY_BPS,
+        });
+        if (grant.ok) economyTx = grant.serialized;
+      }
+
       res.json({
         ok: true,
         proof,
         solscan: `https://solscan.io/tx/${signature}?cluster=devnet`,
+        economyTx,
+        economyReady: economyReady(),
+        rewards: { bcc: KPI_BCC_REWARD, energyBps: KPI_ENERGY_BPS },
       });
     } catch (error: any) {
       res.status(500).json({ error: error.message || "KPI verify failed" });
+    }
+  });
+
+  /** Attention Toll catalog — 1¢ USDC micropayments */
+  app.get("/api/toll/catalog", (_req, res) => {
+    const env = resolveTollEnv();
+    res.json({
+      skus: TOLL_SKUS,
+      usdcMint: env.usdcMint,
+      treasury: env.treasury,
+      configured: env.configured,
+      unit: "micro_usdc",
+      centMicroUsdc: 10_000,
+      note: "Free forever: first Academy pass, claim_daily, basic reactor. Tolls accelerate / retry / list.",
+    });
+  });
+
+  app.get("/api/toll/stats", (_req, res) => {
+    res.json({ ok: true, ...getTollStats(), marketplaceFeeBps: 250 });
+  });
+
+  app.post("/api/toll/verify", requireWalletAuth, async (req: AuthRequest, res) => {
+    try {
+      const wallet = req.walletUser!.walletAddress;
+      const signature = String(req.body?.signature || "").trim();
+      const skuId = String(req.body?.sku || "").trim();
+      const quantity = Math.max(1, Math.min(100, Number(req.body?.quantity) || 1));
+      const practice = Boolean(req.body?.practice);
+
+      const sku = getTollSku(skuId);
+      if (!sku) return res.status(400).json({ error: "Unknown toll SKU" });
+      if (!signature && !practice) {
+        return res.status(400).json({ error: "signature required" });
+      }
+
+      const env = resolveTollEnv();
+      const minAmount = tollPriceMicroUsdc(sku, quantity);
+      const entitlement = entitlementFromSku(sku, quantity);
+
+      if (practice) {
+        if (process.env.NODE_ENV === "production" && env.configured) {
+          return res.status(400).json({
+            error: "Practice tolls disabled when treasury is configured in production",
+          });
+        }
+        const practiceSig = signature || `practice_${sku.id}_${wallet}_${Date.now()}`;
+        const existingPractice = getTollBySignature(practiceSig);
+        if (existingPractice?.verified) {
+          return res.json({
+            ok: true,
+            alreadyVerified: true,
+            payment: existingPractice,
+            entitlement,
+            practice: true,
+          });
+        }
+        const payment = saveTollPayment({
+          id: `toll_${crypto.randomBytes(6).toString("hex")}`,
+          uid: req.walletUser!.uid,
+          walletAddress: wallet,
+          signature: practiceSig,
+          sku: sku.id,
+          quantity,
+          amountMicro: minAmount,
+          priceCents: sku.priceCents * quantity,
+          verified: true,
+          slot: undefined,
+        });
+        return res.json({
+          ok: true,
+          payment,
+          entitlement,
+          practice: true,
+          economyReady: economyReady(),
+          solscan: null,
+        });
+      }
+
+      if (!env.configured) {
+        return res.status(400).json({
+          error: "Toll treasury not configured — set VITE_TOLL_TREASURY or use practice:true in non-prod",
+        });
+      }
+
+      const existing = getTollBySignature(signature);
+      if (existing?.verified) {
+        return res.json({
+          ok: true,
+          alreadyVerified: true,
+          payment: existing,
+          entitlement: entitlementFromSku(sku, existing.quantity),
+          solscan: `https://solscan.io/tx/${signature}?cluster=devnet`,
+        });
+      }
+
+      const check = await verifyUsdcTollTransfer({
+        signature,
+        expectedWallet: wallet,
+        minAmountMicro: minAmount,
+      });
+      if (!check.ok) {
+        return res.status(400).json({ ok: false, error: check.error });
+      }
+
+      const payment = saveTollPayment({
+        id: `toll_${crypto.randomBytes(6).toString("hex")}`,
+        uid: req.walletUser!.uid,
+        walletAddress: wallet,
+        signature,
+        sku: sku.id,
+        quantity,
+        amountMicro: check.amount ?? minAmount,
+        priceCents: sku.priceCents * quantity,
+        verified: true,
+        slot: check.slot != null ? String(check.slot) : undefined,
+      });
+
+      let economyTx: string | undefined;
+      if (economyReady() && entitlement.energyBps > 0) {
+        const grant = await buildGrantEnergyTransaction({
+          walletAddress: wallet,
+          energyBps: entitlement.energyBps,
+        });
+        if (grant.ok) economyTx = grant.serialized;
+      }
+
+      res.json({
+        ok: true,
+        payment,
+        entitlement,
+        economyTx,
+        economyReady: economyReady(),
+        solscan: `https://solscan.io/tx/${signature}?cluster=devnet`,
+      });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message || "Toll verify failed" });
+    }
+  });
+
+  /** Liveness — process is up */
+  app.get("/api/health", (_req, res) => {
+    res.json({
+      ok: true,
+      uptimeSec: Math.floor((Date.now() - SERVER_STARTED_AT) / 1000),
+      ts: new Date().toISOString(),
+    });
+  });
+
+  /**
+   * Readiness — settlement can co-sign when economy env is present.
+   * 503 when mints/authority are set but authority fails to load (misconfig).
+   * 200 with ready:false when bootstrap incomplete (practice mode OK).
+   */
+  app.get("/api/ready", async (_req, res) => {
+    const bccMint = process.env.VITE_BCC_MINT || process.env.BCC_MINT || null;
+    const cgtMint = process.env.VITE_CGT_MINT || process.env.CGT_MINT || null;
+    const hasAuthorityEnv = Boolean(process.env.ECONOMY_AUTHORITY_SECRET);
+    const ready = economyReady();
+    const configured = Boolean(bccMint && cgtMint);
+    const reasons: string[] = [];
+    if (!bccMint || !cgtMint) reasons.push("mints_missing");
+    if (!hasAuthorityEnv) reasons.push("authority_secret_missing");
+    if (configured && hasAuthorityEnv && !ready) reasons.push("authority_load_failed");
+
+    let postgres: "ok" | "skipped" | "error" = "skipped";
+    if (process.env.SQL_HOST && process.env.SQL_DB_NAME) {
+      try {
+        const { createPool } = await import("./src/db/index.ts");
+        const pool = createPool();
+        await pool.query("select 1");
+        await pool.end();
+        postgres = "ok";
+      } catch {
+        postgres = "error";
+        reasons.push("postgres_unreachable");
+      }
+    }
+
+    const misconfigured = configured && hasAuthorityEnv && !ready;
+    const body = {
+      ok: !misconfigured && postgres !== "error",
+      ready,
+      configured,
+      hasAuthority: hasAuthorityEnv && ready,
+      postgres,
+      reasons,
+      ts: new Date().toISOString(),
+    };
+    if (misconfigured || postgres === "error") {
+      return res.status(503).json(body);
+    }
+    res.json(body);
+  });
+
+  /** Status of on-chain economy authority + mints */
+  app.get("/api/economy/status", (_req, res) => {
+    const bccMint = process.env.VITE_BCC_MINT || process.env.BCC_MINT || null;
+    const cgtMint = process.env.VITE_CGT_MINT || process.env.CGT_MINT || null;
+    const hasAuthority = Boolean(process.env.ECONOMY_AUTHORITY_SECRET);
+    const configured = Boolean(bccMint && cgtMint);
+    const ready = economyReady();
+    const reasons: string[] = [];
+    if (!bccMint || !cgtMint) {
+      reasons.push("Missing VITE_BCC_MINT / VITE_CGT_MINT — run npx tsx scripts/devnet-bootstrap.ts");
+    }
+    if (!hasAuthority) {
+      reasons.push("Missing ECONOMY_AUTHORITY_SECRET (server-only base64 keypair)");
+    }
+    if (configured && hasAuthority && !ready) {
+      reasons.push("Economy configured but authority key failed to load");
+    }
+    res.json({
+      ready,
+      configured,
+      hasAuthority,
+      programId: process.env.VITE_ECONOMY_PROGRAM_ID || "AS7E1nsKf3VJGfQPyU5Ekz9iJBNGzZ5sT8P6mGqzbqpZ",
+      bccMint,
+      cgtMint,
+      reasons,
+      bootstrapHint:
+        "cd culture-economy && anchor deploy --provider.cluster devnet && cd .. && npx tsx scripts/devnet-bootstrap.ts",
+    });
+  });
+
+  /**
+   * After Academy / PoA pass — authority co-signs grant_energy (+ optional BCC).
+   * Client must sign as fee payer and send the returned base64 tx.
+   */
+  app.post("/api/economy/grant-energy", requireWalletAuth, async (req: AuthRequest, res) => {
+    try {
+      const wallet = req.walletUser!.walletAddress;
+      const uid = req.walletUser!.uid;
+      const energyBps = Math.min(10000, Math.max(1, Number(req.body?.energyBps) || 2000));
+      const bccReward = Math.max(0, Number(req.body?.bccReward) || 0);
+      const verificationId = req.body?.verificationId as string | undefined;
+
+      const recent = listAttentionForUid(uid).filter((r) => r.passed);
+      const kpiOk = getKpiByWallet(wallet).length > 0;
+      const hasProof =
+        Boolean(verificationId && recent.some((r) => r.id === verificationId)) ||
+        recent.length > 0 ||
+        kpiOk;
+
+      if (!hasProof) {
+        return res.status(400).json({
+          ok: false,
+          error: "No verified Academy/KPI proof for this wallet — complete a session first",
+        });
+      }
+
+      const result = await buildGrantEnergyTransaction({
+        walletAddress: wallet,
+        energyBps,
+        bccReward,
+        ensurePlayer: true,
+      });
+
+      if (!result.ok) {
+        return res.status(503).json(result);
+      }
+
+      res.json({
+        ok: true,
+        serialized: result.serialized,
+        energyBps: result.energyBps,
+        bccReward: result.bccReward,
+        note: "Partial-signed by economy authority — wallet must sign and send",
+      });
+    } catch (error: any) {
+      console.error("grant-energy failed:", error);
+      res.status(500).json({ error: error.message || "grant-energy failed" });
+    }
+  });
+
+  /** Mint BCC/CGT / energy after mission or wheel (requires prior PoA or KPI). */
+  app.post("/api/economy/reward", requireWalletAuth, async (req: AuthRequest, res) => {
+    try {
+      const wallet = req.walletUser!.walletAddress;
+      const uid = req.walletUser!.uid;
+      const bcc = Math.max(0, Number(req.body?.bcc) || 0);
+      const cgt = Math.max(0, Number(req.body?.cgt) || 0);
+      const energyBps = Math.max(0, Number(req.body?.energyBps) || 0);
+      const reason = String(req.body?.reason || "reward");
+
+      const recent = listAttentionForUid(uid).filter((r) => r.passed);
+      const kpiOk = getKpiByWallet(wallet).length > 0;
+      if (recent.length === 0 && !kpiOk && reason !== "bootstrap") {
+        return res.status(400).json({
+          ok: false,
+          error: "Rewards require a prior Academy pass or KPI proof",
+        });
+      }
+
+      // Cap per-call to limit abuse
+      if (bcc > 2000 || cgt > 500 || energyBps > 5000) {
+        return res.status(400).json({ ok: false, error: "Reward exceeds per-call cap" });
+      }
+
+      const result = await buildRewardTransaction({
+        walletAddress: wallet,
+        bcc,
+        cgt,
+        energyBps,
+      });
+
+      if (!result.ok) {
+        return res.status(503).json(result);
+      }
+
+      res.json({ ok: true, serialized: result.serialized, reason });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message || "reward failed" });
     }
   });
 

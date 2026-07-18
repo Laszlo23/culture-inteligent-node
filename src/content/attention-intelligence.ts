@@ -128,6 +128,73 @@ export function isoWeekKey(d = new Date()): string {
   return `${date.getUTCFullYear()}-W${String(weekNo).padStart(2, '0')}`;
 }
 
+/**
+ * First Spark — short (~2 min) ritual for cold-start skeptics.
+ * Not part of the numbered core series; prepended for first-timers.
+ */
+export const FIRST_SPARK_SESSION: AttentionSession = {
+  id: 'ai_first_spark',
+  seriesOrder: 0,
+  title: 'First Spark — Prove Attention Moves Fuel',
+  hook: 'Don\'t take our word. Pass a short snap (~2 min) and watch knowledge become node fuel.',
+  insight:
+    'Proof of Attention is simple: focused questions + a short artifact beat empty hashes. Your score crosses a confidential threshold (Arcium mirror) — then energy lands on your node. That\'s the loop. Everything else is optional depth.',
+  durationMin: 2,
+  exerciseType: 'bias_quiz',
+  exercise: {
+    type: 'bias_quiz',
+    questions: [
+      {
+        prompt: 'Empty hash mining asks machines to burn power. Culture Node asks you to…',
+        options: [
+          'Spend focused attention that becomes verifiable fuel',
+          'Buy PH/s and hope the dashboard fills',
+          'Skip learning and mint tokens first',
+        ],
+        correctIdx: 0,
+        reveal: 'Attention in → energy out. That\'s the claim you\'re testing.',
+      },
+      {
+        prompt: 'A Devnet demo means…',
+        options: [
+          'No mainnet money at risk — you\'re testing the loop',
+          'Your energy is already real USD',
+          'You must connect Phantom or nothing works',
+        ],
+        correctIdx: 0,
+        reveal: 'Honesty first: prove the loop, then decide if it\'s real for you.',
+      },
+    ],
+    journalPrompt: 'One line: what would convince you the Knowledge → Energy → Node loop is real?',
+    minJournalLen: 8,
+  },
+  quiz: [
+    {
+      question: 'What fuels your Culture Node?',
+      options: [
+        'Proof of Attention from focused learning',
+        'Empty GPU hashes alone',
+        'Buying NFTs without learning',
+      ],
+      correctIdx: 0,
+      explanation: 'Learning → verified attention → energy. That\'s the spark.',
+    },
+    {
+      question: 'After this snap you should…',
+      options: [
+        'Watch energy surge, then explore the map',
+        'Ignore fuel and open DEX first',
+        'Reset the wallet immediately',
+      ],
+      correctIdx: 0,
+      explanation: 'Proof accepted → node fueled → map unlocks.',
+    },
+  ],
+  nextHook: 'Spark lit. Dive the core series when you want deeper Attention Intelligence.',
+  rewards: { cp: 40, energy: 18, efficiency: 0.03 },
+  status: 'core',
+};
+
 /** Core series — Sessions 1–8 (Mining Attention Intelligence). */
 export const CORE_ATTENTION_SESSIONS: AttentionSession[] = [
   {
@@ -451,6 +518,7 @@ export function mergeCatalog(
   published: AttentionSession[] = []
 ): AttentionSession[] {
   const byId = new Map<string, AttentionSession>();
+  byId.set(FIRST_SPARK_SESSION.id, FIRST_SPARK_SESSION);
   for (const s of CORE_ATTENTION_SESSIONS) byId.set(s.id, s);
   for (const s of published) {
     if (s.status === 'published') byId.set(s.id, s);

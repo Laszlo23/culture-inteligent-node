@@ -1,17 +1,24 @@
 /**
- * @license
- * SPDX-License-Identifier: Apache-2.0
+ * Thin wallet gate — after skeptic landing. Auto-starts local wallet when requested.
  */
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
-  Wallet, ShieldAlert, Check, Key, Sparkles,
-  RefreshCw, Info, Link2, Copy
+  Wallet,
+  ShieldAlert,
+  Check,
+  Key,
+  Sparkles,
+  RefreshCw,
+  Info,
+  Link2,
+  Copy,
 } from 'lucide-react';
 import { Keypair } from '@solana/web3.js';
 import { Buffer } from 'buffer';
 import { ensureWalletApiSession } from '../lib/api.ts';
+import { CinematicBackdrop } from './fx';
 
 if (typeof window !== 'undefined' && !window.Buffer) {
   window.Buffer = Buffer;
@@ -25,8 +32,12 @@ export interface WalletSessionUser {
   isAdmin?: boolean;
 }
 
+export type AuthAutoStart = 'local' | 'phantom' | null;
+
 interface AuthPortalProps {
   onLoginSuccess: (user: WalletSessionUser) => void;
+  /** Auto-run wallet path from landing CTA */
+  autoStart?: AuthAutoStart;
 }
 
 const SESSION_KEY = 'solana_current_user_session_v1';
@@ -41,12 +52,21 @@ function operatorNameFromWallet(address: string): string {
   return `Op_${address.slice(0, 4)}${address.slice(-4)}`;
 }
 
-export default function AuthPortal({ onLoginSuccess }: AuthPortalProps) {
+export default function AuthPortal({ onLoginSuccess, autoStart = null }: AuthPortalProps) {
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
   const [loading, setLoading] = useState(false);
   const [displayName, setDisplayName] = useState('');
   const [savedLocalAddress, setSavedLocalAddress] = useState<string | null>(null);
+  const [sessionDeferred, setSessionDeferred] = useState<{
+    address: string;
+    walletType: 'extension' | 'local';
+    reason: string;
+    user: WalletSessionUser;
+  } | null>(null);
+  const [retryingSession, setRetryingSession] = useState(false);
+  const pendingLocalKeypair = useRef<Keypair | null>(null);
+  const autoRan = useRef(false);
 
   useEffect(() => {
     try {
@@ -56,7 +76,7 @@ export default function AuthPortal({ onLoginSuccess }: AuthPortalProps) {
       const keypair = Keypair.fromSecretKey(secretKey);
       setSavedLocalAddress(keypair.publicKey.toString());
     } catch {
-      // ignore corrupt local secret
+      // ignore
     }
   }, []);
 
@@ -74,11 +94,9 @@ export default function AuthPortal({ onLoginSuccess }: AuthPortalProps) {
       isAdmin: false,
     };
 
-    localStorage.setItem(
-      WALLET_META_KEY,
-      JSON.stringify({ type: walletType, address })
-    );
+    localStorage.setItem(WALLET_META_KEY, JSON.stringify({ type: walletType, address }));
     localStorage.setItem(SESSION_KEY, JSON.stringify(user));
+    pendingLocalKeypair.current = localKeypair || null;
 
     try {
       await ensureWalletApiSession({
@@ -86,14 +104,47 @@ export default function AuthPortal({ onLoginSuccess }: AuthPortalProps) {
         walletType,
         localKeypair: localKeypair || null,
       });
-      setSuccessMsg(`Wallet linked: ${shortAddr(address)}. API session ready.`);
+      setSessionDeferred(null);
+      setSuccessMsg(`Wallet linked: ${shortAddr(address)}. Opening your node…`);
+      onLoginSuccess(user);
     } catch (err: any) {
       console.warn('Wallet API session:', err);
+      const reason = err?.message || 'network hiccup';
+      // Hold the gate so members can retry before entering empty-handed for proofs.
+      setSessionDeferred({ address, walletType, reason, user });
       setSuccessMsg(
-        `Wallet linked: ${shortAddr(address)}. (API session deferred — ${err?.message || 'retry from Academy'})`
+        `Wallet ready (${shortAddr(address)}). API session deferred — retry so Academy proofs can attach.`
       );
     }
+  };
 
+  const retryApiSession = async () => {
+    if (!sessionDeferred) return;
+    setRetryingSession(true);
+    setErrorMsg('');
+    try {
+      await ensureWalletApiSession({
+        walletAddress: sessionDeferred.address,
+        walletType: sessionDeferred.walletType,
+        localKeypair:
+          sessionDeferred.walletType === 'local' ? pendingLocalKeypair.current : null,
+      });
+      const user = sessionDeferred.user;
+      setSessionDeferred(null);
+      setSuccessMsg(`API session restored. Opening your node…`);
+      onLoginSuccess(user);
+    } catch (err: any) {
+      setErrorMsg(err?.message || 'Session retry failed — try again in a moment.');
+    } finally {
+      setRetryingSession(false);
+    }
+  };
+
+  const continueWithoutApiSession = () => {
+    if (!sessionDeferred) return;
+    const user = sessionDeferred.user;
+    setSessionDeferred(null);
+    setSuccessMsg('Entering node — you can retry API session from Academy if proofs fail.');
     onLoginSuccess(user);
   };
 
@@ -105,7 +156,7 @@ export default function AuthPortal({ onLoginSuccess }: AuthPortalProps) {
     const provider = (window as any).solana;
     if (!provider?.isPhantom) {
       setErrorMsg(
-        'Phantom not detected. Open this app in a normal browser tab (not an iframe), or use Local Devnet Wallet below — works without an extension.'
+        'Phantom not detected. Use Enter with local Devnet wallet — works without an extension.'
       );
       setLoading(false);
       return;
@@ -142,10 +193,7 @@ export default function AuthPortal({ onLoginSuccess }: AuthPortalProps) {
         keypair = Keypair.fromSecretKey(Uint8Array.from(JSON.parse(raw)));
       } else {
         keypair = Keypair.generate();
-        localStorage.setItem(
-          LOCAL_SECRET_KEY,
-          JSON.stringify(Array.from(keypair.secretKey))
-        );
+        localStorage.setItem(LOCAL_SECRET_KEY, JSON.stringify(Array.from(keypair.secretKey)));
         setSavedLocalAddress(keypair.publicKey.toString());
       }
 
@@ -164,6 +212,18 @@ export default function AuthPortal({ onLoginSuccess }: AuthPortalProps) {
     }
   };
 
+  useEffect(() => {
+    if (!autoStart || autoRan.current) return;
+    autoRan.current = true;
+    if (autoStart === 'local') {
+      const hasSaved = Boolean(localStorage.getItem(LOCAL_SECRET_KEY));
+      void createOrUseLocalWallet(hasSaved);
+    } else if (autoStart === 'phantom') {
+      void connectPhantom();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional one-shot autoStart
+  }, [autoStart]);
+
   const copySavedAddress = () => {
     if (!savedLocalAddress) return;
     navigator.clipboard.writeText(savedLocalAddress);
@@ -171,52 +231,50 @@ export default function AuthPortal({ onLoginSuccess }: AuthPortalProps) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#030304]/95 backdrop-blur-md overflow-y-auto">
-      <div className="absolute inset-0 bg-cyber-grid bg-[size:32px_32px] opacity-[0.03] pointer-events-none" />
-      <div className="absolute top-1/4 left-1/4 w-[400px] h-[400px] bg-cyan-500/10 rounded-full blur-[120px] pointer-events-none" />
-      <div className="absolute bottom-1/4 right-1/4 w-[400px] h-[400px] bg-fuchsia-500/5 rounded-full blur-[120px] pointer-events-none" />
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#050608] overflow-y-auto">
+      <CinematicBackdrop variant="auth" />
 
       <motion.div
-        initial={{ opacity: 0, y: 30, scale: 0.96 }}
+        initial={{ opacity: 0, y: 24, scale: 0.98 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
-        transition={{ type: 'spring', damping: 25, stiffness: 140 }}
-        className="relative w-full max-w-md bg-[#09090c] border border-white/10 rounded-3xl p-6 md:p-8 shadow-[0_25px_60px_rgba(0,0,0,0.8)] overflow-hidden z-10"
+        transition={{ type: 'spring', damping: 26, stiffness: 160 }}
+        className="relative w-full max-w-md bg-[#09090c]/82 border border-white/10 rounded-3xl p-6 md:p-8 shadow-[0_25px_60px_rgba(0,0,0,0.8)] overflow-hidden z-10 backdrop-blur-md"
       >
-        <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-cyan-500 via-fuchsia-500 to-indigo-500" />
+        <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-cyan-500 via-amber-500/80 to-cyan-500" />
 
-        <div className="text-center mb-6">
-          <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 mb-3.5 shadow-[0_0_20px_rgba(34,211,238,0.1)]">
-            <Wallet className="w-5 h-5 text-cyan-400" />
+        <div className="text-center mb-5">
+          <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 mb-3">
+            <Wallet className="w-5 h-5" />
           </div>
           <span className="font-mono text-[9px] font-black tracking-[0.25em] text-cyan-400 uppercase block">
-            Solana Operator Gate
+            Solana Devnet
           </span>
-          <h2 className="text-xl font-extrabold text-white tracking-tight mt-1">
-            Wallet Login Only
+          <h2 className="text-xl font-extrabold text-white tracking-tight mt-1 font-display italic">
+            {autoStart === 'local' ? 'Entering your node…' : 'One step — then prove it'}
           </h2>
           <p className="text-xs text-slate-400 font-sans mt-2 leading-relaxed">
-            No email or password. Connect Phantom or generate a local Devnet keypair to enter the facility — for jury review and demo recording.
+            Demo wallet in this browser · Devnet · nothing of value. One Academy session next — then
+            you decide if the loop is real.
           </p>
         </div>
 
         <AnimatePresence mode="wait">
           {errorMsg && (
             <motion.div
-              initial={{ opacity: 0, y: -10 }}
+              initial={{ opacity: 0, y: -8 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
+              exit={{ opacity: 0 }}
               className="mb-4 p-3.5 rounded-xl bg-red-950/20 border border-red-500/30 text-red-300 text-[11px] font-sans flex items-start gap-2"
             >
               <ShieldAlert className="w-4 h-4 text-red-400 flex-shrink-0 mt-0.5" />
               <span>{errorMsg}</span>
             </motion.div>
           )}
-
           {successMsg && (
             <motion.div
-              initial={{ opacity: 0, y: -10 }}
+              initial={{ opacity: 0, y: -8 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
+              exit={{ opacity: 0 }}
               className="mb-4 p-3.5 rounded-xl bg-emerald-950/20 border border-emerald-500/30 text-emerald-300 text-[11px] font-sans flex items-start gap-2"
             >
               <Check className="w-4 h-4 text-emerald-400 flex-shrink-0 mt-0.5" />
@@ -225,84 +283,121 @@ export default function AuthPortal({ onLoginSuccess }: AuthPortalProps) {
           )}
         </AnimatePresence>
 
-        <div className="space-y-1 mb-4">
-          <label className="text-slate-400 font-bold uppercase tracking-wider text-[10px] font-mono block">
-            Operator name (optional)
-          </label>
-          <input
-            type="text"
-            disabled={loading}
-            placeholder="Defaults to Op_xxxx…xxxx from wallet"
-            value={displayName}
-            onChange={(e) => setDisplayName(e.target.value)}
-            className="w-full bg-[#050506] border border-white/10 rounded-xl px-3.5 py-2.5 text-slate-200 focus:outline-none focus:border-cyan-500 text-xs font-sans transition-colors"
-          />
-        </div>
-
-        <div className="space-y-3">
-          <button
-            type="button"
-            onClick={connectPhantom}
-            disabled={loading}
-            className="w-full py-3.5 rounded-xl font-mono text-xs font-black tracking-wider uppercase flex items-center justify-center gap-2 bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500 text-white shadow-lg shadow-fuchsia-950/40 transition-all cursor-pointer disabled:opacity-60"
-          >
-            {loading ? (
-              <RefreshCw className="w-4 h-4 animate-spin" />
-            ) : (
-              <>
-                <Link2 className="w-4 h-4" />
-                Connect Phantom
-              </>
-            )}
-          </button>
-
-          <div className="flex items-center gap-3 my-1">
-            <div className="flex-1 h-[1px] bg-white/5" />
-            <span className="text-[10px] text-slate-600 font-mono">OR DEVNET LOCAL</span>
-            <div className="flex-1 h-[1px] bg-white/5" />
+        {sessionDeferred && (
+          <div className="mb-4 p-3.5 rounded-xl bg-amber-950/25 border border-amber-500/35 text-amber-100 text-[11px] font-sans space-y-3">
+            <p className="leading-relaxed">
+              Wallet is ready — API session still deferred ({sessionDeferred.reason}). Retry so
+              Academy proofs can attach. Stay here until it lands if you can.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => void retryApiSession()}
+                disabled={retryingSession}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-black font-mono text-[10px] font-black uppercase tracking-wider cursor-pointer disabled:opacity-60"
+              >
+                <RefreshCw className={`w-3 h-3 ${retryingSession ? 'animate-spin' : ''}`} />
+                Retry API session
+              </button>
+              <button
+                type="button"
+                onClick={continueWithoutApiSession}
+                disabled={retryingSession}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-white/15 text-slate-300 hover:border-amber-400/40 font-mono text-[10px] font-bold uppercase tracking-wider cursor-pointer disabled:opacity-60"
+              >
+                Continue anyway →
+              </button>
+            </div>
           </div>
-
-          {savedLocalAddress && (
-            <button
-              type="button"
-              onClick={() => createOrUseLocalWallet(true)}
-              disabled={loading}
-              className="w-full py-3 rounded-xl bg-cyan-500/10 border border-cyan-500/30 hover:bg-cyan-500/15 text-cyan-300 font-mono text-xs font-black tracking-wider uppercase flex items-center justify-center gap-2 transition-all cursor-pointer disabled:opacity-60"
-            >
-              <Key className="w-4 h-4" />
-              Continue saved wallet ({shortAddr(savedLocalAddress)})
-            </button>
-          )}
-
-          <button
-            type="button"
-            onClick={() => createOrUseLocalWallet(false)}
-            disabled={loading}
-            className="w-full py-3 rounded-xl bg-white/5 border border-white/10 hover:border-cyan-500/30 hover:bg-cyan-950/10 text-slate-200 font-mono text-xs font-black tracking-wider uppercase flex items-center justify-center gap-2 transition-all cursor-pointer disabled:opacity-60"
-          >
-            <Sparkles className="w-4 h-4 text-cyan-400" />
-            {savedLocalAddress ? 'Create new local Devnet wallet' : 'Create local Devnet wallet'}
-          </button>
-        </div>
-
-        {savedLocalAddress && (
-          <button
-            type="button"
-            onClick={copySavedAddress}
-            className="mt-3 w-full flex items-center justify-center gap-1.5 text-[10px] text-slate-500 hover:text-slate-300 font-mono cursor-pointer"
-          >
-            <Copy className="w-3 h-3" />
-            Copy saved address
-          </button>
         )}
 
-        <div className="mt-5 pt-4 border-t border-white/5">
-          <div className="flex items-start gap-2 text-[10px] text-slate-500 font-sans leading-relaxed">
-            <Info className="w-3.5 h-3.5 text-cyan-500 flex-shrink-0 mt-0.5" />
-            <span>
-              Jury tip: use <strong className="text-slate-400">Local Devnet Wallet</strong> if Phantom is blocked (iframes / AI Studio). Then open Ecosystem Vault → Solana Portal for airdrop + contribution txs.
-            </span>
+        {loading && autoStart ? (
+          <div className="flex flex-col items-center gap-3 py-8 text-slate-400 text-xs font-mono">
+            <RefreshCw className="w-6 h-6 animate-spin text-cyan-400" />
+            {autoStart === 'local' ? 'Creating demo wallet…' : 'Opening Phantom…'}
           </div>
+        ) : (
+          <>
+            <div className="space-y-1 mb-4">
+              <label className="text-slate-500 font-bold uppercase tracking-wider text-[10px] font-mono block">
+                Operator name (optional)
+              </label>
+              <input
+                type="text"
+                disabled={loading}
+                placeholder="Defaults from wallet"
+                value={displayName}
+                onChange={(e) => setDisplayName(e.target.value)}
+                className="w-full bg-[#050506] border border-white/10 rounded-xl px-3.5 py-2.5 text-slate-200 focus:outline-none focus:border-cyan-500 text-xs font-sans"
+              />
+            </div>
+
+            <div className="space-y-3">
+              <button
+                type="button"
+                onClick={() => createOrUseLocalWallet(Boolean(savedLocalAddress))}
+                disabled={loading}
+                className="w-full py-3.5 rounded-xl font-mono text-xs font-black tracking-wider uppercase flex items-center justify-center gap-2 bg-cyan-500 hover:bg-cyan-400 text-black cursor-pointer disabled:opacity-60"
+              >
+                {loading ? (
+                  <RefreshCw className="w-4 h-4 animate-spin" />
+                ) : savedLocalAddress ? (
+                  <>
+                    <Key className="w-4 h-4" />
+                    Continue demo wallet ({shortAddr(savedLocalAddress)})
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="w-4 h-4" />
+                    Continue with a demo wallet
+                  </>
+                )}
+              </button>
+              <p className="text-[10px] text-slate-500 font-sans text-center -mt-1">
+                This browser · Devnet · wipe anytime
+              </p>
+
+              <button
+                type="button"
+                onClick={connectPhantom}
+                disabled={loading}
+                className="w-full py-3 rounded-xl bg-white/5 border border-white/10 hover:border-violet-500/40 text-slate-200 font-mono text-xs font-black tracking-wider uppercase flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
+              >
+                <Link2 className="w-4 h-4 text-violet-400" />
+                Connect Phantom
+              </button>
+
+              {savedLocalAddress && (
+                <button
+                  type="button"
+                  onClick={() => createOrUseLocalWallet(false)}
+                  disabled={loading}
+                  className="w-full py-2 text-[10px] font-mono text-slate-500 hover:text-slate-300 uppercase tracking-wider cursor-pointer"
+                >
+                  Create new local wallet
+                </button>
+              )}
+            </div>
+
+            {savedLocalAddress && (
+              <button
+                type="button"
+                onClick={copySavedAddress}
+                className="mt-3 w-full flex items-center justify-center gap-1.5 text-[10px] text-slate-500 hover:text-slate-300 font-mono cursor-pointer"
+              >
+                <Copy className="w-3 h-3" />
+                Copy saved address
+              </button>
+            )}
+          </>
+        )}
+
+        <div className="mt-5 pt-4 border-t border-white/5 flex items-start gap-2 text-[10px] text-slate-500 font-sans leading-relaxed">
+          <Info className="w-3.5 h-3.5 text-cyan-500 flex-shrink-0 mt-0.5" />
+          <span>
+            Next: <strong className="text-slate-400">First Spark</strong> in Attention Academy (~2 min).
+            Pass the snap — watch fuel move.
+          </span>
         </div>
       </motion.div>
     </div>
