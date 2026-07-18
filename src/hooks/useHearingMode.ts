@@ -7,6 +7,7 @@ import {
   cancelSpeak,
   getSpeechSupport,
   listenOnce,
+  probeNeuralVoice,
   speak,
   stopListening,
   warmSpeechVoices,
@@ -75,7 +76,7 @@ export function useHearingMode(onCommand: HearingCommandHandler): HearingModeApi
   const [phase, setPhase] = useState<HearingPhase>('idle');
   const [lastLine, setLastLine] = useState('');
   const [micEnabled, setMicEnabled] = useState(true);
-  const [support] = useState<SpeechSupport>(() => getSpeechSupport());
+  const [support, setSupport] = useState<SpeechSupport>(() => getSpeechSupport());
 
   const activeRef = useRef(false);
   const micRef = useRef(true);
@@ -98,6 +99,7 @@ export function useHearingMode(onCommand: HearingCommandHandler): HearingModeApi
 
   useEffect(() => {
     warmSpeechVoices();
+    void probeNeuralVoice().then(() => setSupport(getSpeechSupport()));
   }, []);
 
   const speakLine = useCallback(async (text: string) => {
@@ -210,12 +212,6 @@ export function useHearingMode(onCommand: HearingCommandHandler): HearingModeApi
   );
 
   const enable = useCallback(() => {
-    const s = getSpeechSupport();
-    if (!s.tts && !s.stt) {
-      void speakLine(unsupportedScript(s));
-      return;
-    }
-    warmSpeechVoices();
     void soundEngine.unlock();
     soundEngine.setHearingBed(true);
     loopGenRef.current += 1;
@@ -223,12 +219,18 @@ export function useHearingMode(onCommand: HearingCommandHandler): HearingModeApi
     activeRef.current = true;
     setActive(true);
     persistActive(true);
-    track('hearing_open', { tts: s.tts, stt: s.stt });
     void (async () => {
-      // Soft settle before welcome — listening experience begins
+      await probeNeuralVoice();
+      const s = getSpeechSupport();
+      setSupport(s);
+      track('hearing_open', { tts: s.tts, stt: s.stt, neural: s.neural });
       await pause(280);
-      if (!s.tts) {
-        await speakLine(unsupportedScript(s));
+      if (!s.neural) {
+        const miss =
+          'Warm neural guide needs a Gemini key on the server. Mic still works — say Help after the key is live, or use on-screen controls.';
+        lastLineRef.current = miss;
+        setLastLine(miss);
+        setPhase('idle');
       } else {
         await speakLine(welcomeScript());
         if (!s.stt) await speakLine(unsupportedScript(s));

@@ -84,7 +84,8 @@ export default function HearingModeShell() {
           </motion.div>
           <div className="min-w-0">
             <p className="font-mono text-[9px] font-black uppercase tracking-[0.22em] text-cyan-400/95">
-              Hearing{zenOn ? ' · Zen' : ''} · {statusLabel}
+              Hearing{zenOn ? ' · Zen' : ''}
+              {support.neural ? ' · Neural' : ''} · {statusLabel}
             </p>
             <p
               className="truncate text-xs text-slate-300/95 leading-snug"

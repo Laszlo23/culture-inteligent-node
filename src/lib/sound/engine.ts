@@ -4,7 +4,6 @@
  */
 
 import { nextAffirmation } from './affirmations';
-import { pickSympatheticVoice } from '../hearing/speech';
 
 export type UiSound =
   | 'hover'
@@ -243,33 +242,10 @@ class SoundEngine {
     }
   }
 
-  speakAffirmation(immediate: boolean) {
-    if (
-      !this.vibeEnabled ||
-      this.hearingBed ||
-      this.narrationActive ||
-      typeof window === 'undefined' ||
-      !window.speechSynthesis
-    ) {
-      return;
-    }
-    // Never talk over Hearing Mode guide
-    if (window.speechSynthesis.speaking) return;
-
-    const line = nextAffirmation(this.lastAffirmation);
-    this.lastAffirmation = line;
-
-    const utter = new SpeechSynthesisUtterance(line);
-    utter.volume = 0.14;
-    utter.rate = 0.8;
-    utter.pitch = 1.03;
-    utter.lang = 'en-US';
-
-    const soft = pickSympatheticVoice();
-    if (soft) utter.voice = soft;
-
-    if (immediate) window.speechSynthesis.cancel();
-    window.speechSynthesis.speak(utter);
+  speakAffirmation(_immediate: boolean) {
+    // Pad-only vibe — browser TTS sounds cheap; Hearing uses neural Gemini voice instead.
+    if (!this.vibeEnabled || this.hearingBed || this.narrationActive) return;
+    this.lastAffirmation = nextAffirmation(this.lastAffirmation);
   }
 
   play(kind: UiSound) {

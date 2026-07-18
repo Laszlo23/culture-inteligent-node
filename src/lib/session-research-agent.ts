@@ -6,6 +6,7 @@ import { GoogleGenAI } from '@google/genai';
 import type { AttentionSession, ExerciseType } from '../content/attention-intelligence.ts';
 import { CORE_ATTENTION_SESSIONS, isoWeekKey } from '../content/attention-intelligence.ts';
 import crypto from 'crypto';
+import { getGeminiApiKey } from './gemini-key';
 
 const EXERCISE_TYPES: ExerciseType[] = [
   'reps_track',
@@ -128,8 +129,8 @@ export async function researchWeeklySession(opts?: {
     ...(opts?.existingTitles || []),
   ];
 
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey || apiKey === 'MY_GEMINI_API_KEY') {
+  const apiKey = getGeminiApiKey();
+  if (!apiKey) {
     return heuristicDraft(existingTitles);
   }
 

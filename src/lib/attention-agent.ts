@@ -1,4 +1,5 @@
 import { GoogleGenAI } from '@google/genai';
+import { getGeminiApiKey } from './gemini-key';
 
 export interface AttentionVerifyInput {
   sessionId: string;
@@ -44,8 +45,8 @@ function fallbackHeuristic(input: AttentionVerifyInput): AttentionVerifyResult {
 export async function verifyAttentionWithAgent(
   input: AttentionVerifyInput
 ): Promise<AttentionVerifyResult> {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey || apiKey === 'MY_GEMINI_API_KEY') {
+  const apiKey = getGeminiApiKey();
+  if (!apiKey) {
     return fallbackHeuristic(input);
   }
 

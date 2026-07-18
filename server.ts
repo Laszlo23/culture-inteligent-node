@@ -776,6 +776,58 @@ async function startServer() {
     res.status(200).json({ ok: true, received: event });
   });
 
+  /** Hearing Mode — neural Gemini TTS status */
+  app.get("/api/hearing/voice", async (_req, res) => {
+    const { neuralTtsReady, HEARING_VOICES } = await import("./src/lib/hearing/gemini-tts.ts");
+    const { getGeminiApiKey } = await import("./src/lib/gemini-key.ts");
+    const ready = neuralTtsReady();
+    res.json({
+      ready,
+      voice: process.env.HEARING_VOICE?.trim() || HEARING_VOICES.guide,
+      model: process.env.HEARING_TTS_MODEL?.trim() || "gemini-2.5-flash-preview-tts",
+      hasKey: Boolean(getGeminiApiKey()),
+    });
+  });
+
+  /**
+   * Hearing Mode — synthesize warm neural speech (WAV).
+   * Body: { text: string, style?: 'guide' | 'soft' | 'clear' }
+   */
+  app.post("/api/hearing/speak", async (req, res) => {
+    try {
+      const text = String(req.body?.text || "").trim();
+      const styleRaw = String(req.body?.style || "guide");
+      const style =
+        styleRaw === "soft" || styleRaw === "clear" || styleRaw === "guide" ? styleRaw : "guide";
+      if (!text) return res.status(400).json({ error: "text required" });
+      if (text.length > 2800) return res.status(400).json({ error: "text too long" });
+
+      const { synthesizeHearingSpeech, neuralTtsReady } = await import(
+        "./src/lib/hearing/gemini-tts.ts"
+      );
+      if (!neuralTtsReady()) {
+        return res.status(503).json({
+          error: "neural_voice_unavailable",
+          hint: "Set GEMINI_API_KEY or GENERATIVE_AI_API_KEY on the server.",
+        });
+      }
+
+      const result = await synthesizeHearingSpeech(text, style);
+      res.setHeader("Content-Type", "audio/wav");
+      res.setHeader("Cache-Control", "private, max-age=3600");
+      res.setHeader("X-Hearing-Voice", result.voice);
+      res.setHeader("X-Hearing-Model", result.model);
+      res.setHeader("X-Hearing-Cached", result.cached ? "1" : "0");
+      return res.send(result.wav);
+    } catch (error: any) {
+      console.error("[hearing.speak]", error?.message || error);
+      return res.status(500).json({
+        error: "tts_failed",
+        detail: error?.message || "unknown",
+      });
+    }
+  });
+
   /**
    * Readiness — settlement can co-sign when economy env is present.
    * 503 when mints/authority are set but authority fails to load (misconfig).
@@ -1163,9 +1215,8 @@ async function startServer() {
       const user = verifyWalletToken(authHeader.slice(7));
       wallet = user?.walletAddress;
     }
-    const geminiConfigured = Boolean(
-      process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY !== "MY_GEMINI_API_KEY"
-    );
+    const { hasGeminiApiKey } = await import("./src/lib/gemini-key.ts");
+    const geminiConfigured = hasGeminiApiKey();
     res.json({
       core: CORE_ATTENTION_SESSIONS,
       published: listPublishedCurriculum(),

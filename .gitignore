@@ -7,6 +7,9 @@ coverage/
 .env*
 !.env.example
 
+# Hearing Mode neural TTS cache (WAV)
+data/tts-cache/
+
 # TWA / Android signing secrets
 mobile-twa/android.keystore
 mobile-twa/*.jks

@@ -4,6 +4,7 @@
  */
 
 import { GoogleGenAI } from '@google/genai';
+import { getGeminiApiKey } from './gemini-key';
 
 export type ScienceSignal = {
   id: string;
@@ -114,8 +115,8 @@ export async function getScienceSignalDesk(opts?: { force?: boolean }): Promise<
     return cache.payload;
   }
 
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey || apiKey === 'MY_GEMINI_API_KEY') {
+  const apiKey = getGeminiApiKey();
+  if (!apiKey) {
     const payload = seededPayload();
     cache = { at: Date.now(), payload };
     return payload;

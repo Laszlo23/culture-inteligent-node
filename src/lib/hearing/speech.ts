@@ -1,11 +1,12 @@
 /**
- * Web Speech API wrappers — warm guide TTS + one-shot STT for Hearing Mode.
- * Voice profile: smooth, easy-going, sympathetic — a listening companion.
+ * Hearing Mode speech — neural Gemini voice first (warm / real).
+ * Browser speechSynthesis is disabled by default (sounds like cheap TTS).
  */
 
 export type SpeechSupport = {
   tts: boolean;
   stt: boolean;
+  neural: boolean;
 };
 
 export type SpeakStyle = 'guide' | 'soft' | 'clear';
@@ -16,8 +17,8 @@ export type SpeakOptions = {
   volume?: number;
   lang?: string;
   style?: SpeakStyle;
-  /** Skip cancel of current speech (rare). */
-  append?: boolean;
+  /** Force browser TTS (off unless HEARING_ALLOW_BROWSER_TTS). */
+  allowBrowser?: boolean;
 };
 
 type SpeechRecognitionLike = {
@@ -39,40 +40,10 @@ type SpeechRecognitionEventLike = {
 
 type SpeechRecognitionCtor = new () => SpeechRecognitionLike;
 
-/** Preferred warm / sympathetic English voices (macOS, Windows, Chrome). */
-const GUIDE_VOICE_PATTERNS: RegExp[] = [
-  /samantha/i,
-  /karen/i,
-  /moira/i,
-  /fiona/i,
-  /victoria/i,
-  /tessa/i,
-  /serena/i,
-  /aria/i,
-  /jenny/i,
-  /sara/i,
-  /zira/i,
-  /google uk english female/i,
-  /google us english/i,
-  /microsoft (aria|jenny|sara|zira)/i,
-  /natural/i,
-  /neural/i,
-  /premium/i,
-  /enhanced/i,
-  /female/i,
-];
-
-const STYLE_DEFAULTS: Record<
-  SpeakStyle,
-  { rate: number; pitch: number; volume: number; pauseMs: number }
-> = {
-  /** Primary Hearing Mode guide — unhurried, kind */
-  guide: { rate: 0.86, pitch: 1.02, volume: 0.94, pauseMs: 420 },
-  /** Whisper-soft asides */
-  soft: { rate: 0.82, pitch: 1.04, volume: 0.78, pauseMs: 520 },
-  /** Slightly clearer for long command lists */
-  clear: { rate: 0.9, pitch: 1.0, volume: 0.95, pauseMs: 300 },
-};
+let neuralAvailable: boolean | null = null;
+let activeAudio: HTMLAudioElement | null = null;
+let speakGeneration = 0;
+let activeRecognition: SpeechRecognitionLike | null = null;
 
 function getRecognitionCtor(): SpeechRecognitionCtor | null {
   if (typeof window === 'undefined') return null;
@@ -83,164 +54,159 @@ function getRecognitionCtor(): SpeechRecognitionCtor | null {
   return w.SpeechRecognition || w.webkitSpeechRecognition || null;
 }
 
+function browserTtsAllowed(): boolean {
+  if (typeof window === 'undefined') return false;
+  try {
+    return new URLSearchParams(window.location.search).get('browserTts') === '1';
+  } catch {
+    return false;
+  }
+}
+
+export async function probeNeuralVoice(): Promise<boolean> {
+  if (typeof window === 'undefined') return false;
+  try {
+    const res = await fetch('/api/hearing/voice', { credentials: 'same-origin' });
+    if (!res.ok) {
+      neuralAvailable = false;
+      return false;
+    }
+    const data = (await res.json()) as { ready?: boolean };
+    neuralAvailable = Boolean(data.ready);
+    return neuralAvailable;
+  } catch {
+    neuralAvailable = false;
+    return false;
+  }
+}
+
 export function getSpeechSupport(): SpeechSupport {
-  if (typeof window === 'undefined') return { tts: false, stt: false };
+  if (typeof window === 'undefined') return { tts: false, stt: false, neural: false };
+  const neural = neuralAvailable === true;
+  const browser =
+    typeof window.speechSynthesis !== 'undefined' && typeof SpeechSynthesisUtterance !== 'undefined';
   return {
-    tts: typeof window.speechSynthesis !== 'undefined' && typeof SpeechSynthesisUtterance !== 'undefined',
+    neural,
     stt: Boolean(getRecognitionCtor()),
+    // Prefer neural; browser only counts if explicitly allowed
+    tts: neural || (browserTtsAllowed() && browser),
   };
 }
 
-let cachedGuideVoice: SpeechSynthesisVoice | null | undefined;
-
-/** Warm English voice — sympathetic first, then any en. */
-export function pickSympatheticVoice(
-  voices?: SpeechSynthesisVoice[]
-): SpeechSynthesisVoice | null {
-  if (typeof window === 'undefined' || !window.speechSynthesis) return null;
-  const list = voices ?? window.speechSynthesis.getVoices();
-  if (!list.length) return null;
-
-  for (const re of GUIDE_VOICE_PATTERNS) {
-    const hit = list.find((v) => re.test(v.name) && /^en(-|$)/i.test(v.lang));
-    if (hit) return hit;
-  }
-  return (
-    list.find((v) => /^en(-|$)/i.test(v.lang) && v.localService) ||
-    list.find((v) => /^en(-|$)/i.test(v.lang)) ||
-    null
-  );
-}
-
-function resolveGuideVoice(): SpeechSynthesisVoice | null {
-  if (cachedGuideVoice !== undefined) {
-    const stillThere =
-      cachedGuideVoice &&
-      window.speechSynthesis.getVoices().some((v) => v.voiceURI === cachedGuideVoice!.voiceURI);
-    if (stillThere || cachedGuideVoice === null) return cachedGuideVoice;
-  }
-  cachedGuideVoice = pickSympatheticVoice();
-  return cachedGuideVoice;
-}
-
-/** Warm voices load async on Chrome — refresh cache. */
+/** Kept for SoundContext warm-up; no-op for neural path. */
 export function warmSpeechVoices(): void {
-  if (typeof window === 'undefined' || !window.speechSynthesis) return;
-  const refresh = () => {
-    cachedGuideVoice = undefined;
-    resolveGuideVoice();
-  };
-  refresh();
-  window.speechSynthesis.addEventListener('voiceschanged', refresh, { once: true });
+  void probeNeuralVoice();
 }
 
-let activeRecognition: SpeechRecognitionLike | null = null;
-let speakGeneration = 0;
+export function pickSympatheticVoice(): SpeechSynthesisVoice | null {
+  return null;
+}
 
 export function cancelSpeak(): void {
   speakGeneration += 1;
-  if (typeof window === 'undefined' || !window.speechSynthesis) return;
-  window.speechSynthesis.cancel();
-}
-
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => window.setTimeout(resolve, ms));
-}
-
-/** Split into breathable phrases so the guide never rushes. */
-export function splitForBreath(text: string): string[] {
-  const cleaned = text.replace(/\s+/g, ' ').trim();
-  if (!cleaned) return [];
-
-  const parts = cleaned
-    .split(/(?<=[.!?…])\s+|\s+[—–]\s+|\s+·\s+/)
-    .map((p) => p.trim())
-    .filter(Boolean);
-
-  const out: string[] = [];
-  for (const part of parts) {
-    if (part.length <= 160) {
-      out.push(part);
-      continue;
+  if (activeAudio) {
+    try {
+      activeAudio.onended = null;
+      activeAudio.onerror = null;
+      activeAudio.pause();
+      activeAudio.removeAttribute('src');
+      activeAudio.load();
+    } catch {
+      // ignore
     }
-    // Long clause — break on commas / and
-    const bits = part.split(/(?<=,)\s+|\s+(?=and\s)/i);
-    let buf = '';
-    for (const bit of bits) {
-      if ((buf + ' ' + bit).trim().length > 140 && buf) {
-        out.push(buf.trim());
-        buf = bit;
-      } else {
-        buf = buf ? `${buf} ${bit}` : bit;
-      }
-    }
-    if (buf.trim()) out.push(buf.trim());
+    activeAudio = null;
   }
-  return out.length ? out : [cleaned];
+  if (typeof window !== 'undefined' && window.speechSynthesis) {
+    window.speechSynthesis.cancel();
+  }
 }
 
-function utterOnce(
-  text: string,
-  opts: {
-    rate: number;
-    pitch: number;
-    volume: number;
-    lang: string;
-    voice: SpeechSynthesisVoice | null;
-  }
-): Promise<void> {
+function playBlob(blob: Blob, volume: number, gen: number): Promise<void> {
   return new Promise((resolve) => {
+    if (gen !== speakGeneration) {
+      resolve();
+      return;
+    }
+    const url = URL.createObjectURL(blob);
+    const audio = new Audio();
+    activeAudio = audio;
+    audio.volume = Math.min(1, Math.max(0, volume));
+    audio.src = url;
+
+    const finish = () => {
+      URL.revokeObjectURL(url);
+      if (activeAudio === audio) activeAudio = null;
+      resolve();
+    };
+
+    audio.onended = finish;
+    audio.onerror = finish;
+    void audio.play().catch(() => finish());
+  });
+}
+
+async function speakNeural(text: string, style: SpeakStyle, volume: number, gen: number): Promise<boolean> {
+  try {
+    const res = await fetch('/api/hearing/speak', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text, style }),
+    });
+    if (!res.ok) {
+      if (res.status === 503) neuralAvailable = false;
+      return false;
+    }
+    neuralAvailable = true;
+    const blob = await res.blob();
+    if (gen !== speakGeneration) return true;
+    await playBlob(blob, volume, gen);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Speak with neural Gemini voice (warm Sulafat).
+ * Browser TTS only if ?browserTts=1 — otherwise stay quiet if neural fails.
+ */
+export async function speak(text: string, opts?: SpeakOptions): Promise<void> {
+  const line = text.trim();
+  if (!line) return;
+
+  cancelSpeak();
+  const gen = speakGeneration;
+  const style = opts?.style ?? 'guide';
+  const volume = opts?.volume ?? (style === 'soft' ? 0.88 : 0.96);
+
+  if (neuralAvailable === null) {
+    await probeNeuralVoice();
+  }
+
+  const ok = await speakNeural(line, style, volume, gen);
+  if (ok || gen !== speakGeneration) return;
+
+  if (opts?.allowBrowser || browserTtsAllowed()) {
+    await speakBrowserFallback(line, gen);
+  }
+  // else: silent — UI still shows the transcript line
+}
+
+function speakBrowserFallback(text: string, gen: number): Promise<void> {
+  if (typeof window === 'undefined' || !window.speechSynthesis) return Promise.resolve();
+  return new Promise((resolve) => {
+    if (gen !== speakGeneration) {
+      resolve();
+      return;
+    }
     const u = new SpeechSynthesisUtterance(text);
-    u.rate = opts.rate;
-    u.pitch = opts.pitch;
-    u.volume = opts.volume;
-    u.lang = opts.lang;
-    if (opts.voice) u.voice = opts.voice;
+    u.rate = 0.88;
+    u.pitch = 1.02;
     u.onend = () => resolve();
     u.onerror = () => resolve();
     window.speechSynthesis.speak(u);
   });
-}
-
-/**
- * Speak with a sympathetic guide voice.
- * Phrases are paced with soft pauses — listening / enlightened feel.
- */
-export async function speak(text: string, opts?: SpeakOptions): Promise<void> {
-  const support = getSpeechSupport();
-  if (!support.tts || !text.trim()) return;
-
-  const style = opts?.style ?? 'guide';
-  const defaults = STYLE_DEFAULTS[style];
-  const rate = opts?.rate ?? defaults.rate;
-  const pitch = opts?.pitch ?? defaults.pitch;
-  const volume = opts?.volume ?? defaults.volume;
-  const lang = opts?.lang ?? 'en-US';
-  const pauseMs = defaults.pauseMs;
-
-  if (!opts?.append) {
-    cancelSpeak();
-  }
-  const gen = speakGeneration;
-
-  // Chrome: kick voices if empty
-  if (!window.speechSynthesis.getVoices().length) {
-    warmSpeechVoices();
-    await sleep(80);
-  }
-
-  const voice = resolveGuideVoice();
-  const phrases = splitForBreath(text);
-
-  for (let i = 0; i < phrases.length; i++) {
-    if (gen !== speakGeneration) return;
-    const phrase = phrases[i];
-    await utterOnce(phrase, { rate, pitch, volume, lang, voice });
-    if (gen !== speakGeneration) return;
-    if (i < phrases.length - 1) {
-      await sleep(pauseMs);
-    }
-  }
 }
 
 export function stopListening(): void {
@@ -256,9 +222,6 @@ export function stopListening(): void {
   activeRecognition = null;
 }
 
-/**
- * Listen once for a final transcript. Rejects with a short error code string.
- */
 export function listenOnce(opts?: { lang?: string; timeoutMs?: number }): Promise<string> {
   const Ctor = getRecognitionCtor();
   if (!Ctor) return Promise.reject(new Error('stt_unsupported'));
@@ -313,4 +276,14 @@ export function listenOnce(opts?: { lang?: string; timeoutMs?: number }): Promis
       finish(() => reject(new Error('stt_start_failed')));
     }
   });
+}
+
+/** @deprecated phrase split only used by browser path — kept for tests */
+export function splitForBreath(text: string): string[] {
+  return text
+    .replace(/\s+/g, ' ')
+    .trim()
+    .split(/(?<=[.!?…])\s+/)
+    .map((p) => p.trim())
+    .filter(Boolean);
 }
