@@ -8,7 +8,8 @@ import { motion, AnimatePresence } from 'motion/react';
 import { 
   Coins, TrendingUp, Sparkles, RefreshCw, Layers, 
   ShieldCheck, Download, Calendar, Trophy, Clock, 
-  CheckCircle, Lock, Unlock, FileText, ShieldAlert, Activity
+  CheckCircle, Lock, Unlock, FileText, ShieldAlert, Activity,
+  Brain, Cpu, ArrowRightLeft
 } from 'lucide-react';
 import { GameState } from '../types';
 import SolanaPortal from './SolanaPortal';
@@ -161,7 +162,7 @@ export default function Treasury({
           cognitiveTokens: (prev.cognitiveTokens || 0) + cgtGained,
         }));
         addLog(
-          `DEX [PRACTICE]: ${cpVal} BCC → ${cgtGained} CGT at practice rate (economy not configured).`,
+          `DUALITY [PRACTICE]: crystallized ${cpVal} Mind BCC → ${cgtGained} Machine CGT (economy not configured).`,
           'warn'
         );
       } else {
@@ -169,7 +170,7 @@ export default function Treasury({
         const sig = await swapBccToCgtOnChain(cpVal);
         await syncLedgerToState(setState);
         addLog(
-          `DEX ON-CHAIN: swap_bcc_to_cgt ${cpVal} BCC. https://solscan.io/tx/${sig}?cluster=devnet`,
+          `DUALITY ON-CHAIN: Mind → Machine swap_bcc_to_cgt ${cpVal} BCC. https://solscan.io/tx/${sig}?cluster=devnet`,
           'success'
         );
       }
@@ -270,6 +271,16 @@ export default function Treasury({
 
   // Projections
   const dailyProjection = (state.miningPower * state.efficiency * (state.energy / 100) * 0.015 * 60 * 60 * 24).toFixed(0);
+
+  // Mind ↔ Machine duality meter (BCC living attention vs CGT crystallized cognition)
+  const mindBalance = Math.max(0, state.credits);
+  const machineBalance = Math.max(0, state.cognitiveTokens ?? 0);
+  const dualityTotal = mindBalance + machineBalance;
+  const mindSharePct = dualityTotal <= 0 ? 50 : (mindBalance / dualityTotal) * 100;
+  const machineSharePct = 100 - mindSharePct;
+  const cgtPreview = economyReady
+    ? Math.max(0, Math.floor(Number(swapCpAmount) || 0))
+    : Math.max(0, Math.floor(Number(swapCpAmount) / 5) || 0);
 
   return (
     <div id="treasury-room" className="space-y-6">
@@ -536,8 +547,9 @@ export default function Treasury({
           </span>
         </div>
         <p className="text-[11px] text-slate-500 mb-4 leading-relaxed">
-          Mainnet Solana context from OKX OnchainOS. Facility CP ↔ CGT swap below remains a{' '}
-          <span className="text-cyan-400/80 font-mono">simulated playground</span> — not an on-chain trade.
+          Mainnet Solana context from OKX OnchainOS. Facility{' '}
+          <span className="text-amber-400/80 font-mono">Mind ↔ Machine</span> crystallize below is the
+          facility swap — not a mainnet trade.
         </p>
         {pulseLoading && !marketPulse ? (
           <div className="flex items-center gap-2 text-slate-500 font-mono text-[11px]">
@@ -594,109 +606,153 @@ export default function Treasury({
         )}
       </div>
 
-      {/* COGNITIVE SPL Token Exchange (DEX Swap) */}
-      <div className="bg-[#0a0a0c] border border-white/5 rounded-2xl p-6 relative overflow-hidden flex flex-col justify-between shadow-xl">
-        <div className="absolute top-0 right-0 w-48 h-48 bg-cyan-500/5 rounded-full blur-3xl pointer-events-none" />
-        
-        <div>
-          <div className="flex items-center justify-between mb-4 pb-3 border-b border-white/5">
+      {/* Duality Exchange — Mind (BCC) ↔ Machine (CGT) */}
+      <div className="bg-[#0a0a0c] border border-white/8 rounded-2xl p-6 relative overflow-hidden flex flex-col justify-between shadow-xl">
+        <div className="absolute top-0 left-0 w-56 h-56 bg-amber-500/[0.06] rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute bottom-0 right-0 w-56 h-56 bg-cyan-500/[0.06] rounded-full blur-3xl pointer-events-none" />
+
+        <div className="relative">
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-4 pb-3 border-b border-white/5">
             <div className="flex items-center gap-2">
-              <Coins className="w-5 h-5 text-cyan-400" />
-              <h3 className="font-mono text-sm font-semibold text-slate-100 tracking-wider">CGT SWAP [SIMULATED PLAYGROUND]</h3>
+              <div className="relative w-8 h-8">
+                <span className="absolute inset-0 rounded-full border border-amber-400/40 bg-amber-500/10" />
+                <span className="absolute inset-[3px] rounded-full border border-cyan-400/40 bg-cyan-500/10" />
+                <ArrowRightLeft className="absolute inset-0 m-auto w-3.5 h-3.5 text-slate-200" />
+              </div>
+              <h3 className="font-mono text-sm font-semibold text-slate-100 tracking-wider">
+                DUALITY EXCHANGE · MIND ↔ MACHINE
+              </h3>
             </div>
-            <span className="text-[9px] font-mono bg-cyan-950/40 border border-cyan-500/20 text-cyan-400 px-2.5 py-0.5 rounded-lg font-black tracking-widest uppercase">
-              LOCAL LIQUIDITY POOL
-            </span>
+            <div className="flex items-center gap-2">
+              <span className="text-[9px] font-mono bg-amber-950/40 border border-amber-500/25 text-amber-300 px-2.5 py-0.5 rounded-lg font-black tracking-widest uppercase">
+                BCC → CGT
+              </span>
+              <span
+                className={`text-[9px] font-mono px-2.5 py-0.5 rounded-lg font-black tracking-widest uppercase border ${
+                  economyReady
+                    ? 'bg-emerald-950/40 border-emerald-500/30 text-emerald-400'
+                    : 'bg-slate-950/40 border-white/15 text-slate-400'
+                }`}
+              >
+                {economyReady ? 'ON-CHAIN' : 'PRACTICE'}
+              </span>
+            </div>
           </div>
 
-          <p className="text-xs text-slate-400 font-sans mb-6 leading-relaxed">
-            Mint and trade our platform's official utility token: <span className="text-cyan-400 font-bold font-mono">COGNITIVE (CGT)</span>. Convert your earned facility credits (CP) in our liquidity pool instantly at a fixed rate of <span className="text-amber-400 font-bold font-mono">5 CP = 1 CGT</span>. CGT is fully integrated on-chain to mint visual NFT miners and power hardware upgrades.
+          <p className="text-xs text-slate-400 font-sans mb-5 leading-relaxed">
+            Living attention (<span className="text-amber-300 font-mono font-bold">BCC</span>) crystallizes into
+            digital cognition (<span className="text-cyan-300 font-mono font-bold">CGT</span>). Keep both sides
+            alive — pure machine with no mind, or mind with no machine, is imbalance.
+            {' '}Rate:{' '}
+            <span className="text-slate-300 font-mono font-bold">
+              {economyReady ? '1 BCC = 1 CGT' : 'practice ~5 BCC = 1 CGT'}
+            </span>
+            . CGT mints NFT miners and powers upgrades.
           </p>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-stretch mb-4">
-            {/* Input fields */}
-            <div className="p-4 bg-[#050506] border border-white/5 rounded-xl flex flex-col justify-between space-y-4">
-              <div>
-                <span className="text-[8px] text-slate-500 font-mono tracking-widest block uppercase mb-1.5">CONVERSION RATE ENGINE</span>
-                <div className="flex items-center gap-3 bg-black/40 p-3 rounded-lg border border-white/[0.02]">
-                  <div className="flex-1">
-                    <span className="text-[8px] text-slate-500 block">YOU SPEND (CREDITS)</span>
-                    <input 
-                      type="number"
-                      value={swapCpAmount}
-                      onChange={(e) => setSwapCpAmount(e.target.value)}
-                      disabled={isSwapping}
-                      className="w-full bg-transparent text-sm font-bold text-slate-200 outline-none mt-1"
-                    />
-                  </div>
-                  <span className="text-[10px] text-slate-500 font-bold">CP</span>
-                </div>
-              </div>
-
-              <div className="flex justify-center py-1">
-                <div className="w-8 h-8 rounded-full bg-cyan-950/40 border border-cyan-500/20 flex items-center justify-center text-cyan-400">
-                  <RefreshCw className={`w-3.5 h-3.5 ${isSwapping ? 'animate-spin' : ''}`} />
-                </div>
-              </div>
-
-              <div>
-                <div className="flex items-center gap-3 bg-cyan-950/10 p-3 rounded-lg border border-cyan-500/10">
-                  <div className="flex-1">
-                    <span className="text-[8px] text-cyan-500 block font-bold">
-                      YOU RECEIVE ({economyReady ? 'ON-CHAIN 1:1' : 'PRACTICE ~1:5'})
-                    </span>
-                    <span className="text-sm font-black text-cyan-400 block mt-1">
-                      {economyReady
-                        ? Math.max(0, Math.floor(Number(swapCpAmount) || 0))
-                        : Math.max(0, Math.floor(Number(swapCpAmount) / 5) || 0)}{' '}
-                      CGT
-                    </span>
-                  </div>
-                  <span className="text-[10px] text-cyan-400 font-bold">CGT</span>
-                </div>
-              </div>
+          {/* Balance meter */}
+          <div className="mb-6">
+            <div className="flex justify-between items-center mb-2 font-mono text-[10px]">
+              <span className="text-amber-300/90 flex items-center gap-1.5">
+                <Brain className="w-3 h-3" />
+                Mind {mindSharePct.toFixed(0)}%
+              </span>
+              <span className="text-[8px] text-slate-500 tracking-widest uppercase">Balance</span>
+              <span className="text-cyan-300/90 flex items-center gap-1.5">
+                Machine {machineSharePct.toFixed(0)}%
+                <Cpu className="w-3 h-3" />
+              </span>
             </div>
-
-            {/* Balances overview */}
-            <div className="p-4 bg-[#050506] border border-white/5 rounded-xl flex flex-col justify-between">
-              <div className="space-y-2 font-mono text-[11px]">
-                <span className="text-[8px] text-slate-500 tracking-widest block uppercase mb-2">LIQUID WALLET STORES</span>
-                
-                <div className="flex justify-between bg-black/30 p-2 rounded border border-white/[0.01]">
-                  <span className="text-slate-500">FACILITY CREDITS:</span>
-                  <span className="text-slate-200 font-bold">{state.credits} CP</span>
-                </div>
-
-                <div className="flex justify-between bg-black/30 p-2 rounded border border-white/[0.01]">
-                  <span className="text-cyan-500">COGNITIVE TOKEN:</span>
-                  <span className="text-cyan-400 font-black">
-                    {state.cognitiveTokens ?? 250} CGT
-                  </span>
-                </div>
-              </div>
-
-              <div className="pt-4 border-t border-white/5 mt-4">
-                <button
-                  onClick={executeSwap}
-                  disabled={isSwapping || Number(swapCpAmount) <= 0 || state.credits < Number(swapCpAmount)}
-                  className={`w-full py-2.5 rounded-lg font-mono text-xs font-bold tracking-wider flex items-center justify-center gap-2 transition-all cursor-pointer ${
-                    !isSwapping && Number(swapCpAmount) > 0 && state.credits >= Number(swapCpAmount)
-                      ? 'bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-black shadow-md shadow-cyan-950/20'
-                      : 'bg-white/[0.02] border border-white/5 text-slate-600 cursor-not-allowed'
-                  }`}
-                >
-                  <RefreshCw className={`w-3.5 h-3.5 ${isSwapping ? 'animate-spin' : ''}`} />
-                  {isSwapping ? 'SIMULATING…' : 'EXECUTE LOCAL SWAP'}
-                </button>
-              </div>
+            <div className="h-2.5 rounded-full overflow-hidden flex border border-white/10 bg-black/50">
+              <motion.div
+                className="h-full bg-gradient-to-r from-amber-600/90 to-amber-400/80"
+                animate={{ width: `${mindSharePct}%` }}
+                transition={{ type: 'spring', stiffness: 120, damping: 22 }}
+              />
+              <motion.div
+                className="h-full bg-gradient-to-r from-cyan-500/80 to-cyan-400/90"
+                animate={{ width: `${machineSharePct}%` }}
+                transition={{ type: 'spring', stiffness: 120, damping: 22 }}
+              />
+            </div>
+            <div className="flex justify-between mt-1.5 font-mono text-[9px] text-slate-500">
+              <span>{mindBalance} BCC</span>
+              <span>{machineBalance} CGT</span>
             </div>
           </div>
 
+          <div className="grid grid-cols-1 md:grid-cols-[1fr_auto_1fr] gap-4 md:gap-3 items-stretch mb-4">
+            {/* Mind — spend */}
+            <div className="p-4 bg-[#050506] border border-amber-500/20 rounded-xl flex flex-col">
+              <div className="flex items-center gap-2 mb-3">
+                <Brain className="w-4 h-4 text-amber-400" />
+                <span className="text-[9px] font-mono tracking-widest uppercase text-amber-300 font-bold">
+                  Mind · living attention
+                </span>
+              </div>
+              <span className="text-[8px] text-slate-500 font-mono uppercase tracking-wider mb-1">You crystallize (BCC)</span>
+              <div className="flex items-center gap-3 bg-amber-950/20 p-3 rounded-lg border border-amber-500/15">
+                <input
+                  type="number"
+                  value={swapCpAmount}
+                  onChange={(e) => setSwapCpAmount(e.target.value)}
+                  disabled={isSwapping}
+                  className="w-full bg-transparent text-sm font-bold text-amber-100 outline-none"
+                />
+                <span className="text-[10px] text-amber-400 font-bold shrink-0">BCC</span>
+              </div>
+              <span className="text-[9px] text-slate-500 font-mono mt-2">Wallet · {mindBalance} BCC</span>
+            </div>
+
+            {/* Pivot */}
+            <div className="flex md:flex-col items-center justify-center gap-2 py-1">
+              <div className="w-11 h-11 rounded-full bg-gradient-to-br from-amber-500/20 via-[#0a0a0c] to-cyan-500/20 border border-white/15 flex items-center justify-center relative">
+                <span className="absolute inset-1 rounded-full border border-amber-400/20 border-r-cyan-400/30" />
+                <RefreshCw className={`w-4 h-4 text-slate-200 relative z-10 ${isSwapping ? 'animate-spin' : ''}`} />
+              </div>
+              <span className="text-[8px] font-mono text-slate-500 tracking-widest uppercase hidden md:block">
+                Crystallize
+              </span>
+            </div>
+
+            {/* Machine — receive */}
+            <div className="p-4 bg-[#050506] border border-cyan-500/20 rounded-xl flex flex-col">
+              <div className="flex items-center gap-2 mb-3">
+                <Cpu className="w-4 h-4 text-cyan-400" />
+                <span className="text-[9px] font-mono tracking-widest uppercase text-cyan-300 font-bold">
+                  Machine · crystallized cognition
+                </span>
+              </div>
+              <span className="text-[8px] text-cyan-500/80 font-mono uppercase tracking-wider mb-1 font-bold">
+                You receive ({economyReady ? 'on-chain 1:1' : 'practice ~1:5'})
+              </span>
+              <div className="flex items-center gap-3 bg-cyan-950/20 p-3 rounded-lg border border-cyan-500/15">
+                <span className="text-sm font-black text-cyan-300 flex-1">{cgtPreview}</span>
+                <span className="text-[10px] text-cyan-400 font-bold shrink-0">CGT</span>
+              </div>
+              <span className="text-[9px] text-slate-500 font-mono mt-2">Wallet · {machineBalance} CGT</span>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={executeSwap}
+            disabled={isSwapping || Number(swapCpAmount) <= 0 || state.credits < Number(swapCpAmount)}
+            className={`w-full py-2.5 rounded-lg font-mono text-xs font-bold tracking-wider flex items-center justify-center gap-2 transition-all cursor-pointer ${
+              !isSwapping && Number(swapCpAmount) > 0 && state.credits >= Number(swapCpAmount)
+                ? 'bg-gradient-to-r from-amber-500 via-amber-400 to-cyan-400 hover:from-amber-400 hover:to-cyan-300 text-slate-950 font-black shadow-md shadow-cyan-950/20'
+                : 'bg-white/[0.02] border border-white/5 text-slate-600 cursor-not-allowed'
+            }`}
+          >
+            <ArrowRightLeft className={`w-3.5 h-3.5 ${isSwapping ? 'animate-pulse' : ''}`} />
+            {isSwapping ? 'CRYSTALLIZING…' : 'Crystallize Mind → Machine'}
+          </button>
+
           {isSwapping && (
-            <div className="bg-[#050506] border border-cyan-500/20 p-3 rounded-xl font-mono text-[9px] space-y-1">
+            <div className="mt-3 bg-[#050506] border border-cyan-500/20 p-3 rounded-xl font-mono text-[9px] space-y-1">
               <div className="flex items-center gap-2 text-cyan-400 font-bold animate-pulse">
                 <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-ping" />
-                <span>LIQUIDITY ROUTE ESTABLISHED:</span>
+                <span>DUALITY ROUTE · MIND → MACHINE:</span>
               </div>
               <span className="text-slate-300 block">{swapStep}</span>
             </div>

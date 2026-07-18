@@ -234,6 +234,7 @@ export default function App() {
   const [showNotificationsDropdown, setShowNotificationsDropdown] = useState<boolean>(false);
   const [notificationTarget, setNotificationTarget] = useState<{ type: 'message' | 'ticket'; id: string } | null>(null);
   const notificationsMenuRef = useRef<HTMLDivElement | null>(null);
+  const notificationsPanelRef = useRef<HTMLDivElement | null>(null);
   const shownToastsRef = useRef<Set<string>>(new Set());
   const flowToastTimerRef = useRef<number | null>(null);
 
@@ -317,8 +318,12 @@ export default function App() {
   useEffect(() => {
     if (!showNotificationsDropdown) return;
     const onPointerDown = (e: MouseEvent) => {
-      const el = notificationsMenuRef.current;
-      if (el && !el.contains(e.target as Node)) {
+      const target = e.target as Node;
+      const bell = notificationsMenuRef.current;
+      const panel = notificationsPanelRef.current;
+      const inBell = bell?.contains(target);
+      const inPanel = panel?.contains(target);
+      if (!inBell && !inPanel) {
         setShowNotificationsDropdown(false);
       }
     };
@@ -938,7 +943,7 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-[#050506] text-slate-300 flex flex-col justify-between font-sans selection:bg-cyan-500/30 selection:text-cyan-300 relative overflow-hidden">
+    <div className="min-h-screen bg-[#050506] text-slate-300 flex flex-col justify-between font-sans selection:bg-cyan-500/30 selection:text-cyan-300 relative overflow-x-hidden">
 
       {/* Background Atmosphere — cinematic video field */}
       <div className="absolute inset-0 pointer-events-none z-0 overflow-hidden">
@@ -1085,80 +1090,6 @@ export default function App() {
               )}
             </button>
 
-            <AnimatePresence>
-              {showNotificationsDropdown && (
-                <motion.div
-                  initial={{ opacity: 0, y: 10, scale: 0.95 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  exit={{ opacity: 0, y: 8 }}
-                  className="absolute right-0 mt-2 w-72 bg-[#0a0a0c]/95 border border-white/10 rounded-2xl shadow-2xl p-4 z-50 font-mono text-xs space-y-3 backdrop-blur-md"
-                >
-                  <div className="flex justify-between items-center pb-2 border-b border-white/5 gap-2">
-                    <span className="font-bold text-slate-200 uppercase tracking-widest text-[9px] flex items-center gap-1">
-                      <Bell className="w-3.5 h-3.5 text-cyan-400" /> Notifications
-                    </span>
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setState((prev) => ({
-                            ...prev,
-                            notifications: [],
-                          }));
-                        }}
-                        className="text-[8px] text-slate-500 hover:text-red-400 uppercase font-black cursor-pointer"
-                      >
-                        Clear
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setShowNotificationsDropdown(false)}
-                        title="Close"
-                        className="w-6 h-6 rounded-lg flex items-center justify-center text-slate-500 hover:text-slate-200 hover:bg-white/5 cursor-pointer"
-                      >
-                        <X className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="space-y-2 max-h-60 overflow-y-auto divide-y divide-white/[0.03]">
-                    {(state.notifications || []).length === 0 ? (
-                      <div className="text-center py-4 text-slate-500 text-[10px] italic">
-                        No notifications to report. Node is peaceful.
-                      </div>
-                    ) : (
-                      (state.notifications || []).map(noti => (
-                        <div 
-                          key={noti.id} 
-                          onClick={() => {
-                            if (noti.relatedId && noti.relatedType) {
-                              setNotificationTarget({ type: noti.relatedType, id: noti.relatedId });
-                              changeRoom('feedback');
-                              setShowNotificationsDropdown(false);
-                            }
-                          }}
-                          className={`pt-2 pb-1.5 px-1.5 flex gap-2 items-start text-[10px] rounded-lg transition-colors ${noti.relatedId ? 'cursor-pointer hover:bg-white/5 border border-white/5 hover:border-cyan-500/20' : ''}`}
-                        >
-                          <span className={`w-1.5 h-1.5 rounded-full mt-1.5 shrink-0 ${
-                            noti.type === 'warn' ? 'bg-red-500 animate-pulse' :
-                            noti.type === 'success' ? 'bg-emerald-500' :
-                            noti.type === 'message' ? 'bg-purple-500' : 'bg-cyan-500'
-                          }`} />
-                          <div className="flex-1">
-                            <span className="text-white font-bold block">{noti.title}</span>
-                            <p className="text-slate-400 mt-0.5 leading-relaxed text-[9px]">{noti.message}</p>
-                            <span className="text-[8px] text-slate-600 block mt-1 flex justify-between items-center">
-                              <span>{noti.timestamp}</span>
-                              {noti.relatedId && <span className="text-[7px] text-cyan-400 font-bold uppercase tracking-widest">View details &rarr;</span>}
-                            </span>
-                          </div>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
           </div>
 
           <button
@@ -1978,6 +1909,98 @@ export default function App() {
         )}
       </footer>
 
+      {/* Notifications panel — fixed to viewport so mobile isn't clipped by header overflow */}
+      <AnimatePresence>
+        {showNotificationsDropdown && (
+          <React.Fragment key="notifications-overlay">
+            <motion.button
+              key="notif-backdrop"
+              type="button"
+              aria-label="Dismiss notifications"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowNotificationsDropdown(false)}
+              className="fixed inset-0 z-[95] bg-black/50 sm:bg-transparent cursor-default"
+            />
+            <motion.div
+              key="notif-panel"
+              ref={notificationsPanelRef}
+              role="dialog"
+              aria-label="Notifications"
+              initial={{ opacity: 0, y: 12, scale: 0.98 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 8 }}
+              className="fixed z-[100] left-3 right-3 top-[max(4.5rem,env(safe-area-inset-top))] sm:left-auto sm:right-4 sm:top-20 sm:w-72 max-h-[min(70dvh,28rem)] flex flex-col bg-[#0a0a0c]/98 border border-white/10 rounded-2xl shadow-2xl p-4 font-mono text-xs space-y-3 backdrop-blur-md"
+            >
+              <div className="flex justify-between items-center pb-2 border-b border-white/5 gap-2 shrink-0">
+                <span className="font-bold text-slate-200 uppercase tracking-widest text-[9px] flex items-center gap-1">
+                  <Bell className="w-3.5 h-3.5 text-cyan-400" /> Notifications
+                </span>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setState((prev) => ({
+                        ...prev,
+                        notifications: [],
+                      }));
+                    }}
+                    className="text-[8px] text-slate-500 hover:text-red-400 uppercase font-black cursor-pointer"
+                  >
+                    Clear
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowNotificationsDropdown(false)}
+                    title="Close"
+                    className="w-6 h-6 rounded-lg flex items-center justify-center text-slate-500 hover:text-slate-200 hover:bg-white/5 cursor-pointer"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+
+              <div className="space-y-2 overflow-y-auto overscroll-contain divide-y divide-white/[0.03] min-h-0">
+                {(state.notifications || []).length === 0 ? (
+                  <div className="text-center py-4 text-slate-500 text-[10px] italic">
+                    No notifications to report. Node is peaceful.
+                  </div>
+                ) : (
+                  (state.notifications || []).map(noti => (
+                    <div
+                      key={noti.id}
+                      onClick={() => {
+                        if (noti.relatedId && noti.relatedType) {
+                          setNotificationTarget({ type: noti.relatedType, id: noti.relatedId });
+                          changeRoom('feedback');
+                          setShowNotificationsDropdown(false);
+                        }
+                      }}
+                      className={`pt-2 pb-1.5 px-1.5 flex gap-2 items-start text-[10px] rounded-lg transition-colors ${noti.relatedId ? 'cursor-pointer hover:bg-white/5 border border-white/5 hover:border-cyan-500/20' : ''}`}
+                    >
+                      <span className={`w-1.5 h-1.5 rounded-full mt-1.5 shrink-0 ${
+                        noti.type === 'warn' ? 'bg-red-500 animate-pulse' :
+                        noti.type === 'success' ? 'bg-emerald-500' :
+                        noti.type === 'message' ? 'bg-purple-500' : 'bg-cyan-500'
+                      }`} />
+                      <div className="flex-1 min-w-0">
+                        <span className="text-white font-bold block">{noti.title}</span>
+                        <p className="text-slate-400 mt-0.5 leading-relaxed text-[9px]">{noti.message}</p>
+                        <span className="text-[8px] text-slate-600 mt-1 flex justify-between items-center gap-2">
+                          <span>{noti.timestamp}</span>
+                          {noti.relatedId && <span className="text-[7px] text-cyan-400 font-bold uppercase tracking-widest shrink-0">View details &rarr;</span>}
+                        </span>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </motion.div>
+          </React.Fragment>
+        )}
+      </AnimatePresence>
+
       <AnimatePresence>
         {flowToast && (
           <motion.div
@@ -1987,7 +2010,7 @@ export default function App() {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -8 }}
             onClick={() => setFlowToast(null)}
-            className={`fixed top-20 left-1/2 -translate-x-1/2 z-[90] max-w-lg w-[calc(100%-2rem)] px-4 py-3 rounded-xl border backdrop-blur-md shadow-xl pointer-events-auto cursor-pointer ${
+            className={`fixed top-[max(5rem,env(safe-area-inset-top))] left-1/2 -translate-x-1/2 z-[90] max-w-lg w-[calc(100%-1.5rem)] px-4 py-3 rounded-xl border backdrop-blur-md shadow-xl pointer-events-auto cursor-pointer ${
               flowToast.tone === 'warn'
                 ? 'bg-amber-950/95 border-amber-400/40 text-amber-100'
                 : flowToast.tone === 'success'
@@ -2021,7 +2044,7 @@ export default function App() {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 15, scale: 0.95 }}
             transition={{ duration: 0.25, ease: 'easeOut' }}
-            className="fixed bottom-6 right-6 z-50 flex items-center gap-3 bg-[#07070a]/95 border border-emerald-500/20 backdrop-blur-md px-4 py-3 rounded-xl shadow-[0_10px_30px_-5px_rgba(16,185,129,0.1)] pointer-events-none"
+            className="fixed bottom-[max(1.5rem,env(safe-area-inset-bottom))] left-4 right-4 sm:left-auto sm:right-6 z-50 flex items-center gap-3 bg-[#07070a]/95 border border-emerald-500/20 backdrop-blur-md px-4 py-3 rounded-xl shadow-[0_10px_30px_-5px_rgba(16,185,129,0.1)] pointer-events-none"
           >
             <div className="relative flex h-2 w-2">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
