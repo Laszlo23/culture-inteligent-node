@@ -1,5 +1,5 @@
-import { GoogleGenAI } from '@google/genai';
 import { getGeminiApiKey } from './gemini-key';
+import { generateGeminiText, geminiFailureNote } from './gemini-generate';
 import { toUserError, thrownToUserError } from './user-errors';
 
 export interface AttentionVerifyInput {
@@ -52,7 +52,6 @@ export async function verifyAttentionWithAgent(
   }
 
   try {
-    const ai = new GoogleGenAI({ apiKey });
     const prompt = `You are the Building Culture attention verification agent on Solana Devnet.
 Score whether this operator completed a genuine learning/attention session (not spam).
 
@@ -67,32 +66,16 @@ ${(input.artifacts || input.summary || '(none)').slice(0, 4000)}
 Respond ONLY with JSON:
 {"passed":boolean,"score":0-100,"reason":"short string"}`;
 
-    const models = [
-      process.env.ATTENTION_GEMINI_MODEL?.trim(),
-      'gemini-flash-latest',
-      'gemini-2.0-flash',
-    ].filter(Boolean) as string[];
-
     let text = '';
-    let usedModel = models[0] || 'gemini-flash-latest';
-    let lastErr: unknown;
-    for (const model of models) {
-      try {
-        const response = await ai.models.generateContent({
-          model,
-          contents: prompt,
-        });
-        text = response.text || '';
-        usedModel = model;
-        break;
-      } catch (err) {
-        lastErr = err;
-      }
-    }
-    if (!text) {
+    let usedModel = 'gemini-flash-latest';
+    try {
+      const out = await generateGeminiText(prompt);
+      text = out.text;
+      usedModel = out.model;
+    } catch (err) {
       return {
         ...fallbackHeuristic(input),
-        verification: `Gemini unavailable (${lastErr instanceof Error ? lastErr.message.slice(0, 80) : 'error'}); heuristic fallback`,
+        verification: geminiFailureNote(err),
         model: 'heuristic-fallback',
       };
     }
@@ -115,7 +98,7 @@ Respond ONLY with JSON:
       verification: `Gemini agent: score ${score}${passed ? ' PASS' : ' FAIL'}`,
       model: usedModel,
     };
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error('Gemini attention verify failed:', err);
     return {
       ...fallbackHeuristic(input),

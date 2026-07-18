@@ -2,11 +2,11 @@
  * Weekly Attention Intelligence research agent — Gemini drafts evidence-based sessions.
  */
 
-import { GoogleGenAI } from '@google/genai';
 import type { AttentionSession, ExerciseType } from '../content/attention-intelligence.ts';
 import { CORE_ATTENTION_SESSIONS, isoWeekKey } from '../content/attention-intelligence.ts';
 import crypto from 'crypto';
 import { getGeminiApiKey } from './gemini-key';
+import { generateGeminiText, geminiFailureNote } from './gemini-generate';
 
 const EXERCISE_TYPES: ExerciseType[] = [
   'reps_track',
@@ -135,7 +135,6 @@ export async function researchWeeklySession(opts?: {
   }
 
   try {
-    const ai = new GoogleGenAI({ apiKey });
     const signalBlock = opts?.scienceContext
       ? `\nCurrent science/tech signals to optionally ground the session (pick ONE as the real-world hook):\n${opts.scienceContext}\n`
       : '';
@@ -169,12 +168,7 @@ Respond ONLY with JSON matching:
   "researchNote": string
 }`;
 
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.0-flash',
-      contents: prompt,
-    });
-
-    const text = response.text || '';
+    const { text, model } = await generateGeminiText(prompt);
     const match = text.match(/\{[\s\S]*\}/);
     if (!match) {
       return {
@@ -183,10 +177,14 @@ Respond ONLY with JSON matching:
       };
     }
     const raw = JSON.parse(match[0]);
-    return normalizeDraft(raw, existingTitles);
-  } catch (err: any) {
+    const draft = normalizeDraft(raw, existingTitles);
+    if (!draft.researchNote) {
+      draft.researchNote = `Drafted with ${model}.`;
+    }
+    return draft;
+  } catch (err: unknown) {
     const draft = heuristicDraft(existingTitles);
-    draft.researchNote = `Gemini error (${err?.message || 'failed'}); heuristic draft.`;
+    draft.researchNote = `${geminiFailureNote(err)} Heuristic draft.`;
     return draft;
   }
 }

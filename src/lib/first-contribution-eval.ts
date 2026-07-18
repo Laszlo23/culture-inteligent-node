@@ -2,8 +2,8 @@
  * Evaluate first-contribution reflection for curiosity / creativity / reflection.
  */
 
-import { GoogleGenAI } from '@google/genai';
 import { getGeminiApiKey } from './gemini-key';
+import { generateGeminiText, geminiFailureNote } from './gemini-generate';
 import type { ContributionDims } from './first-contribution';
 
 export type FirstContributionEvalResult = {
@@ -18,12 +18,6 @@ export type FirstContributionEvalResult = {
 function clamp(n: number): number {
   return Math.max(0, Math.min(100, Math.round(n)));
 }
-
-const GEMINI_SCORE_MODELS = [
-  process.env.PASSPORT_GEMINI_MODEL?.trim(),
-  'gemini-flash-latest',
-  'gemini-2.0-flash',
-].filter(Boolean) as string[];
 
 /** Pull a short quote from their answer for offline coach lines. */
 function quoteSnippet(answer: string, max = 72): string {
@@ -115,51 +109,36 @@ coachLine rules:
 Respond ONLY JSON:
 {"curiosity":0-100,"creativity":0-100,"reflection":0-100,"coachLine":"..."}`;
 
-  const ai = new GoogleGenAI({ apiKey });
-  let lastErr: unknown;
-  for (const model of GEMINI_SCORE_MODELS) {
-    try {
-      const response = await ai.models.generateContent({
-        model,
-        contents: prompt,
-      });
-      const text = response.text || '';
-      const match = text.match(/\{[\s\S]*\}/);
-      if (!match) continue;
-      const parsed = JSON.parse(match[0]) as {
-        curiosity?: number;
-        creativity?: number;
-        reflection?: number;
-        coachLine?: string;
-      };
-      const coach =
-        typeof parsed.coachLine === 'string' && parsed.coachLine.trim()
-          ? parsed.coachLine.trim().slice(0, 240)
-          : 'Measured. Your Human Passport is starting.';
-      return {
-        dims: {
-          curiosity: clamp(Number(parsed.curiosity) || 0),
-          creativity: clamp(Number(parsed.creativity) || 0),
-          reflection: clamp(Number(parsed.reflection) || 0),
-        },
-        coachLine: coach,
-        model,
-        live: true,
-      };
-    } catch (err) {
-      lastErr = err;
-      console.warn(
-        '[first-contribution] gemini model failed',
-        model,
-        err instanceof Error ? err.message.slice(0, 180) : err
-      );
+  try {
+    const { text, model } = await generateGeminiText(prompt);
+    const match = text.match(/\{[\s\S]*\}/);
+    if (!match) {
+      return heuristicFirstContributionEval(answer);
     }
+    const parsed = JSON.parse(match[0]) as {
+      curiosity?: number;
+      creativity?: number;
+      reflection?: number;
+      coachLine?: string;
+    };
+    const coach =
+      typeof parsed.coachLine === 'string' && parsed.coachLine.trim()
+        ? parsed.coachLine.trim().slice(0, 240)
+        : 'Measured. Your Human Passport is starting.';
+    return {
+      dims: {
+        curiosity: clamp(Number(parsed.curiosity) || 0),
+        creativity: clamp(Number(parsed.creativity) || 0),
+        reflection: clamp(Number(parsed.reflection) || 0),
+      },
+      coachLine: coach,
+      model,
+      live: true,
+    };
+  } catch (err) {
+    console.warn('[first-contribution]', geminiFailureNote(err));
+    return heuristicFirstContributionEval(answer);
   }
-  console.warn(
-    '[first-contribution] falling back to heuristic',
-    lastErr instanceof Error ? lastErr.message.slice(0, 180) : lastErr
-  );
-  return heuristicFirstContributionEval(answer);
 }
 
 /** Browser-safe: call server so Gemini key stays on the host. */

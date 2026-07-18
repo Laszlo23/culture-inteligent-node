@@ -3,8 +3,8 @@
  * Grounds Academy + Void in what's actually breaking in science/tech.
  */
 
-import { GoogleGenAI } from '@google/genai';
 import { getGeminiApiKey } from './gemini-key';
+import { generateGeminiText, geminiFailureNote } from './gemini-generate';
 
 export type ScienceSignal = {
   id: string;
@@ -95,8 +95,10 @@ const SEEDED: ScienceSignal[] = [
   },
 ];
 
-let cache: { at: number; payload: SignalDeskPayload } | null = null;
+let cache: { at: number; payload: SignalDeskPayload; ttlMs: number } | null = null;
 const CACHE_MS = 6 * 60 * 60 * 1000;
+/** Retry sooner when Gemini quota/API fails */
+const FAIL_CACHE_MS = 15 * 60 * 1000;
 
 function seededPayload(note?: string): SignalDeskPayload {
   return {
@@ -111,19 +113,18 @@ function seededPayload(note?: string): SignalDeskPayload {
 }
 
 export async function getScienceSignalDesk(opts?: { force?: boolean }): Promise<SignalDeskPayload> {
-  if (!opts?.force && cache && Date.now() - cache.at < CACHE_MS) {
+  if (!opts?.force && cache && Date.now() - cache.at < cache.ttlMs) {
     return cache.payload;
   }
 
   const apiKey = getGeminiApiKey();
   if (!apiKey) {
     const payload = seededPayload();
-    cache = { at: Date.now(), payload };
+    cache = { at: Date.now(), payload, ttlMs: CACHE_MS };
     return payload;
   }
 
   try {
-    const ai = new GoogleGenAI({ apiKey });
     const seedTitles = SEEDED.map((s) => `- ${s.title}`).join('\n');
     const prompt = `You are Building Culture's Science Signal Desk.
 Given these CURRENT science/tech headlines (July 2026 context), produce attention-training lenses for builders/learners.
@@ -148,15 +149,11 @@ Respond ONLY with JSON:
 }
 Return 4 signals matching the headlines. No mysticism. Ground in the news.`;
 
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.0-flash',
-      contents: prompt,
-    });
-    const text = response.text || '';
+    const { text, model } = await generateGeminiText(prompt);
     const match = text.match(/\{[\s\S]*\}/);
     if (!match) {
       const payload = seededPayload('Gemini non-JSON; using seeded pulse.');
-      cache = { at: Date.now(), payload };
+      cache = { at: Date.now(), payload, ttlMs: FAIL_CACHE_MS };
       return payload;
     }
     const raw = JSON.parse(match[0]);
@@ -177,13 +174,15 @@ Return 4 signals matching the headlines. No mysticism. Ground in the news.`;
       fetchedAt: new Date().toISOString(),
       mode: 'live-research',
       signals: enriched,
-      note: String(raw.note || 'Live research lenses on current science/tech signals.'),
+      note: String(
+        raw.note || `Live research lenses (${model}) on current science/tech signals.`
+      ),
     };
-    cache = { at: Date.now(), payload };
+    cache = { at: Date.now(), payload, ttlMs: CACHE_MS };
     return payload;
-  } catch (e: any) {
-    const payload = seededPayload(`Research enrich failed (${e?.message || 'error'}); seeded pulse.`);
-    cache = { at: Date.now(), payload };
+  } catch (e: unknown) {
+    const payload = seededPayload(`${geminiFailureNote(e)} Seeded pulse.`);
+    cache = { at: Date.now(), payload, ttlMs: FAIL_CACHE_MS };
     return payload;
   }
 }
