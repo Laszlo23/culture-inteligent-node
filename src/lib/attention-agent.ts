@@ -67,18 +67,42 @@ ${(input.artifacts || input.summary || '(none)').slice(0, 4000)}
 Respond ONLY with JSON:
 {"passed":boolean,"score":0-100,"reason":"short string"}`;
 
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.0-flash',
-      contents: prompt,
-    });
+    const models = [
+      process.env.ATTENTION_GEMINI_MODEL?.trim(),
+      'gemini-flash-latest',
+      'gemini-2.0-flash',
+    ].filter(Boolean) as string[];
 
-    const text = response.text || '';
+    let text = '';
+    let usedModel = models[0] || 'gemini-flash-latest';
+    let lastErr: unknown;
+    for (const model of models) {
+      try {
+        const response = await ai.models.generateContent({
+          model,
+          contents: prompt,
+        });
+        text = response.text || '';
+        usedModel = model;
+        break;
+      } catch (err) {
+        lastErr = err;
+      }
+    }
+    if (!text) {
+      return {
+        ...fallbackHeuristic(input),
+        verification: `Gemini unavailable (${lastErr instanceof Error ? lastErr.message.slice(0, 80) : 'error'}); heuristic fallback`,
+        model: 'heuristic-fallback',
+      };
+    }
+
     const match = text.match(/\{[\s\S]*\}/);
     if (!match) {
       return {
         ...fallbackHeuristic(input),
         verification: 'Gemini returned non-JSON; used heuristic fallback',
-        model: 'gemini-2.0-flash+fallback',
+        model: `${usedModel}+fallback`,
       };
     }
     const parsed = JSON.parse(match[0]);
@@ -89,7 +113,7 @@ Respond ONLY with JSON:
       score,
       reason: String(parsed.reason || 'No reason provided'),
       verification: `Gemini agent: score ${score}${passed ? ' PASS' : ' FAIL'}`,
-      model: 'gemini-2.0-flash',
+      model: usedModel,
     };
   } catch (err: any) {
     console.error('Gemini attention verify failed:', err);
