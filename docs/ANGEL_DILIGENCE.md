@@ -1,16 +1,16 @@
-# Culture Node — Angel Diligence
+# Building Culture — Angel Diligence
 
 **Lens:** Pre-seed / angel. Not a banker’s model — a conviction checklist.  
-**Product:** Culture Node · **Company:** Building Culture  
-**Live:** https://mining.buildingcultureid.space/?hear=1  
+**Product:** Human Economy / Human Passport · **Company:** Building Culture  
+**Workspace:** Culture Node · **Live:** https://mining.buildingcultureid.space/  
 
-Related: [INVESTOR_PARTNER_BRIEF.md](./INVESTOR_PARTNER_BRIEF.md) · [PARTNER_ATTENTION_SESSION.md](./PARTNER_ATTENTION_SESSION.md) · [FIELD_DECK.md](./FIELD_DECK.md)
+Related: [HUMAN_ECONOMY.md](./HUMAN_ECONOMY.md) · [INVESTOR_PARTNER_BRIEF.md](./INVESTOR_PARTNER_BRIEF.md) · [PARTNER_ATTENTION_SESSION.md](./PARTNER_ATTENTION_SESSION.md)
 
 ---
 
 ## Verdict (one line)
 
-Worth a conversation if the founder keeps shipping Hearing + Club Spread and closes **one** real partner pilot — the wedge is real; the settlement story must stay honest.
+Worth a conversation if the founder keeps shipping Human Passport + Proof of Attention and closes **one** real company pilot — the wedge is reputation for the AI economy; settlement must stay honest.
 
 ---
 

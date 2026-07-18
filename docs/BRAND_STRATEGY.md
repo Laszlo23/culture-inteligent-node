@@ -1,127 +1,114 @@
 # Building Culture — Brand Strategy (strict)
 
-**Product:** Culture Node  
 **Company:** Building Culture  
-**Campaign:** Mine Culture / Culture Club  
+**Product line:** Human Economy  
+**Identity:** Human Passport  
+**Workspace:** Culture Node  
+**Proof:** Proof of Attention  
+
+See also: [HUMAN_ECONOMY.md](./HUMAN_ECONOMY.md)
 
 ---
 
 ## 1. Positioning (one sentence)
 
-We mine culture — attention that becomes knowledge fuel — so people leave humanity’s failure curve, not collect another empty flex.
+Building Culture is the Human Economy — a platform where people build digital reputation through learning, creating, and contributing.
 
 ## 2. Brand hierarchy (never invert)
 
 | Tier | Name | Use |
 |------|------|-----|
 | Parent | **Building Culture** | Legal, pitch, “by” line |
-| Product | **Culture Node** | App, store, hero |
-| Ritual | **Culture Club** | Membership, oath, Spread |
-| Proof | **Proof of Attention** | Technical / loop claim |
+| Product | **Human Economy** | Landing, hero, category |
+| Identity | **Human Passport** | Profile, claim, ownership |
+| Workspace | **Culture Node** | App shell after passport (secondary) |
+| Proof | **Proof of Attention** | Challenge / verification loop |
 
-Wrong: leading with Solana, Devnet, or “AI mining game.”  
-Right: Culture Node first; chain is the settlement layer, not the brand.
+Wrong: leading with Solana, mining, oaths, or token farms.  
+Right: Human value / contribution first; chain is invisible ownership infrastructure.
 
 ## 3. Voice
 
 - Direct, warm, slightly defiant  
 - Short sentences. No corporate fog.  
-- Allowed: love, knowledge, soul, hook, fuel, curve  
-- Banned: “revolutionary,” “disrupt,” “ecosystem synergies,” “gm ser,” empty hash energy as praise  
+- Allowed: reputation, contribution, human value, learning, building, knowledge, ownership  
+- Banned in main UI: mining, farm, yield, token earning, oath, membership gate, “gm ser,” empty hash praise  
 
 **Tone test:** Would a tired parent and a sharp builder both feel seen? If only degens laugh, rewrite.
 
-## 4. Color system (campaign + UI)
+## 4. Color system
 
 | Token | Hex | Role |
 |-------|-----|------|
 | Void | `#050608` | Background plane |
-| Signal | `#22D3EE` | Primary accent (attention / live) |
-| Ember | `#F59E0B` | Campaign / Club / CTA |
-| Heart | `#FB7185` | Spread / love (sparingly) |
+| Signal | `#22D3EE` | Primary accent |
+| Ember | `#F59E0B` | CTA / progress |
+| Heart | `#FB7185` | Contribution / share (sparingly) |
 | Bone | `#F8FAFC` | Headlines |
 | Mute | `#94A3B8` | Body |
 
-**Do not:** purple-on-white gradients, cream/terracotta “AI editorial,” neon rainbow, comic meme fonts for hero.
+**Do not:** purple-on-white gradients, cream/terracotta “AI editorial,” neon rainbow, crypto-casino chrome.
 
 ## 5. Typography
 
-- Display: expressive italic bold (app `font-display`) — brand hero only  
+- Display: expressive italic bold (`font-display`) — brand hero only  
 - Body: clean grotesque / mono for labels  
-- Campaign type: few words, huge; one slogan per frame  
 
 ## 6. Visual rules
 
-1. One composition per asset — not a dashboard collage.  
+1. One composition per section — not a dashboard collage in the hero.  
 2. Brand or slogan is the hero; product UI is secondary proof.  
-3. Full-bleed atmosphere (facility / signal / void) — no floating cards in hero.  
-4. No detached sticker badges on faces of people.  
-5. Real metaphor: mining = attention → fuel, not cartoon pickaxes unless ironic and rare.
+3. Full-bleed atmosphere — premium dark, Apple/Tesla calm.  
+4. No detached sticker badges on faces.  
+5. Metaphor: reputation from contribution — not pickaxes or slot machines.
 
 ## 7. Master slogans (approved)
 
-### Primary
-1. **Mine some culture.**  
-2. **It’s about time to mine some culture.**  
+### Hero
+1. **Human value was never measured correctly.**  
+2. **Human Value = Contribution**  
+3. **Build Your Human Passport**  
+4. **Explore The Human Economy**  
+5. **Own your digital reputation.**
 
-### Spine (worldview)
-3. **Their failure curve is optional.**  
-4. **Just because humanity wants the same failure curve does not mean you have to.**  
+### Spine
+6. **Their failure curve is optional.**  
+7. **Discover → Prove → Passport → Grow → Reputation.**  
+8. **Share knowledge. Lift others. Reputation compounds.**  
+9. **Proof of Attention > empty hours.**  
 
-### Loop
-5. **Hook → Club → Spread.**  
-6. **Spread love and knowledge — that’s how we win.**  
-7. **Get hooked. Join the club. Pass it on.**  
+### Social (secondary)
+10. **Name the bait that owns your thumb.** (Hook Loop)  
+11. **How they hook you into doomscrolling.** (Hook Loop)
 
-### Product proof
-8. **Attention becomes fuel.**  
-9. **Proof of Attention > empty hashes.**  
-10. **Knowledge that works now.**  
+## 8. Message house
 
-### Culture Club
-11. **First night? You have to sign.**  
-12. **You’re in. Now pass it on.**  
-
-## 8. Campaign naming
-
-| Campaign | Lockup | Channel |
-|----------|--------|---------|
-| Mine Culture | slogans 1–2 | X, OG, store |
-| Off the Curve | slogans 3–4 | Hero, pitch |
-| Culture Club | slogans 5–7, 11–12 | Oath, invites |
+```
+        HUMAN VALUE WAS NEVER MEASURED CORRECTLY
+                         │
+          ┌──────────────┼──────────────┐
+          │              │              │
+    HUMAN PASSPORT   PROOF OF       HUMAN ECONOMY
+    (identity)       ATTENTION      (category / growth)
+                     (challenge)
+```
 
 ## 9. Lockups
 
-- `CULTURE NODE` (display)  
-- Sub: `Building Culture` or `Proof of Attention OS` — never both crowded  
+- `BUILDING CULTURE` / `HUMAN ECONOMY` (display)  
+- Sub: `Human Passport` or `Proof of Attention` — never crowded  
 - URL: `mining.buildingcultureid.space`  
 
-## 10. Asset checklist before publish
+## 10. Monetization (public)
+
+- Individual: Human Passport Pro — $9.99/mo  
+- Companies: Human Intelligence Platform — $999–$5,000/mo  
+- Creators: Knowledge marketplace — platform fee  
+
+## 11. Asset checklist before publish
 
 - [ ] One slogan only on the frame  
-- [ ] Void + Signal/Ember only (Heart only on Spread assets)  
-- [ ] Building Culture or Culture Node readable without zoom  
-- [ ] No fake UI chrome pretending to be screenshots unless real  
+- [ ] Void + Signal/Ember only  
+- [ ] Building Culture or Human Economy readable without zoom  
+- [ ] No mining / farm / oath language on hero  
 - [ ] CTA or URL if it’s a traffic asset  
-
-## 11. Message house
-
-```
-           MINE SOME CULTURE
-                    │
-     ┌──────────────┼──────────────┐
-     │              │              │
- OFF THE CURVE   CULTURE CLUB   PROOF OF ATTENTION
- (worldview)     (membership)   (product loop)
-```
-
-## 12. Campaign image kit
-
-Generated assets live in `public/campaign/`:
-
-| File | Slogan | Use |
-|------|--------|-----|
-| `mine-culture.png` | Mine some culture. | Hero / OG / X header |
-| `failure-curve.png` | Their failure curve is optional. | Worldview posts |
-| `culture-club.png` | You’re in. Now pass it on. | Club / invite |
-| `spread-love.png` | Spread love & knowledge. | Social Buzz / Spread |

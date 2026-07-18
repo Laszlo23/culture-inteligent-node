@@ -26,7 +26,7 @@ const WHEEL_PRIZES: WheelPrize[] = [
   { label: "50 $BCC", color: "from-slate-900 to-slate-800 border-r border-white/5", action: (s) => ({ ...s, credits: s.credits + 50 }), logMessage: "WHEEL OF FORTUNE: Won +50 Building Culture Coins ($BCC)!" },
   { label: "+20% Energy", color: "from-cyan-950/40 to-cyan-900/40 border-r border-white/5", action: (s) => ({ ...s, energy: Math.min(100, s.energy + 20) }), logMessage: "WHEEL OF FORTUNE: Won +20% Reactor Core Energy recharge!" },
   { label: "100 $BCC", color: "from-slate-900 to-slate-800 border-r border-white/5", action: (s) => ({ ...s, credits: s.credits + 100 }), logMessage: "WHEEL OF FORTUNE: Won +100 Building Culture Coins ($BCC)!" },
-  { label: "+10 PH/s Core", color: "from-fuchsia-950/40 to-fuchsia-900/40 border-r border-white/5", action: (s) => ({ ...s, miningPower: s.miningPower + 10 }), logMessage: "WHEEL OF FORTUNE: Won +10 PH/s permanent compiler power booster!" },
+  { label: "+10 Builder", color: "from-fuchsia-950/40 to-fuchsia-900/40 border-r border-white/5", action: (s) => ({ ...s, miningPower: s.miningPower + 10 }), logMessage: "DAILY SIGNAL: Builder boost applied to your growth score." },
   { label: "250 $BCC", color: "from-slate-900 to-slate-800 border-r border-white/5", action: (s) => ({ ...s, credits: s.credits + 250 }), logMessage: "WHEEL OF FORTUNE: Won +250 Building Culture Coins ($BCC)!" },
   { label: "+50% Energy", color: "from-orange-950/40 to-orange-900/40 border-r border-white/5", action: (s) => ({ ...s, energy: Math.min(100, s.energy + 50) }), logMessage: "WHEEL OF FORTUNE: Won +50% heavy energy capsule drop!" },
   { label: "500 $BCC", color: "from-slate-900 to-slate-800 border-r border-white/5", action: (s) => ({ ...s, credits: s.credits + 500 }), logMessage: "WHEEL OF FORTUNE: Won +500 Building Culture Coins ($BCC)!" },
@@ -276,16 +276,16 @@ export default function DailyMissions({ state, setState, addLog }: DailyMissions
           <div>
             <div className="flex items-center gap-2">
               <span className={`text-[10px] font-mono tracking-widest block uppercase ${state.energy < 40 ? 'text-red-400 font-bold' : 'text-emerald-400'}`}>
-                {state.energy < 40 ? '⚠ REACTOR RUNNING LOW' : '✔ REACTOR RUNNING NOMINAL'}
+                {state.energy < 40 ? 'FOCUS RESERVE LOW' : 'FOCUS RESERVE READY'}
               </span>
             </div>
             <h3 className="text-sm font-mono font-bold text-slate-100 mt-1">
-              CURRENT FACILITY GRID ENERGY: {state.energy}%
+              QUESTS · LEARN · BUILD · CONTRIBUTE · {state.energy}% capacity
             </h3>
             <p className="text-xs text-slate-400 font-sans mt-0.5 max-w-xl leading-relaxed">
               {state.energy < 40 
-                ? 'Maintenance cycle is critical. Fuel levels are depleted. Operations will lock down if systems reach 0%. Complete objectives below to refuel!' 
-                : 'Systems optimal. Continue logging attention sessions or completing tasks to preserve maximum stability.'
+                ? 'Complete a Learn or Build quest to restore capacity and grow your Human Passport.' 
+                : 'Keep the loop warm — daily quests update Knowledge, Builder, and Contribution scores.'
               }
             </p>
           </div>
@@ -309,7 +309,7 @@ export default function DailyMissions({ state, setState, addLog }: DailyMissions
         <div className="flex items-center gap-2 mb-4">
           <RotateCw className="w-4 h-4 text-cyan-400" />
           <h3 className="font-mono text-sm font-bold text-white tracking-wider uppercase">
-            Lucky Wheel of Fortune
+            Daily Signal
           </h3>
           <span className="text-[8px] font-mono px-2 py-0.5 rounded border border-cyan-500/30 text-cyan-400 tracking-widest">
             DAILY SPIN
@@ -375,7 +375,7 @@ export default function DailyMissions({ state, setState, addLog }: DailyMissions
           <div className="md:col-span-7 space-y-4">
             <div className="flex items-center gap-2">
               <Trophy className="w-5 h-5 text-amber-400" />
-              <h3 className="font-mono text-sm font-semibold text-slate-100 tracking-wider">DAILY $BCC WHEEL OF FORTUNE</h3>
+              <h3 className="font-mono text-sm font-semibold text-slate-100 tracking-wider">DAILY SIGNAL · REPUTATION BOOST</h3>
             </div>
             
             <p className="text-xs text-slate-400 font-sans leading-relaxed">

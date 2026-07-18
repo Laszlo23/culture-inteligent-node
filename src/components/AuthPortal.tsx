@@ -259,14 +259,16 @@ export default function AuthPortal({ onLoginSuccess, autoStart = null }: AuthPor
             <Wallet className="w-5 h-5" />
           </div>
           <span className="font-mono text-[9px] font-black tracking-[0.25em] text-cyan-400 uppercase block">
-            Proof of Attention
+            Human Passport
           </span>
           <h2 className="text-xl font-extrabold text-white tracking-tight mt-1 font-display italic">
-            {autoStart === 'local' ? 'Entering — attention next…' : "We're here for attention"}
+            {autoStart === 'local'
+              ? 'Securing your passport…'
+              : 'Own your digital reputation'}
           </h2>
           <p className="text-xs text-slate-400 font-sans mt-2 leading-relaxed">
-            Phantom + Solana Devnet. Connect once, then prove attention in Academy — not empty
-            hashes. Mobile? We open Culture Node inside Phantom for you.
+            Continue with a secure ID, claim your Human Passport, then prove attention. Mobile opens
+            inside Phantom for you — ownership stays yours.
           </p>
         </div>
 
@@ -357,11 +359,11 @@ export default function AuthPortal({ onLoginSuccess, autoStart = null }: AuthPor
                   <Link2 className="w-4 h-4" />
                 )}
                 {isLikelyMobile() && !getPhantomProvider()
-                  ? 'Open in Phantom'
-                  : 'Connect Phantom'}
+                  ? 'Continue in Phantom'
+                  : 'Continue with Phantom'}
               </button>
               <p className="text-[10px] text-slate-500 font-sans text-center -mt-1">
-                Solana Devnet ·{' '}
+                Secure passport ·{' '}
                 <a
                   href={phantomInstallUrl()}
                   target="_blank"
@@ -370,7 +372,7 @@ export default function AuthPortal({ onLoginSuccess, autoStart = null }: AuthPor
                 >
                   Get Phantom
                 </a>
-                {isLikelyMobile() ? ' · opens in-app browser' : ' · browser extension'}
+                {isLikelyMobile() ? ' · works on phone' : ' · browser'}
               </p>
 
               <button
@@ -384,17 +386,17 @@ export default function AuthPortal({ onLoginSuccess, autoStart = null }: AuthPor
                 ) : savedLocalAddress ? (
                   <>
                     <Key className="w-4 h-4 text-cyan-400" />
-                    Continue demo wallet ({shortAddr(savedLocalAddress)})
+                    Continue without app ({shortAddr(savedLocalAddress)})
                   </>
                 ) : (
                   <>
                     <Sparkles className="w-4 h-4 text-cyan-400" />
-                    Demo wallet (no extension)
+                    Continue without app
                   </>
                 )}
               </button>
               <p className="text-[10px] text-slate-500 font-sans text-center -mt-1">
-                This browser only · Devnet · logout clears keys
+                This device only · practice network · logout clears keys
               </p>
 
               {savedLocalAddress && (
@@ -425,8 +427,8 @@ export default function AuthPortal({ onLoginSuccess, autoStart = null }: AuthPor
         <div className="mt-5 pt-4 border-t border-white/5 flex items-start gap-2 text-[10px] text-slate-500 font-sans leading-relaxed">
           <Info className="w-3.5 h-3.5 text-cyan-500 flex-shrink-0 mt-0.5" />
           <span>
-            Next: <strong className="text-slate-400">First Spark</strong> — prove attention (~2 min).
-            Pass → knowledge fuel. Then Hook Mirror: see why you scroll.
+            Next: claim your <strong className="text-slate-400">Human Passport</strong>, then a short{' '}
+            <strong className="text-slate-400">Proof of Attention</strong> challenge (~2 min).
           </span>
         </div>
       </motion.div>

@@ -1,8 +1,8 @@
 {
   "id": "/",
-  "name": "Building Culture — Culture Node",
-  "short_name": "Culture Node",
-  "description": "Proof of Attention OS on Solana — Phantom wallet, First Spark, Hook Loop. Mind ↔ Machine.",
+  "name": "Building Culture — Human Economy",
+  "short_name": "Human Economy",
+  "description": "Human Passport — reputation from learning, creating, contributing. Proof of Attention.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

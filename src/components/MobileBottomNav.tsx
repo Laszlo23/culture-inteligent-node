@@ -56,7 +56,7 @@ function tabActive(tab: Tab, activeRoom: string): boolean {
 }
 
 function shortNextLabel(step: NextStep, phase: NavPhase): string {
-  if (phase === 'ritual') return 'Ignite First Spark';
+  if (phase === 'ritual') return 'Start Proof of Attention';
   if (/quieter path/i.test(step.label)) return 'Quieter path';
   if (step.label.length <= 24) return step.label;
   return step.label.slice(0, 22).trimEnd() + '…';
@@ -189,7 +189,7 @@ export default function MobileBottomNav({
                       : 'text-slate-500 active:text-slate-300'
                 } ${lockPulse === tab.id ? 'ring-1 ring-cyan-400/40 bg-cyan-500/5' : ''}`}
                 aria-current={active ? 'page' : undefined}
-                aria-label={locked ? `${tab.label} — unlocks after First Spark` : tab.label}
+                aria-label={locked ? `${tab.label} — unlocks after Proof of Attention` : tab.label}
               >
                 <span className="relative flex items-center justify-center">
                   {tab.icon}

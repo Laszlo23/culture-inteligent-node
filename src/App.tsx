@@ -48,7 +48,6 @@ import {
   buildAttentionBrief,
 } from './components/fx';
 import FacilitySectorCard from './components/FacilitySectorCard';
-import PersonalHomeHero from './components/PersonalHomeHero';
 import FieldDeckClaim from './components/FieldDeckClaim';
 import HookLoopCampaign from './components/HookLoopCampaign';
 import SoundControls from './components/SoundControls';
@@ -82,15 +81,17 @@ import {
 } from './lib/meta-quest';
 import MetaQuestWhisper from './components/MetaQuestWhisper';
 import AnonymousChamber from './components/AnonymousChamber';
-import ClubOath from './components/ClubOath';
+import HumanEconomyLanding from './components/HumanEconomyLanding';
+import HumanPassportClaim from './components/HumanPassportClaim';
+import HumanPassportDashboard from './components/HumanPassportDashboard';
 import {
   buildMemberInvitePost,
-  hasClubOath,
+  hasHumanPassport,
   hasSpreadLove,
   markSpreadLove,
-} from './lib/club-oath';
+} from './lib/human-passport';
 import { sendAttentionProofMemo } from './lib/poa-chain';
-import { SLOGANS } from './lib/brand-slogans';
+import { BRAND, SLOGANS } from './lib/brand-slogans';
 import {
   CULTURE_BROADCAST,
   HEARING_MODE_URL,
@@ -225,7 +226,7 @@ const INITIAL_WORKERS: AIWorker[] = [
 const INITIAL_ROOMS: FacilityRoom[] = [
   { id: 'reactor', name: 'Attention Reactor', level: 1, maxLevel: 5, unlocked: true, costToUnlock: 0, costToUpgrade: 500, description: 'Converts verified attention into node energy and monitors core stability.', perk: '+15% Core Energy Capacity' },
   { id: 'workshop', name: 'Hardware Marketplace', level: 1, maxLevel: 5, unlocked: true, costToUnlock: 0, costToUpgrade: 600, description: 'Acquire and mount modules that amplify your facility’s attention throughput.', perk: '-10% Part Purchasing Costs' },
-  { id: 'lab', name: 'Attention Academy', level: 1, maxLevel: 5, unlocked: true, costToUnlock: 0, costToUpgrade: 700, description: 'Learn, verify focus, and refuel the reactor with Proof of Attention.', perk: '+20% Energy Refuel Multiplier' },
+  { id: 'lab', name: 'Proof of Attention', level: 1, maxLevel: 5, unlocked: true, costToUnlock: 0, costToUpgrade: 700, description: 'Learn, create, and prove contribution — updates your Human Passport.', perk: '+20% Knowledge path boost' },
   { id: 'ai', name: 'Automation Center', level: 0, maxLevel: 3, unlocked: false, costToUnlock: 800, costToUpgrade: 1200, description: 'Deploy AI companions that passively boost facility output.', perk: '+5% Worker Passive Speed' },
   { id: 'treasury', name: 'Ecosystem Vault', level: 1, maxLevel: 3, unlocked: true, costToUnlock: 0, costToUpgrade: 1500, description: 'Claim yields, attest daily streaks, and operate the Solana Devnet portal.', perk: '+12% Hourly Claim Multiplier' },
   { id: 'guild', name: 'Apex Summit', level: 1, maxLevel: 1, unlocked: true, costToUnlock: 0, costToUpgrade: 0, description: 'Monthly chamber for the top of the top — faction houses feed the Apex Circle.', perk: '+10% Team Output · Apex seating' },
@@ -238,11 +239,11 @@ const INITIAL_GUILDS: Guild[] = [
 ];
 
 const INITIAL_MISSIONS: DailyMission[] = [
-  { id: 'm_kpi', label: 'Stabilize node: prove Devnet contribution (0.05 SOL on-chain)', completed: false, energyReward: 25, powerReward: 15, category: 'build' },
-  { id: 'm_academy', label: 'Refuel reactor: complete an agent-verified Academy session', completed: false, energyReward: 30, powerReward: 20, category: 'build' },
-  { id: 'm1', label: 'Decode AI signal: review Solana Devnet checklist (practice)', completed: false, energyReward: 15, powerReward: 8, category: 'video' },
-  { id: 'm2', label: 'Analyze archive: skim parallel execution notes (practice)', completed: false, energyReward: 15, powerReward: 8, category: 'article' },
-  { id: 'm3', label: 'Recover focus: warm-up attention timer (practice)', completed: false, energyReward: 20, powerReward: 10, category: 'quest' },
+  { id: 'm_kpi', label: 'BUILD: Verify a real contribution on-chain (practice network)', completed: false, energyReward: 25, powerReward: 15, category: 'build' },
+  { id: 'm_academy', label: 'LEARN: Complete a Proof of Attention challenge', completed: false, energyReward: 30, powerReward: 20, category: 'build' },
+  { id: 'm1', label: 'LEARN: Review today\'s knowledge checklist (practice)', completed: false, energyReward: 15, powerReward: 8, category: 'video' },
+  { id: 'm2', label: 'BUILD: Skim a problem-solving note and capture one insight', completed: false, energyReward: 15, powerReward: 8, category: 'article' },
+  { id: 'm3', label: 'CONTRIBUTE: Warm-up focus timer — then help someone later', completed: false, energyReward: 20, powerReward: 10, category: 'quest' },
 ];
 
 export default function App() {
@@ -361,7 +362,8 @@ export default function App() {
         room === 'lab' ||
         room === 'map' ||
         room === 'field-deck' ||
-        room === 'hook-loop'
+        room === 'hook-loop' ||
+        room === 'passport'
       ) {
         return room;
       }
@@ -429,15 +431,15 @@ export default function App() {
   } | null>(null);
   const [apiSessionMissing, setApiSessionMissing] = useState(false);
   const [retryingApiSession, setRetryingApiSession] = useState(false);
-  /** Culture Club oath — signed membership before the facility opens */
-  const [clubOathPending, setClubOathPending] = useState<boolean>(() => {
+  /** Human Passport claim — once per identity before workspace opens */
+  const [passportPending, setPassportPending] = useState<boolean>(() => {
     if (typeof window === 'undefined') return false;
     try {
       const saved = localStorage.getItem('solana_current_user_session_v1');
       if (!saved) return false;
       const user = JSON.parse(saved) as { walletAddress?: string };
       if (!user.walletAddress) return false;
-      return !hasClubOath(user.walletAddress);
+      return !hasHumanPassport(user.walletAddress);
     } catch {
       return false;
     }
@@ -631,7 +633,7 @@ export default function App() {
     ensureFirstRitualPending();
     setFirstRitualPending(isFirstRitualPending());
     setShowStory(false);
-    setClubOathPending(user.walletAddress ? !hasClubOath(user.walletAddress) : false);
+    setPassportPending(user.walletAddress ? !hasHumanPassport(user.walletAddress) : false);
 
     const walletHint = user.walletAddress
       ? ` (${user.walletAddress.slice(0, 4)}…${user.walletAddress.slice(-4)})`
@@ -983,7 +985,7 @@ export default function App() {
     } else if (roomId === 'onboarding') {
       roomName = 'Ecosystem Hub';
     } else if (roomId === 'missions') {
-      roomName = "Daily Missions & Lucky Wheel";
+      roomName = 'Quests — Learn · Build · Contribute';
     } else if (roomId === 'legal-privacy') {
       roomName = "Privacy Policy";
     } else if (roomId === 'legal-terms') {
@@ -1002,8 +1004,12 @@ export default function App() {
       roomName = 'Field Deck — Hunt & Claim';
     } else if (roomId === 'hook-loop') {
       roomName = 'Hook Loop — Meme Truths';
+    } else if (roomId === 'passport') {
+      roomName = 'Human Passport';
+    } else if (roomId === 'lab') {
+      roomName = 'Proof of Attention — Learn';
     } else {
-      roomName = state.rooms.find(r => r.id === roomId)?.name || "Facility Schematic";
+      roomName = state.rooms.find(r => r.id === roomId)?.name || 'Workspace';
     }
     addLog(`Entering ${roomName}...`, "info");
 
@@ -1026,7 +1032,7 @@ export default function App() {
     currentUser,
     changeRoom,
     addLog,
-    clubOathPending,
+    passportPending,
   });
   hearingWorldRef.current = {
     state,
@@ -1035,7 +1041,7 @@ export default function App() {
     currentUser,
     changeRoom,
     addLog,
-    clubOathPending,
+    passportPending,
   };
 
   const hearingCommandHandler = useCallback<HearingCommandHandler>(async (cmd, { speakLine }) => {
@@ -1119,7 +1125,7 @@ export default function App() {
       case 'spread': {
         const user = w.currentUser;
         if (!user?.walletAddress) {
-          await speakLine('Connect a wallet and sign Culture Club before Spread.');
+          await speakLine('Secure your identity and claim a Human Passport before inviting others.');
           return true;
         }
         const post = buildMemberInvitePost({
@@ -1231,7 +1237,7 @@ export default function App() {
   })();
   const spreadPending = Boolean(
     currentUser?.walletAddress &&
-      hasClubOath(currentUser.walletAddress) &&
+      hasHumanPassport(currentUser.walletAddress) &&
       !hasSpreadLove(currentUser.walletAddress)
   );
   const dailyStreak = (() => {
@@ -1253,8 +1259,8 @@ export default function App() {
     if (firstRitualPending) {
       return {
         id: 'lab' as NavDestination,
-        label: 'Ignite First Spark',
-        reason: `${you}, one short session — just for you. Then your facility opens.`,
+        label: 'Start Proof of Attention',
+        reason: `${you}, one short challenge — then your Knowledge Score moves.`,
       };
     }
     if (fuelWin) {
@@ -1267,8 +1273,8 @@ export default function App() {
     if (state.energy < 35) {
       return {
         id: 'lab' as NavDestination,
-        label: 'Refuel in Academy',
-        reason: `${you}, fuel’s low. Another short session brings your node back.`,
+        label: 'Continue learning',
+        reason: `${you}, keep proving attention — another short challenge grows your passport.`,
       };
     }
     if (dailyClaimReady) {
@@ -1331,6 +1337,7 @@ export default function App() {
       const allowed: NavDestination[] = [
         'lab',
         'map',
+        'passport',
         'hook-loop',
         'field-deck',
         'legal-privacy',
@@ -1339,7 +1346,7 @@ export default function App() {
       ];
       if (!allowed.includes(id)) {
         addLog(
-          'First Spark unlocks that room — ~2 min in Academy, just for you.',
+          'Proof of Attention unlocks that room — ~2 min challenge to grow your passport.',
           'info'
         );
         changeRoom('lab');
@@ -1492,30 +1499,22 @@ export default function App() {
     }
   };
 
-  // Cold start: landing / auth only — no mining dashboard behind the gate
+  // Cold start: Human Economy landing → secure ID — no workspace behind the gate
   if (!currentUser) {
     return (
       <HearingModeContext.Provider value={hearing}>
         <div className="min-h-screen bg-[#050608] text-slate-300 font-sans selection:bg-cyan-500/30 selection:text-cyan-300 relative overflow-hidden">
           <AnimatePresence mode="wait">
             {showStory ? (
-              <OnboardingModal
-                key="cold-story"
-                replay={false}
-                onClose={() => {
-                  dismissStoryToAuth(null);
-                  addLog(
-                    "ONBOARDING: We're here for attention — connect, then prove it in First Spark.",
-                    'info'
-                  );
-                }}
-                onEnterLocal={() => {
-                  dismissStoryToAuth('local');
-                  addLog('ONBOARDING: Entering with local Devnet wallet…', 'info');
-                }}
-                onEnterPhantom={() => {
+              <HumanEconomyLanding
+                key="cold-landing"
+                onBuildPassport={() => {
                   dismissStoryToAuth('phantom');
-                  addLog('ONBOARDING: Phantom path…', 'info');
+                  addLog('HUMAN ECONOMY: Building Human Passport — secure your identity…', 'info');
+                }}
+                onContinueSecure={() => {
+                  dismissStoryToAuth(null);
+                  addLog('HUMAN ECONOMY: Continue — claim your passport after secure ID.', 'info');
                 }}
               />
             ) : (
@@ -1532,67 +1531,45 @@ export default function App() {
     );
   }
 
-  // Culture Club: every member signs the oath once per wallet before the floor opens
-  if (clubOathPending && currentUser.walletAddress) {
+  // Human Passport: claim once per identity before the workspace opens
+  if (passportPending && currentUser.walletAddress) {
     return (
       <HearingModeContext.Provider value={hearing}>
         <div className="min-h-screen bg-[#050608] text-slate-300 font-sans selection:bg-cyan-500/30 selection:text-cyan-300 relative overflow-hidden">
-          <ClubOath
+          <HumanPassportClaim
             walletAddress={currentUser.walletAddress}
             walletType={currentUser.walletType === 'extension' ? 'extension' : 'local'}
             displayName={currentUser.username}
             addLog={addLog}
-            onSigned={({ spread }) => {
-              setClubOathPending(false);
-              if (spread) {
-                setState((prev) => ({
-                  ...prev,
-                  credits: prev.credits + 40,
-                  energy: Math.min(100, prev.energy + 8),
-                  notifications: [
-                    {
-                      id: `club_spread_${Date.now()}`,
-                      title: 'Love & knowledge',
-                      message:
-                        "You spread the invite — +40 BCC · +8% fuel. We're here for attention — pull the next soul in.",
-                      timestamp: new Date().toLocaleTimeString([], {
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      }),
-                      read: false,
-                      type: 'success' as const,
-                    },
-                    ...(prev.notifications || []),
-                  ],
-                }));
-                addLog(
-                  "CULTURE CLUB: Spread +40 BCC · +8% fuel. Floor open — prove attention (First Spark).",
-                  'success'
-                );
-              } else {
-                setState((prev) => ({
-                  ...prev,
-                  notifications: [
-                    {
-                      id: `club_in_${Date.now()}`,
-                      title: 'Culture Club',
-                      message:
-                        "You're in. We're here for attention — First Spark next, then Spread when ready.",
-                      timestamp: new Date().toLocaleTimeString([], {
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      }),
-                      read: false,
-                      type: 'info' as const,
-                    },
-                    ...(prev.notifications || []),
-                  ],
-                }));
-                addLog(
-                  "CULTURE CLUB: Floor open. We're here for attention — First Spark when ready.",
-                  'system'
-                );
-              }
+            onClaimed={({ invited }) => {
+              setPassportPending(false);
+              setState((prev) => ({
+                ...prev,
+                notifications: [
+                  {
+                    id: `passport_${Date.now()}`,
+                    title: 'Human Passport',
+                    message: invited
+                      ? 'Passport ready — you invited a builder. Start Proof of Attention when ready.'
+                      : 'Passport ready. Prove attention to grow your Knowledge Score.',
+                    timestamp: new Date().toLocaleTimeString([], {
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    }),
+                    read: false,
+                    type: 'success' as const,
+                  },
+                  ...(prev.notifications || []),
+                ],
+              }));
+              addLog(
+                'PASSPORT: Workspace open. Own your digital reputation — prove attention next.',
+                'system'
+              );
+            }}
+            onStartProof={() => {
+              setPassportPending(false);
+              changeRoom('lab');
             }}
           />
           <HearingModeShell />
@@ -1746,11 +1723,13 @@ export default function App() {
           </div>
           <div className="min-w-0">
             <span className="hidden sm:block text-[10px] font-mono tracking-widest uppercase text-amber-500/80">
-              {SLOGANS.attention}
+              {BRAND.parent}
             </span>
             <h1 className="text-sm font-bold tracking-tight text-white flex items-center gap-1.5 sm:gap-2">
-              <span className="truncate">CULTURE NODE</span>
-              <span className="text-[8px] font-mono tracking-widest uppercase bg-cyan-950/60 border border-cyan-800 text-cyan-400 px-1.5 py-0.5 rounded shrink-0">DEVNET</span>
+              <span className="truncate">{BRAND.product.toUpperCase()}</span>
+              <span className="text-[8px] font-mono tracking-widest uppercase bg-cyan-950/60 border border-cyan-800 text-cyan-400 px-1.5 py-0.5 rounded shrink-0">
+                {BRAND.passport}
+              </span>
             </h1>
           </div>
         </div>
@@ -1803,9 +1782,9 @@ export default function App() {
             <div className="hidden md:flex items-center gap-2 px-3 py-1.5 bg-cyan-950/20 border border-cyan-500/20 rounded-lg font-mono text-[10px] text-cyan-400 font-bold uppercase" title={currentUser.walletAddress || currentUser.username}>
               <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
               <span>@{currentUser.username}</span>
-              {currentUser.walletAddress && hasClubOath(currentUser.walletAddress) && (
-                <span className="text-amber-400/90 border border-amber-500/30 bg-amber-500/10 px-1.5 py-0.5 rounded" title="Culture Club oath signed">
-                  Club
+              {currentUser.walletAddress && hasHumanPassport(currentUser.walletAddress) && (
+                <span className="text-amber-400/90 border border-amber-500/30 bg-amber-500/10 px-1.5 py-0.5 rounded" title="Human Passport claimed">
+                  Passport
                 </span>
               )}
               {currentUser.walletAddress && (
@@ -1813,10 +1792,10 @@ export default function App() {
                   {currentUser.walletAddress.slice(0, 4)}…{currentUser.walletAddress.slice(-4)}
                 </span>
               )}
-              {currentUser.walletAddress && hasClubOath(currentUser.walletAddress) && (
+              {currentUser.walletAddress && hasHumanPassport(currentUser.walletAddress) && (
                 <button
                   type="button"
-                  title="Copy your Culture Club invite — spread love & knowledge"
+                  title="Copy your Human Passport invite"
                   onClick={() => {
                     const post = buildMemberInvitePost({
                       displayName: currentUser.username,
@@ -2020,6 +1999,7 @@ export default function App() {
                   void: 'SECTOR_VOID',
                   'field-deck': 'SECTOR_FIELD',
                   'hook-loop': 'SECTOR_HOOK',
+                  passport: 'SECTOR_PASS',
                   roadmap: 'SECTOR_PATH',
                   onboarding: 'SECTOR_HUB',
                   partners: 'SECTOR_ALLY',
@@ -2084,17 +2064,20 @@ export default function App() {
             <RoomEnter key="map-view" roomKey="map-view">
               <div className="space-y-6">
               {currentUser && (
-                <PersonalHomeHero
+                <HumanPassportDashboard
                   username={currentUser.username}
                   avatarUrl={state.profile?.avatarUrl}
-                  aboutMe={state.profile?.aboutMe}
                   state={state}
                   firstRitualPending={firstRitualPending}
                   academyCompletedCount={academyCompletedCount}
                   coreSessionTotal={CORE_ATTENTION_SESSIONS.length}
-                  streak={dailyStreak}
-                  nextStep={navNextStep}
-                  onNavigate={(room) => handleNavNavigate(room)}
+                  compact
+                  nextStep={{
+                    label: navNextStep.label,
+                    reason: navNextStep.reason,
+                    onGo: () => handleNavNavigate(navNextStep.id),
+                  }}
+                  onOpenFull={() => changeRoom('passport')}
                 />
               )}
 
@@ -2152,36 +2135,27 @@ export default function App() {
                       <div className="min-w-0">
                         <span className="text-[10px] font-mono font-bold text-cyan-400 block tracking-widest uppercase">
                           {currentUser
-                            ? `@${currentUser.username.replace(/^@/, '')} · first spark waiting`
-                            : 'Just for you · fuel starts empty on purpose'}
+                            ? `@${currentUser.username.replace(/^@/, '')} · proof waiting`
+                            : 'Proof of Attention · start here'}
                         </span>
                         <h4 className="font-display text-xl font-extrabold italic text-white mt-1 tracking-tight">
                           {currentUser
-                            ? `${currentUser.username.replace(/^@/, '')}, prove attention moves energy`
-                            : 'Prove attention moves energy'}
+                            ? `${currentUser.username.replace(/^@/, '')}, prove what you learn`
+                            : 'Prove what you learn'}
                         </h4>
                         <p className="text-xs text-slate-400 mt-2 max-w-xl font-sans leading-relaxed">
-                          One short snap (~2 min). Watch knowledge fuel fill — yours. Attention first,
-                          then the facility opens around you.
+                          One short challenge (~2 min). Your Knowledge Score moves — then the workspace
+                          opens around your Human Passport.
                         </p>
                         <div className="mt-3 flex flex-wrap gap-2 text-[9px] font-mono uppercase tracking-wider">
                           <span className="px-2 py-1 rounded-md border border-cyan-400/25 bg-cyan-500/10 text-cyan-200">
-                            Plasticity
+                            Knowledge
                           </span>
                           <span className="px-2 py-1 rounded-md border border-amber-400/25 bg-amber-500/10 text-amber-100">
-                            Bias check
+                            Creativity
                           </span>
                           <span className="px-2 py-1 rounded-md border border-white/10 bg-white/5 text-slate-300">
-                            Proof of Attention
-                          </span>
-                        </div>
-                        <div className="mt-4 max-w-xs">
-                          <span className="text-[9px] font-mono text-slate-500 uppercase tracking-widest">
-                            Your core fuel
-                          </span>
-                          <EnergyFlow energy={state.energy} className="mt-1.5 h-2" />
-                          <span className="text-[10px] font-mono text-orange-400/90 mt-1 block">
-                            {Math.round(state.energy)}% — empty until you earn it
+                            Contribution
                           </span>
                         </div>
                       </div>
@@ -2191,7 +2165,7 @@ export default function App() {
                       onClick={() => changeRoom('lab')}
                       className="px-6 py-3.5 bg-cyan-500 hover:bg-cyan-400 text-black font-black font-mono text-xs rounded-xl tracking-wider transition-all cursor-pointer shrink-0 shadow-[0_0_32px_rgba(34,211,238,0.35)] hover:shadow-[0_0_40px_rgba(34,211,238,0.5)]"
                     >
-                      Ignite First Spark →
+                      Start Proof of Attention →
                     </button>
                   </div>
                 </motion.div>
@@ -2904,6 +2878,21 @@ export default function App() {
                   onOpenMap={() => changeRoom('map')}
                 />
               )}
+              {activeRoom === 'passport' && currentUser && (
+                <HumanPassportDashboard
+                  username={currentUser.username}
+                  avatarUrl={state.profile?.avatarUrl}
+                  state={state}
+                  firstRitualPending={firstRitualPending}
+                  academyCompletedCount={academyCompletedCount}
+                  coreSessionTotal={CORE_ATTENTION_SESSIONS.length}
+                  nextStep={{
+                    label: navNextStep.label,
+                    reason: navNextStep.reason,
+                    onGo: () => handleNavNavigate(navNextStep.id),
+                  }}
+                />
+              )}
               {activeRoom === 'partners' && <PartnerProgram state={state} setState={setState} addLog={addLog} />}
               {activeRoom === 'onboarding' && (
                 <OnboardingHub
@@ -2933,6 +2922,7 @@ export default function App() {
                 'void',
                 'field-deck',
                 'hook-loop',
+                'passport',
                 'partners',
                 'onboarding',
                 'legal-privacy',

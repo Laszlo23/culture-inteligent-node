@@ -24,7 +24,7 @@ export function helpScript(): string {
     'Commands:',
     'Status — attention fuel and node.',
     'Academy or First Spark — prove attention (~2 min).',
-    'Club — Culture Club oath — we are here for attention.',
+    'Passport — claim your Human Passport — own your digital reputation.',
     'Spread — copy your invite.',
     'Broadcast — copy the campaign post.',
     'Map — back to the facility.',

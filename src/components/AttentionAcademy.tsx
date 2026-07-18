@@ -863,7 +863,7 @@ export default function AttentionAcademy({
             <p className="text-[10px] font-mono text-cyan-400 tracking-[0.22em] uppercase flex items-center gap-1.5">
               <Sparkles className="w-3.5 h-3.5" />{' '}
               {ritualPending
-                ? 'First Spark · Proof of Attention'
+                ? 'Proof of Attention · Knowledge challenge'
                 : hookMirrorPending
                   ? 'Hook Mirror · why you scroll again'
                   : 'AI mentor · attention → fuel'}
@@ -904,7 +904,7 @@ export default function AttentionAcademy({
               </>
             ) : hookMirrorPending ? (
               <>
-                This is why Culture Node exists — name what hooks you, what you notice when
+                This is why the Human Passport exists — name what hooks you, what you notice when
                 you&apos;re doomscrolling again, and why you keep going. Then Zen: Mind or Machine.{' '}
                 {recommendedSession ? (
                   <>
@@ -934,7 +934,7 @@ export default function AttentionAcademy({
               className="mt-3 relative text-[10px] font-mono uppercase tracking-wider px-3 py-1.5 rounded-lg bg-cyan-500 text-black font-black hover:bg-cyan-400 cursor-pointer"
             >
               {ritualPending
-                ? 'Start First Spark →'
+                ? 'Start Proof of Attention →'
                 : hookMirrorPending
                   ? 'Start Hook Mirror →'
                   : 'Start recommended session →'}

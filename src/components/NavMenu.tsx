@@ -31,6 +31,7 @@ import {
   EyeOff,
   Layers,
   Share2,
+  Award,
 } from 'lucide-react';
 
 export type NavDestination =
@@ -44,6 +45,7 @@ export type NavDestination =
   | 'guild'
   | 'missions'
   | 'profile'
+  | 'passport'
   | 'leaderboard'
   | 'onboarding'
   | 'partners'
@@ -79,17 +81,23 @@ interface NavMenuProps {
 }
 
 const ALL: Record<string, NavItem> = {
-  map: { id: 'map', label: 'Home', hint: 'Facility overview', icon: <Map className="w-4 h-4" /> },
+  map: { id: 'map', label: 'Home', hint: 'Your Human Economy', icon: <Map className="w-4 h-4" /> },
+  passport: {
+    id: 'passport',
+    label: 'Passport',
+    hint: 'Your Human Value',
+    icon: <Award className="w-4 h-4" />,
+  },
   lab: {
     id: 'lab',
-    label: 'Academy',
-    hint: 'Earn knowledge fuel',
+    label: 'Learn',
+    hint: 'Proof of Attention',
     icon: <Compass className="w-4 h-4" />,
   },
   reactor: {
     id: 'reactor',
-    label: 'Reactor',
-    hint: 'Core energy & yield',
+    label: 'Workspace',
+    hint: 'Energy & growth',
     icon: <Zap className="w-4 h-4" />,
   },
   workshop: {
@@ -118,8 +126,8 @@ const ALL: Record<string, NavItem> = {
   },
   missions: {
     id: 'missions',
-    label: 'Missions',
-    hint: 'Daily practice + Lucky Wheel',
+    label: 'Quests',
+    hint: 'Learn · Build · Contribute',
     icon: <RotateCw className="w-4 h-4" />,
   },
   ai: { id: 'ai', label: 'Automation', hint: 'AI workers', icon: <Bot className="w-4 h-4" /> },
@@ -295,10 +303,10 @@ export default function NavMenu({
 
   const primaryIds: NavDestination[] =
     phase === 'ritual'
-      ? ['lab', 'map']
+      ? ['lab', 'passport', 'map']
       : phase === 'guided'
-        ? ['lab', 'treasury', 'profile', 'map']
-        : ['map', 'lab', 'reactor', 'treasury', 'profile'];
+        ? ['lab', 'passport', 'missions', 'map']
+        : ['map', 'passport', 'lab', 'missions', 'profile'];
 
   const moreFacilityIds: NavDestination[] =
     phase === 'open'
@@ -310,7 +318,7 @@ export default function NavMenu({
   const accountIds: NavDestination[] =
     phase === 'ritual'
       ? ['hook-loop', 'field-deck']
-      : ['hook-loop', 'field-deck', 'onboarding', 'partners', 'feedback', 'void'];
+      : ['hook-loop', 'field-deck', 'treasury', 'onboarding', 'partners', 'feedback', 'void'];
 
   return (
     <AnimatePresence>
