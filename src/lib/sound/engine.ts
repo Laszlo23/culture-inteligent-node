@@ -4,6 +4,7 @@
  */
 
 import { nextAffirmation } from './affirmations';
+import { pickSympatheticVoice } from '../hearing/speech';
 
 export type UiSound =
   | 'hover'
@@ -15,6 +16,10 @@ export type UiSound =
 
 const SFX_KEY = 'bc_sound_sfx_v1';
 const VIBE_KEY = 'bc_sound_vibe_v1';
+
+/** Quiet pad under Hearing Mode guide (does not enable vibe affirmations). */
+const HEARING_PAD_GAIN = 0.032;
+const VIBE_PAD_GAIN = 0.045;
 
 function readFlag(key: string, fallback: boolean): boolean {
   try {
@@ -47,6 +52,10 @@ class SoundEngine {
   private lastAffirmation = '';
   private affirmationTimer: ReturnType<typeof setTimeout> | null = null;
   private listeners = new Set<() => void>();
+  /** Soft listening bed while Hearing Mode is active */
+  private hearingBed = false;
+  /** Guide voice is speaking — pause vibe affirmations */
+  private narrationActive = false;
 
   sfxEnabled = readFlag(SFX_KEY, true);
   vibeEnabled = readFlag(VIBE_KEY, false);
@@ -116,18 +125,55 @@ class SoundEngine {
     void this.unlock().then(() => {
       if (on) {
         this.startPad();
-        this.fadePad(0.045);
-        this.scheduleAffirmations();
-        this.speakAffirmation(true);
+        this.fadePad(this.hearingBed ? HEARING_PAD_GAIN : VIBE_PAD_GAIN);
+        if (!this.hearingBed && !this.narrationActive) {
+          this.scheduleAffirmations();
+          this.speakAffirmation(true);
+        }
       } else {
-        this.fadePad(0);
         this.stopAffirmations();
-        if (typeof window !== 'undefined' && window.speechSynthesis) {
-          window.speechSynthesis.cancel();
+        if (!this.hearingBed) {
+          this.fadePad(0);
+          if (typeof window !== 'undefined' && window.speechSynthesis) {
+            window.speechSynthesis.cancel();
+          }
+        } else {
+          this.fadePad(HEARING_PAD_GAIN);
         }
       }
       this.emit();
     });
+  }
+
+  /**
+   * Soft ambient bed for Hearing Mode — breathy pad, no competing affirmations.
+   * Restores vibe affirmations when Hearing turns off (if vibe is on).
+   */
+  setHearingBed(on: boolean) {
+    this.hearingBed = on;
+    void this.unlock().then(() => {
+      if (on) {
+        this.startPad();
+        this.fadePad(HEARING_PAD_GAIN);
+        this.stopAffirmations();
+      } else if (this.vibeEnabled) {
+        this.fadePad(VIBE_PAD_GAIN);
+        if (!this.narrationActive) this.scheduleAffirmations();
+      } else {
+        this.fadePad(0);
+      }
+      this.emit();
+    });
+  }
+
+  /** Call around guide TTS so vibe affirmations never talk over Hearing. */
+  setNarrationActive(on: boolean) {
+    this.narrationActive = on;
+    if (on) {
+      this.stopAffirmations();
+    } else if (this.vibeEnabled && !this.hearingBed) {
+      this.scheduleAffirmations();
+    }
   }
 
   private fadePad(target: number) {
@@ -171,21 +217,23 @@ class SoundEngine {
     lfo.start(now);
     this.padLfo = lfo;
 
-    if (this.vibeEnabled) this.fadePad(0.045);
+    if (this.vibeEnabled || this.hearingBed) {
+      this.fadePad(this.hearingBed ? HEARING_PAD_GAIN : VIBE_PAD_GAIN);
+    }
   }
 
   private scheduleAffirmations() {
     this.stopAffirmations();
-    if (!this.vibeEnabled) return;
+    if (!this.vibeEnabled || this.hearingBed || this.narrationActive) return;
 
     const loop = () => {
-      if (!this.vibeEnabled) return;
+      if (!this.vibeEnabled || this.hearingBed || this.narrationActive) return;
       this.speakAffirmation(false);
-      // Sparse — every 45–75s so it stays subliminal / ambient
-      const wait = 45_000 + Math.random() * 30_000;
+      // Sparse — every 55–90s so it stays subliminal / ambient
+      const wait = 55_000 + Math.random() * 35_000;
       this.affirmationTimer = setTimeout(loop, wait);
     };
-    this.affirmationTimer = setTimeout(loop, 12_000);
+    this.affirmationTimer = setTimeout(loop, 18_000);
   }
 
   private stopAffirmations() {
@@ -196,20 +244,28 @@ class SoundEngine {
   }
 
   speakAffirmation(immediate: boolean) {
-    if (!this.vibeEnabled || typeof window === 'undefined' || !window.speechSynthesis) return;
+    if (
+      !this.vibeEnabled ||
+      this.hearingBed ||
+      this.narrationActive ||
+      typeof window === 'undefined' ||
+      !window.speechSynthesis
+    ) {
+      return;
+    }
+    // Never talk over Hearing Mode guide
+    if (window.speechSynthesis.speaking) return;
+
     const line = nextAffirmation(this.lastAffirmation);
     this.lastAffirmation = line;
 
     const utter = new SpeechSynthesisUtterance(line);
-    utter.volume = 0.18;
-    utter.rate = 0.85;
-    utter.pitch = 1.05;
+    utter.volume = 0.14;
+    utter.rate = 0.8;
+    utter.pitch = 1.03;
     utter.lang = 'en-US';
 
-    const voices = window.speechSynthesis.getVoices();
-    const soft =
-      voices.find((v) => /samantha|karen|moira|female|soft/i.test(v.name)) ||
-      voices.find((v) => v.lang.startsWith('en'));
+    const soft = pickSympatheticVoice();
     if (soft) utter.voice = soft;
 
     if (immediate) window.speechSynthesis.cancel();

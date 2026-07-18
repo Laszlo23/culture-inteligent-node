@@ -1,8 +1,9 @@
 /**
- * Minimal always-on Hearing Mode chrome — listening / speaking, mic, exit.
+ * Hearing Mode chrome — calm listening companion UI.
  */
 
 import React, { useEffect, useState } from 'react';
+import { motion } from 'motion/react';
 import { Ear, Mic, MicOff, X } from 'lucide-react';
 import { useHearing } from '../lib/hearing/context';
 import { isZenMode } from '../lib/zen-duality';
@@ -23,41 +24,74 @@ export default function HearingModeShell() {
   const { phase, lastLine, micEnabled, setMicEnabled, disable, support } = hearing;
 
   const statusLabel =
-    phase === 'speaking' ? 'Speaking' : phase === 'listening' ? 'Listening' : 'Ready';
+    phase === 'speaking'
+      ? 'Speaking gently'
+      : phase === 'listening'
+        ? 'Listening with you'
+        : 'Present';
+
+  const hint =
+    phase === 'listening'
+      ? 'I am listening — take your time.'
+      : phase === 'speaking'
+        ? lastLine || 'Soft words for you…'
+        : lastLine || 'Say Help — or Academy when you are ready.';
 
   return (
     <div
-      className={`fixed left-1/2 z-[60] w-[min(100%-2rem,28rem)] -translate-x-1/2 rounded-2xl border px-4 py-3 shadow-[0_16px_48px_rgba(0,0,0,0.55)] backdrop-blur-xl bottom-[calc(6.75rem+env(safe-area-inset-bottom))] md:bottom-4 ${
+      className={`fixed left-1/2 z-[60] w-[min(100%-2rem,28rem)] -translate-x-1/2 rounded-2xl border px-4 py-3.5 shadow-[0_16px_48px_rgba(0,0,0,0.55)] backdrop-blur-xl bottom-[calc(6.75rem+env(safe-area-inset-bottom))] md:bottom-4 ${
         zenOn
-          ? 'border-amber-500/40 bg-gradient-to-r from-amber-950/80 via-[#0a0a0c]/92 to-cyan-950/50'
-          : 'border-cyan-500/35 bg-[#0a0a0c]/92'
+          ? 'border-amber-500/35 bg-gradient-to-r from-amber-950/75 via-[#0a0a0c]/94 to-cyan-950/45'
+          : 'border-cyan-500/30 bg-[#0a0a0c]/94'
       }`}
       role="region"
-      aria-label="Hearing Mode"
+      aria-label="Hearing Mode — listening space"
     >
       <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2 min-w-0">
-          <div
-            className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border ${
+        <div className="flex items-center gap-2.5 min-w-0">
+          <motion.div
+            className={`relative flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border ${
               phase === 'listening'
-                ? 'border-cyan-400/60 bg-cyan-500/20 text-cyan-300'
+                ? 'border-cyan-400/55 bg-cyan-500/18 text-cyan-200'
                 : phase === 'speaking'
-                  ? 'border-amber-400/50 bg-amber-500/15 text-amber-300'
+                  ? 'border-amber-400/45 bg-amber-500/14 text-amber-200'
                   : 'border-white/10 bg-white/5 text-slate-400'
             }`}
+            animate={
+              phase === 'listening'
+                ? { scale: [1, 1.06, 1], opacity: [0.9, 1, 0.9] }
+                : phase === 'speaking'
+                  ? { scale: [1, 1.03, 1] }
+                  : { scale: 1, opacity: 1 }
+            }
+            transition={
+              phase === 'listening' || phase === 'speaking'
+                ? { duration: phase === 'listening' ? 2.8 : 2.2, repeat: Infinity, ease: 'easeInOut' }
+                : { duration: 0.3 }
+            }
           >
-            <Ear className="h-4 w-4" />
-          </div>
+            {(phase === 'listening' || phase === 'speaking') && (
+              <motion.span
+                className={`absolute inset-0 rounded-xl ${
+                  phase === 'listening' ? 'bg-cyan-400/15' : 'bg-amber-400/12'
+                }`}
+                animate={{ scale: [1, 1.35, 1], opacity: [0.5, 0, 0.5] }}
+                transition={{ duration: 2.6, repeat: Infinity, ease: 'easeInOut' }}
+                aria-hidden
+              />
+            )}
+            <Ear className="relative h-4 w-4" />
+          </motion.div>
           <div className="min-w-0">
-            <p className="font-mono text-[9px] font-black uppercase tracking-[0.22em] text-cyan-400">
+            <p className="font-mono text-[9px] font-black uppercase tracking-[0.22em] text-cyan-400/95">
               Hearing{zenOn ? ' · Zen' : ''} · {statusLabel}
             </p>
             <p
-              className="truncate text-xs text-slate-300"
+              className="truncate text-xs text-slate-300/95 leading-snug"
               aria-live="assertive"
               aria-atomic="true"
             >
-              {lastLine || 'Say help — or Academy.'}
+              {hint}
             </p>
           </div>
         </div>
@@ -85,6 +119,11 @@ export default function HearingModeShell() {
           </button>
         </div>
       </div>
+      {phase === 'listening' && (
+        <p className="mt-2.5 text-[10px] text-slate-500 font-sans leading-relaxed">
+          Soft space. Speak when it feels easy — Help, Academy, or Passport.
+        </p>
+      )}
     </div>
   );
 }

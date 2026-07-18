@@ -102,12 +102,13 @@ export default function SoundControls() {
               </span>
               <span className="block text-[11px] text-slate-400 mt-0.5 leading-snug">
                 Quiet warm pad + soft spoken affirmations. Opt-in only — never hidden.
+                Hearing Mode adds its own gentle bed automatically.
               </span>
             </span>
           </label>
 
           <p className="mt-3 text-[10px] text-slate-600 leading-relaxed">
-            Affirmations stay gentle and spaced out. Turn off anytime.
+            Affirmations stay gentle and spaced. Hearing Mode pauses them so the guide can speak clearly.
           </p>
         </div>
       )}

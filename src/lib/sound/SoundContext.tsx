@@ -10,6 +10,7 @@ import React, {
   useMemo,
   useState,
 } from 'react';
+import { warmSpeechVoices } from '../hearing/speech';
 import { soundEngine, type UiSound } from './engine';
 
 type SoundApi = {
@@ -53,11 +54,14 @@ export function SoundProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
-  // Chrome loads voices async
+  // Chrome loads voices async — prefer warm guide voice for Hearing + vibe
   useEffect(() => {
+    warmSpeechVoices();
     if (typeof window === 'undefined' || !window.speechSynthesis) return;
-    const warm = () => window.speechSynthesis.getVoices();
-    warm();
+    const warm = () => {
+      warmSpeechVoices();
+      window.speechSynthesis.getVoices();
+    };
     window.speechSynthesis.addEventListener('voiceschanged', warm);
     return () => window.speechSynthesis.removeEventListener('voiceschanged', warm);
   }, []);

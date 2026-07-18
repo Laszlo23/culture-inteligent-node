@@ -1,5 +1,5 @@
 /**
- * Hearing Mode controller — TTS, listen loop, barge-in, persistence.
+ * Hearing Mode controller — warm guide TTS, listen loop, barge-in, soft pad.
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -9,6 +9,7 @@ import {
   listenOnce,
   speak,
   stopListening,
+  warmSpeechVoices,
   type SpeechSupport,
 } from '../lib/hearing/speech';
 import { parseHearingCommand, type HearingCommand } from '../lib/hearing/commands';
@@ -20,6 +21,7 @@ import {
   welcomeScript,
 } from '../lib/hearing/scripts';
 import { track } from '../lib/attention-metrics';
+import { soundEngine } from '../lib/sound/engine';
 
 export const HEARING_STORAGE_KEY = 'culture_hearing_v1';
 export const HEARING_BANNER_KEY = 'culture_hearing_banner_v1';
@@ -64,6 +66,10 @@ function persistActive(on: boolean): void {
   }
 }
 
+function pause(ms: number): Promise<void> {
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
+}
+
 export function useHearingMode(onCommand: HearingCommandHandler): HearingModeApi {
   const [active, setActive] = useState(false);
   const [phase, setPhase] = useState<HearingPhase>('idle');
@@ -90,6 +96,10 @@ export function useHearingMode(onCommand: HearingCommandHandler): HearingModeApi
     micRef.current = micEnabled;
   }, [micEnabled]);
 
+  useEffect(() => {
+    warmSpeechVoices();
+  }, []);
+
   const speakLine = useCallback(async (text: string) => {
     const line = text.trim();
     if (!line) return;
@@ -97,9 +107,13 @@ export function useHearingMode(onCommand: HearingCommandHandler): HearingModeApi
     setLastLine(line);
     setPhase('speaking');
     stopListening();
+    soundEngine.setNarrationActive(true);
     try {
-      await speak(line);
+      await speak(line, { style: 'guide' });
+      // Contemplative beat before the mic opens — enlightened pause
+      if (activeRef.current) await pause(480);
     } finally {
+      soundEngine.setNarrationActive(false);
       if (activeRef.current) setPhase('idle');
       else setPhase('idle');
     }
@@ -110,6 +124,7 @@ export function useHearingMode(onCommand: HearingCommandHandler): HearingModeApi
       track('hearing_command', { cmd });
       if (cmd === 'stop') {
         cancelSpeak();
+        soundEngine.setNarrationActive(false);
         setPhase('idle');
         return;
       }
@@ -118,7 +133,20 @@ export function useHearingMode(onCommand: HearingCommandHandler): HearingModeApi
         return;
       }
       if (cmd === 'help') {
-        await speakLine(helpScript());
+        // Clearer pacing for the longer command list
+        const line = helpScript();
+        lastLineRef.current = line;
+        setLastLine(line);
+        setPhase('speaking');
+        stopListening();
+        soundEngine.setNarrationActive(true);
+        try {
+          await speak(line, { style: 'clear' });
+          if (activeRef.current) await pause(400);
+        } finally {
+          soundEngine.setNarrationActive(false);
+          setPhase('idle');
+        }
         return;
       }
       if (cmd === 'exit') {
@@ -126,6 +154,8 @@ export function useHearingMode(onCommand: HearingCommandHandler): HearingModeApi
         loopGenRef.current += 1;
         stopListening();
         cancelSpeak();
+        soundEngine.setHearingBed(false);
+        soundEngine.setNarrationActive(false);
         activeRef.current = false;
         setActive(false);
         persistActive(false);
@@ -139,7 +169,6 @@ export function useHearingMode(onCommand: HearingCommandHandler): HearingModeApi
         lastLine: lastLineRef.current,
       });
       if (!handled && cmd !== 'unknown') {
-        // Command reserved for app but not handled this tick — stay quiet.
         return;
       }
       if (!handled) {
@@ -153,17 +182,16 @@ export function useHearingMode(onCommand: HearingCommandHandler): HearingModeApi
     async (gen: number) => {
       while (activeRef.current && gen === loopGenRef.current) {
         if (!micRef.current || !support.stt) {
-          await new Promise((r) => setTimeout(r, 600));
+          await pause(600);
           continue;
         }
-        // Don't listen over TTS
         if (typeof window !== 'undefined' && window.speechSynthesis?.speaking) {
-          await new Promise((r) => setTimeout(r, 200));
+          await pause(220);
           continue;
         }
         setPhase('listening');
         try {
-          const transcript = await listenOnce({ timeoutMs: 10_000 });
+          const transcript = await listenOnce({ timeoutMs: 14_000 });
           if (!activeRef.current || gen !== loopGenRef.current) return;
           cancelSpeak(); // barge-in
           const cmd = parseHearingCommand(transcript);
@@ -175,7 +203,7 @@ export function useHearingMode(onCommand: HearingCommandHandler): HearingModeApi
             setPhase((p) => (p === 'listening' ? 'idle' : p));
           }
         }
-        await new Promise((r) => setTimeout(r, 280));
+        await pause(360);
       }
     },
     [handleCommand, support.stt]
@@ -187,6 +215,9 @@ export function useHearingMode(onCommand: HearingCommandHandler): HearingModeApi
       void speakLine(unsupportedScript(s));
       return;
     }
+    warmSpeechVoices();
+    void soundEngine.unlock();
+    soundEngine.setHearingBed(true);
     loopGenRef.current += 1;
     const gen = loopGenRef.current;
     activeRef.current = true;
@@ -194,6 +225,8 @@ export function useHearingMode(onCommand: HearingCommandHandler): HearingModeApi
     persistActive(true);
     track('hearing_open', { tts: s.tts, stt: s.stt });
     void (async () => {
+      // Soft settle before welcome — listening experience begins
+      await pause(280);
       if (!s.tts) {
         await speakLine(unsupportedScript(s));
       } else {
@@ -208,13 +241,14 @@ export function useHearingMode(onCommand: HearingCommandHandler): HearingModeApi
     loopGenRef.current += 1;
     stopListening();
     cancelSpeak();
+    soundEngine.setHearingBed(false);
+    soundEngine.setNarrationActive(false);
     activeRef.current = false;
     setActive(false);
     persistActive(false);
     setPhase('idle');
     track('hearing_exit', { reason: 'toggle' });
-    // Soft line — don't await; loop already stopped
-    void speak(exitScript()).catch(() => undefined);
+    void speak(exitScript(), { style: 'soft' }).catch(() => undefined);
   }, []);
 
   const toggle = useCallback(() => {
@@ -229,12 +263,11 @@ export function useHearingMode(onCommand: HearingCommandHandler): HearingModeApi
       bootedRef.current = true;
       return;
     }
-    // Defer so App handlers are ready
     const t = window.setTimeout(() => {
       if (bootedRef.current) return;
       bootedRef.current = true;
       enable();
-    }, 400);
+    }, 500);
     return () => window.clearTimeout(t);
   }, [enable]);
 
@@ -243,6 +276,8 @@ export function useHearingMode(onCommand: HearingCommandHandler): HearingModeApi
       loopGenRef.current += 1;
       stopListening();
       cancelSpeak();
+      soundEngine.setHearingBed(false);
+      soundEngine.setNarrationActive(false);
     };
   }, []);
 

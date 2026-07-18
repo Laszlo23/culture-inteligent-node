@@ -14,6 +14,11 @@ export const POSITIVE_AFFIRMATIONS = [
   'Small sparks become light.',
   'Mind and machine can be friends.',
   'Today you notice what matters.',
+  'Breathe. You are already enough.',
+  'Listening is a form of light.',
+  'Soft attention still counts.',
+  'You can go gently and still grow.',
+  'Presence before proof.',
 ] as const;
 
 export function nextAffirmation(previous?: string): string {

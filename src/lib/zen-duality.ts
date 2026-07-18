@@ -81,30 +81,30 @@ export const ZEN_COPY = {
 
 export function zenDecisionPrompt(sessionTitle: string): string {
   return [
-    'Zen break. Knowledge first.',
-    'Mind and Machine stay in duality — you choose.',
-    `After ${sessionTitle}, the human learning loop ends in a decision.`,
-    'Say Mind to hold the knowledge.',
-    'Say Machine to convert attention into fuel.',
+    'A soft Zen break. Knowledge first — no rush.',
+    'Mind and Machine stay in gentle duality. You choose.',
+    `After ${sessionTitle}, the learning loop rests in a decision.`,
+    'Say Mind to hold what landed — just sit with it.',
+    'Or say Machine when you are ready to convert attention into fuel.',
   ].join(' ');
 }
 
 export function zenMindChosenScript(): string {
-  return 'Mind. Knowledge held. Zen first. When you are ready to prove it, say Machine.';
+  return 'Mind. Beautiful. Knowledge held. Rest with it. When you feel ready to prove it, say Machine — no pressure.';
 }
 
 export function zenMachineChosenScript(): string {
-  return 'Machine. Convert attention to fuel. Submit for Neural Snap when ready.';
+  return 'Machine. We will convert attention into fuel. Submit for Neural Snap when you feel settled.';
 }
 
 export function zenModeOnScript(): string {
-  return 'Zen Mode on. Knowledge first. Duality stays — Mind and Machine. Say Academy, then decide Mind or Machine at the Zen break.';
+  return 'Zen Mode on. Knowledge first. Mind and Machine stay in duality. Say Academy, then at the Zen break choose Mind or Machine — slowly is perfect.';
 }
 
 export function zenModeOffScript(): string {
-  return 'Zen Mode off. Duality still holds when you reach the decision break.';
+  return 'Zen Mode off. Duality still waits kindly when you reach the decision break.';
 }
 
 export function zenHelpLine(): string {
-  return 'Zen — knowledge-first mode. At the Academy break: say Mind to hold knowledge, or Machine to convert to fuel.';
+  return 'Zen — knowledge-first mode. At the Academy break: say Mind to hold knowledge, or Machine to convert to fuel. Either choice is welcome.';
 }

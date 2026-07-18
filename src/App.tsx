@@ -1095,7 +1095,7 @@ export default function App() {
         const snap = buildAttentionSnapshot(7);
         setShowMetricsPanel(true);
         await speakLine(
-          `Seven day snapshot. Active days ${snap.uniqueDaysActive}. Hearing opens ${snap.hearingOpens}. Academy starts ${snap.academyStarts}. Hook Mirrors ${snap.hookMirrors}. Zen Mind ${snap.zenMind}, Machine ${snap.zenMachine}. Spreads ${snap.spreads}. Focus minutes about ${snap.focusMinutesApprox}.`
+          `A gentle seven-day snapshot. Active days ${snap.uniqueDaysActive}. Hearing opens ${snap.hearingOpens}. Academy starts ${snap.academyStarts}. Hook Mirrors ${snap.hookMirrors}. Zen Mind ${snap.zenMind}, Machine ${snap.zenMachine}. Spreads ${snap.spreads}. Focus minutes about ${snap.focusMinutesApprox}. You are building something real.`
         );
         return true;
       }

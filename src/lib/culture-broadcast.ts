@@ -45,7 +45,8 @@ export const CULTURE_BROADCAST = {
   ].join('\n'),
   notificationTitle: 'BROADCAST · The Human Economy',
   notificationBody: `${SLOGANS.hero} ${SLOGANS.equation} · ${SLOGANS.spread}`,
-  hearingBanner: 'Ears-first Proof of Attention is live — say Help. Prove it without looking.',
+  hearingBanner:
+    'Hearing Mode — a soft listening space. Say Help. Prove attention without staring at the screen.',
   /** Campaign art under /campaign/ */
   art: {
     mineCulture: '/campaign/mine-culture.png',
