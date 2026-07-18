@@ -10,6 +10,9 @@ coverage/
 # Hearing Mode neural TTS cache (WAV)
 data/tts-cache/
 
+# Growth loop ledger (invite connections)
+data/growth-network.json
+
 # TWA / Android signing secrets
 mobile-twa/android.keystore
 mobile-twa/*.jks

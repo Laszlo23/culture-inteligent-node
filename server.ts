@@ -776,6 +776,55 @@ async function startServer() {
     res.status(200).json({ ok: true, received: event });
   });
 
+  /**
+   * Growth loop ledger — Discover → Claim → Spark → Spread → Return.
+   * File-backed connections graph (invite codes). See docs/COMMUNITY.md
+   */
+  app.post("/api/growth/event", async (req, res) => {
+    try {
+      const type = String(req.body?.type || "").trim();
+      const allowed = ["land", "claim", "spread", "spark", "return"] as const;
+      if (!(allowed as readonly string[]).includes(type)) {
+        return res.status(400).json({ error: "invalid_type" });
+      }
+      const { ingestGrowthEvent } = await import("./src/lib/growth-network.ts");
+      const result = await ingestGrowthEvent({
+        type: type as (typeof allowed)[number],
+        inviteCode: req.body?.inviteCode,
+        actorCode: req.body?.actorCode,
+        nonce: req.body?.nonce,
+      });
+      return res.json(result);
+    } catch (error: any) {
+      console.error("[growth.event]", error?.message || error);
+      return res.status(500).json({ error: "growth_ingest_failed" });
+    }
+  });
+
+  app.get("/api/growth/pulse", async (_req, res) => {
+    try {
+      const { getGrowthPulse } = await import("./src/lib/growth-network.ts");
+      return res.json(await getGrowthPulse());
+    } catch (error: any) {
+      console.error("[growth.pulse]", error?.message || error);
+      return res.status(500).json({ error: "growth_pulse_failed" });
+    }
+  });
+
+  app.get("/api/growth/stats", async (req, res) => {
+    try {
+      const code = String(req.query?.code || "").trim();
+      if (!code) return res.status(400).json({ error: "code_required" });
+      const { getMemberGrowthStats } = await import("./src/lib/growth-network.ts");
+      const stats = await getMemberGrowthStats(code);
+      if (!stats) return res.status(400).json({ error: "invalid_code" });
+      return res.json(stats);
+    } catch (error: any) {
+      console.error("[growth.stats]", error?.message || error);
+      return res.status(500).json({ error: "growth_stats_failed" });
+    }
+  });
+
   /** Hearing Mode — neural Gemini TTS status */
   app.get("/api/hearing/voice", async (_req, res) => {
     const { neuralTtsReady, HEARING_VOICES } = await import("./src/lib/hearing/gemini-tts.ts");

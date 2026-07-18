@@ -60,6 +60,7 @@ import {
 import { setZenDecisionHandler } from '../lib/hearing/zen-bridge';
 import { useHearing } from '../lib/hearing/context';
 import { track } from '../lib/attention-metrics';
+import { inviteCodeFromWallet, reportGrowthEvent } from '../lib/growth-loop';
 
 interface AttentionAcademyProps {
   state: GameState;
@@ -450,6 +451,20 @@ export default function AttentionAcademy({
           sessionId: session.id,
           onChain: onChainFuel,
         });
+        try {
+          const sessionRaw = localStorage.getItem('solana_current_user_session_v1');
+          const sessionUser = sessionRaw ? JSON.parse(sessionRaw) : null;
+          const actor = inviteCodeFromWallet(sessionUser?.walletAddress);
+          if (actor) {
+            void reportGrowthEvent({
+              type: 'spark',
+              actorCode: actor,
+              nonce: `spark:${actor}:${session.id}`,
+            });
+          }
+        } catch {
+          // growth report optional
+        }
         addLog(
           onChainFuel
             ? 'First Spark proved on-chain — your node has fuel.'

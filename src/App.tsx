@@ -95,6 +95,10 @@ import {
   inviteWelcomeLine,
   markInviteClaimed,
 } from './lib/community-invite';
+import {
+  inviteCodeFromWallet,
+  reportGrowthEvent,
+} from './lib/growth-loop';
 import { signalMiniAppReady } from './lib/farcaster/miniapp-ready';
 import { sendAttentionProofMemo } from './lib/poa-chain';
 import { BRAND, SLOGANS } from './lib/brand-slogans';
@@ -735,8 +739,13 @@ export default function App() {
       notifications: state.notifications || [],
       completedAcademySessions: completedAcademy,
       coreSessionCount: CORE_ATTENTION_SESSIONS.length,
+      metaDiscovered: metaView.discovered,
+      metaSealed: metaView.sealed,
+      metaRemaining: Math.max(0, metaView.total - metaView.completedCount),
+      metaWhisper: metaView.current?.whisper ?? null,
+      metaRoom: metaView.current?.room ?? null,
     });
-  }, [state.energy, state.dailyMissions, state.notifications]);
+  }, [state.energy, state.dailyMissions, state.notifications, metaView]);
 
 
   const pushFlowToast = (message: string, tone: 'warn' | 'success') => {
@@ -811,6 +820,11 @@ export default function App() {
     setInviteCode(record.code);
     if (fresh) {
       track('invite_land', { code: record.code });
+      void reportGrowthEvent({
+        type: 'land',
+        inviteCode: record.code,
+        nonce: `land:${record.code}:${record.landedAt}`,
+      });
     }
   }, []);
 
@@ -1162,6 +1176,11 @@ export default function App() {
           const first = !hasSpreadLove(user.walletAddress);
           markSpreadLove(user.walletAddress);
           track('spread_copy', { channel: 'hearing', first, how });
+          void reportGrowthEvent({
+            type: 'spread',
+            actorCode: inviteCodeFromWallet(user.walletAddress),
+            nonce: `spread:hearing:${user.walletAddress}:${how}:${first ? '1' : Date.now()}`,
+          });
           await speakLine(spreadDoneScript(first));
           w.addLog(
             how === 'share'
@@ -1571,6 +1590,12 @@ export default function App() {
               if (inviteCode) {
                 markInviteClaimed();
                 track('invite_claim', { code: inviteCode });
+                void reportGrowthEvent({
+                  type: 'claim',
+                  inviteCode,
+                  actorCode: inviteCodeFromWallet(currentUser.walletAddress),
+                  nonce: `claim:${inviteCode}:${currentUser.walletAddress}`,
+                });
               }
               setPassportPending(false);
               setState((prev) => ({
@@ -1839,6 +1864,11 @@ export default function App() {
                       const first = !hasSpreadLove(currentUser.walletAddress!);
                       markSpreadLove(currentUser.walletAddress!);
                       track('spread_copy', { channel: 'header', first });
+                      void reportGrowthEvent({
+                        type: 'spread',
+                        actorCode: inviteCodeFromWallet(currentUser.walletAddress),
+                        nonce: `spread:header:${currentUser.walletAddress}:${first ? '1' : Date.now()}`,
+                      });
                       addLog(
                         first
                           ? 'Invite copied — pass it to someone who needs the hook.'
@@ -2101,6 +2131,7 @@ export default function App() {
                 <HumanPassportDashboard
                   username={currentUser.username}
                   avatarUrl={state.profile?.avatarUrl}
+                  walletAddress={currentUser.walletAddress}
                   state={state}
                   firstRitualPending={firstRitualPending}
                   academyCompletedCount={academyCompletedCount}
@@ -2916,6 +2947,7 @@ export default function App() {
                 <HumanPassportDashboard
                   username={currentUser.username}
                   avatarUrl={state.profile?.avatarUrl}
+                  walletAddress={currentUser.walletAddress}
                   state={state}
                   firstRitualPending={firstRitualPending}
                   academyCompletedCount={academyCompletedCount}

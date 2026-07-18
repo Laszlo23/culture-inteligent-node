@@ -5,6 +5,7 @@
 import React from 'react';
 import { motion } from 'motion/react';
 import { Flame } from 'lucide-react';
+import { AttentionIconTile } from './fx/Glitch';
 
 type Props = {
   beats: number;
@@ -15,6 +16,8 @@ type Props = {
 export default function PlayMomentumBar({ beats, nextAt, progress }: Props) {
   if (beats < 1) return null;
 
+  const nearReward = nextAt != null && progress >= 0.7;
+
   return (
     <motion.div
       initial={{ opacity: 0, y: -8 }}
@@ -22,13 +25,21 @@ export default function PlayMomentumBar({ beats, nextAt, progress }: Props) {
       className="mx-4 mt-1 mb-0 z-30 relative"
     >
       <div className="rounded-xl border border-white/10 bg-[#0a0a0c]/85 backdrop-blur-md px-3 py-2 flex items-center gap-3 shadow-lg">
-        <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-amber-500/25 to-cyan-500/25 border border-white/10 flex items-center justify-center shrink-0">
-          <Flame className="w-3.5 h-3.5 text-amber-300" />
-        </div>
+        <AttentionIconTile
+          tone="amber"
+          badge={nearReward ? '!' : beats}
+          badgePulse={nearReward}
+          icon={<Flame className="w-3.5 h-3.5" />}
+        />
         <div className="flex-1 min-w-0">
           <div className="flex justify-between items-baseline gap-2 mb-1">
-            <span className="text-[9px] font-mono font-black tracking-widest uppercase text-slate-200">
+            <span className="text-[9px] font-mono font-black tracking-widest uppercase text-slate-200 inline-flex items-center gap-1.5">
               Session momentum · ×{beats}
+              {nearReward && (
+                <span className="px-1.5 py-0.5 rounded border border-amber-400/35 bg-amber-500/15 text-[8px] text-amber-200 font-bold tracking-wider">
+                  Near reward
+                </span>
+              )}
             </span>
             <span className="text-[8px] font-mono text-slate-500 shrink-0">
               {nextAt != null ? `Next reward @ ×${nextAt}` : 'Peak duality — keep playing'}

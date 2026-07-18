@@ -3,7 +3,8 @@
 **Live:** https://mining.buildingcultureid.space/  
 **Telegram:** https://t.me/+4zFH7-2tyW0yOTBk  
 **Discord:** https://discord.gg/geUpHt3eSb  
-**Farcaster Mini App:** `?fc=1` · playbook: [FARCASTER_GROWTH.md](./FARCASTER_GROWTH.md)
+**Farcaster Mini App:** `?fc=1` · playbook: [FARCASTER_GROWTH.md](./FARCASTER_GROWTH.md)  
+**Docs hub:** [README.md](./README.md) · Growth ledger: [GROWTH_LOOP.md](./GROWTH_LOOP.md) · Hearing: [HEARING_MODE.md](./HEARING_MODE.md)
 
 Community is not a feature dump. It is **one weekly ritual + invites that actually land + warm follow-up**.
 
@@ -98,6 +99,19 @@ Replace `YOUR6` with the first 6 chars of your wallet (or use the in-app **Invit
 - Hook Loop — cast unlocks next truth
 - Hearing Mode — neural Sulafat guide
 - Landing Growth Deck — one-tap cast templates
+- **Growth Loop panel** (Home + Passport) — live **Your connections** + **Network links**
+- Server ledger: `POST /api/growth/event`, `GET /api/growth/pulse`, `GET /api/growth/stats?code=`
+
+### How connections count
+
+| Event | When | Effect |
+| --- | --- | --- |
+| `land` | Fresh `?invite=` open | Inviter lands++ |
+| `claim` | Invitee claims passport | Edge inviter → invitee (**connection**) |
+| `spark` | First Spark complete | Actor sparks++ |
+| `spread` | Cast / copy invite | Actor spreads++ |
+
+Watch the panel fill as people you invite claim — that is the loop closing.
 
 ---
 

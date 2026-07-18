@@ -13,6 +13,7 @@ import {
 } from '../lib/human-economy';
 import { buildAttentionSnapshot } from '../lib/attention-metrics';
 import ReputationGraph from './ReputationGraph';
+import GrowthLoopPanel from './GrowthLoopPanel';
 import { GlowPulse } from './fx';
 
 export type PassportNextStep = {
@@ -24,6 +25,7 @@ export type PassportNextStep = {
 type Props = {
   username: string;
   avatarUrl?: string;
+  walletAddress?: string | null;
   state: GameState;
   academyCompletedCount: number;
   coreSessionTotal: number;
@@ -59,6 +61,7 @@ function ScoreCard({
 export default function HumanPassportDashboard({
   username,
   avatarUrl,
+  walletAddress,
   state,
   academyCompletedCount,
   coreSessionTotal,
@@ -189,6 +192,14 @@ export default function HumanPassportDashboard({
           )}
         </div>
         <p className="mt-2 text-[11px] text-slate-500">{nextStep.reason}</p>
+
+        <div className="mt-5">
+          <GrowthLoopPanel
+            walletAddress={walletAddress}
+            displayName={username}
+            compact={compact}
+          />
+        </div>
       </div>
     </motion.section>
   );

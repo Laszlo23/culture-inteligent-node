@@ -18,6 +18,8 @@ rsync -az --delete \
   --exclude 'culture-economy/target' \
   --exclude 'culture-poa/target' \
   --exclude '.agents' \
+  --exclude 'data/tts-cache' \
+  --exclude 'data/growth-network.json' \
   "${ROOT}/" "${HOST}:${REMOTE}/"
 
 echo "==> Install + build + restart culture-node.service"

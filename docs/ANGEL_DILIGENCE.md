@@ -4,7 +4,7 @@
 **Product:** Human Economy / Human Passport · **Company:** Building Culture  
 **Workspace:** Culture Node · **Live:** https://mining.buildingcultureid.space/  
 
-Related: [HUMAN_ECONOMY.md](./HUMAN_ECONOMY.md) · [COMMUNITY.md](./COMMUNITY.md) · [FARCASTER_GROWTH.md](./FARCASTER_GROWTH.md) · [INVESTOR_PARTNER_BRIEF.md](./INVESTOR_PARTNER_BRIEF.md) · [PARTNER_ATTENTION_SESSION.md](./PARTNER_ATTENTION_SESSION.md)
+Related: [HUMAN_ECONOMY.md](./HUMAN_ECONOMY.md) · [COMMUNITY.md](./COMMUNITY.md) · [GROWTH_LOOP.md](./GROWTH_LOOP.md) · [HEARING_MODE.md](./HEARING_MODE.md) · [FARCASTER_GROWTH.md](./FARCASTER_GROWTH.md) · [INVESTOR_PARTNER_BRIEF.md](./INVESTOR_PARTNER_BRIEF.md) · [PARTNER_ATTENTION_SESSION.md](./PARTNER_ATTENTION_SESSION.md) · [docs hub](./README.md)
 
 ---
 
@@ -23,7 +23,7 @@ Worth a conversation if the founder keeps shipping Human Passport + Proof of Att
 | 3 | **Unproven retention** | Ritual + Academy are strong ideas; MAU / D7 / Spreads are not yet a board pack. |
 | 4 | **Revenue is designed, not proven** | 1¢ tolls + partner packages exist on paper; few (or zero) closed $ cycles. |
 | 5 | **Category stigma** | “Learn-to-earn” smells like extractive web3 unless brand discipline holds. |
-| 6 | **Hearing Mode fragility** | Web Speech API = browser / mic / OS dependent; Safari ≠ Chrome. |
+| 6 | **Hearing Mode dependency** | Neural Gemini TTS needs API key + latency; offline / keyless falls soft. |
 | 7 | **Product surface area** | Facility HUD + economy + NFT gallery can distract from the simple Hearing → Zen → fuel story. |
 | 8 | **Founder concentration** | Push is an asset until it’s a single point of failure (curriculum, partners, ops). |
 | 9 | **Partner offer is early** | Attention Sessions need one public case study or the price list feels fictional. |

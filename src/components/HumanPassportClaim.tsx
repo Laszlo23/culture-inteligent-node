@@ -22,6 +22,7 @@ import {
 import { copyTextFallback } from '../lib/culture-broadcast';
 import { sendAttentionProofMemo } from '../lib/poa-chain';
 import { track } from '../lib/attention-metrics';
+import { inviteCodeFromWallet, reportGrowthEvent } from '../lib/growth-loop';
 import { CinematicBackdrop } from './fx';
 import { useSound } from '../lib/sound/SoundContext';
 import FarcasterCastButton from './FarcasterCastButton';
@@ -99,6 +100,11 @@ export default function HumanPassportClaim({
       markSpreadLove(walletAddress);
       setInvited(true);
       track('invite_spread', { how: 'clipboard', first });
+      void reportGrowthEvent({
+        type: 'spread',
+        actorCode: inviteCodeFromWallet(walletAddress),
+        nonce: `spread:passport-clip:${walletAddress}:${first ? '1' : Date.now()}`,
+      });
       play('soft');
       addLog(
         first
@@ -198,6 +204,11 @@ export default function HumanPassportClaim({
                   markSpreadLove(walletAddress);
                   setInvited(true);
                   track('invite_spread', { how: 'farcaster', first });
+                  void reportGrowthEvent({
+                    type: 'spread',
+                    actorCode: inviteCodeFromWallet(walletAddress),
+                    nonce: `spread:passport-fc:${walletAddress}:${first ? '1' : Date.now()}`,
+                  });
                   addLog('PASSPORT: Invite cast opened — rain on Farcaster.', 'success');
                 }}
                 className="w-full"

@@ -4,10 +4,30 @@
 
 import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
+import {
+  Activity,
+  Battery,
+  Bell,
+  Brain,
+  Calendar,
+  Compass,
+  Eye,
+  Flame,
+  Images,
+  Sparkles,
+  Zap,
+} from 'lucide-react';
 import { CinematicBackdrop, type AtmosphereVariant } from './CinematicBackdrop';
+import { AttentionIconTile } from './Glitch';
 
 export { CinematicBackdrop } from './CinematicBackdrop';
 export type { AtmosphereVariant } from './CinematicBackdrop';
+export {
+  AttentionBadge,
+  AttentionIconTile,
+  GlitchFrame,
+  GlitchText,
+} from './Glitch';
 
 /** Facility-wide atmosphere (single video plate + soft CSS field). */
 export function AmbientField({
@@ -146,7 +166,49 @@ export type BriefItem = {
   body: string;
   actionLabel?: string;
   actionRoom?: string;
+  /** Corner badge count / mark */
+  badge?: string | number;
+  badgePulse?: boolean;
 };
+
+type BriefIconTone = 'violet' | 'amber' | 'cyan' | 'rose' | 'emerald' | 'orange';
+
+function briefVisual(item: BriefItem): {
+  tone: BriefIconTone;
+  icon: React.ReactNode;
+} {
+  if (item.id === 'energy-low') {
+    return { tone: 'orange', icon: <Zap className="w-3.5 h-3.5" /> };
+  }
+  if (item.id === 'energy-high') {
+    return { tone: 'emerald', icon: <Battery className="w-3.5 h-3.5" /> };
+  }
+  if (item.id === 'nft-live') {
+    return { tone: 'emerald', icon: <Images className="w-3.5 h-3.5" /> };
+  }
+  if (item.id.startsWith('mission-')) {
+    return { tone: 'cyan', icon: <Compass className="w-3.5 h-3.5" /> };
+  }
+  if (item.id === 'streak') {
+    return { tone: 'amber', icon: <Flame className="w-3.5 h-3.5" /> };
+  }
+  if (item.id === 'streak-claim') {
+    return { tone: 'amber', icon: <Calendar className="w-3.5 h-3.5" /> };
+  }
+  if (item.id === 'notif') {
+    return { tone: 'rose', icon: <Bell className="w-3.5 h-3.5" /> };
+  }
+  if (item.id === 'academy') {
+    return { tone: 'cyan', icon: <Brain className="w-3.5 h-3.5" /> };
+  }
+  if (item.id === 'outer-circuit') {
+    return { tone: 'violet', icon: <Eye className="w-3.5 h-3.5" /> };
+  }
+  if (item.id === 'momentum') {
+    return { tone: 'amber', icon: <Sparkles className="w-3.5 h-3.5" /> };
+  }
+  return { tone: 'cyan', icon: <Activity className="w-3.5 h-3.5" /> };
+}
 
 /** Build Attention Brief cards from existing GameState (no backend). */
 export function buildAttentionBrief(input: {
@@ -155,8 +217,27 @@ export function buildAttentionBrief(input: {
   notifications: { id: string; read: boolean; title: string; type?: string }[];
   completedAcademySessions: string[];
   coreSessionCount: number;
+  /** Outer Circuit whisper active */
+  metaDiscovered?: boolean;
+  metaSealed?: boolean;
+  metaRemaining?: number;
+  metaWhisper?: string | null;
+  metaRoom?: string | null;
 }): BriefItem[] {
   const items: BriefItem[] = [];
+
+  if (input.metaDiscovered && !input.metaSealed && input.metaRemaining != null) {
+    items.push({
+      id: 'outer-circuit',
+      tone: 'warn',
+      title: 'Hidden path open',
+      body: input.metaWhisper || 'A quieter circuit is watching — follow the whisper.',
+      actionLabel: 'Follow whisper',
+      actionRoom: input.metaRoom || 'lab',
+      badge: input.metaRemaining,
+      badgePulse: true,
+    });
+  }
 
   if (input.energy < 40) {
     items.push({
@@ -166,6 +247,8 @@ export function buildAttentionBrief(input: {
       body: `Knowledge fuel at ${Math.round(input.energy)}%. A short Academy session can restore energy.`,
       actionLabel: 'Enter Academy',
       actionRoom: 'lab',
+      badge: Math.round(input.energy),
+      badgePulse: true,
     });
   } else if (input.energy >= 85) {
     items.push({
@@ -196,6 +279,8 @@ export function buildAttentionBrief(input: {
       body: openMission.label,
       actionLabel: 'View Missions',
       actionRoom: 'missions',
+      badge: '!',
+      badgePulse: true,
     });
   }
 
@@ -211,6 +296,7 @@ export function buildAttentionBrief(input: {
       body: 'Proof of Attention cadence maintained. Keep the node warm.',
       actionLabel: 'Vault',
       actionRoom: 'treasury',
+      badge: streak,
     });
   } else if (!claimedToday) {
     items.push({
@@ -220,6 +306,8 @@ export function buildAttentionBrief(input: {
       body: 'Sign today’s vault ritual to extend your streak.',
       actionLabel: 'Claim in Vault',
       actionRoom: 'treasury',
+      badge: '1',
+      badgePulse: true,
     });
   }
 
@@ -230,6 +318,8 @@ export function buildAttentionBrief(input: {
       tone: unread.some((n) => n.type === 'warn') ? 'warn' : 'info',
       title: `${unread.length} signal${unread.length > 1 ? 's' : ''} unread`,
       body: unread[0].title,
+      badge: unread.length,
+      badgePulse: true,
     });
   }
 
@@ -242,6 +332,7 @@ export function buildAttentionBrief(input: {
       body: `${done}/${input.coreSessionCount} core sessions verified. Learning fuels the reactor.`,
       actionLabel: 'Continue Academy',
       actionRoom: 'lab',
+      badge: input.coreSessionCount - done,
     });
   }
 
@@ -273,7 +364,8 @@ export function AttentionBriefStrip({
   return (
     <div className="mb-5 space-y-2">
       <div className="flex items-center justify-between px-1">
-        <span className="text-[9px] font-mono tracking-[0.28em] uppercase text-slate-500">
+        <span className="text-[9px] font-mono tracking-[0.28em] uppercase text-slate-500 inline-flex items-center gap-1.5">
+          <Activity className="w-3 h-3 text-cyan-500/70" />
           Attention Brief
         </span>
         <span className="text-[8px] font-mono text-slate-600 uppercase tracking-widest">
@@ -281,27 +373,44 @@ export function AttentionBriefStrip({
         </span>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
-        {items.map((item, i) => (
-          <motion.div
-            key={item.id}
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: i * 0.05 }}
-            className={`rounded-xl border px-3 py-2.5 backdrop-blur-sm ${toneBorder[item.tone]}`}
-          >
-            <p className={`text-[11px] font-bold font-mono ${toneText[item.tone]}`}>{item.title}</p>
-            <p className="text-[10px] text-slate-400 mt-1 leading-relaxed line-clamp-2">{item.body}</p>
-            {item.actionRoom && item.actionLabel && (
-              <button
-                type="button"
-                onClick={() => onNavigate(item.actionRoom!)}
-                className="mt-2 text-[9px] font-mono uppercase tracking-wider text-cyan-400/90 hover:text-cyan-300 cursor-pointer"
-              >
-                {item.actionLabel} →
-              </button>
-            )}
-          </motion.div>
-        ))}
+        {items.map((item, i) => {
+          const visual = briefVisual(item);
+          return (
+            <motion.div
+              key={item.id}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: i * 0.05 }}
+              className={`rounded-xl border px-3 py-2.5 backdrop-blur-sm ${toneBorder[item.tone]}`}
+            >
+              <div className="flex items-start gap-2.5">
+                <AttentionIconTile
+                  tone={visual.tone}
+                  icon={visual.icon}
+                  badge={item.badge}
+                  badgePulse={item.badgePulse}
+                />
+                <div className="min-w-0 flex-1">
+                  <p className={`text-[11px] font-bold font-mono ${toneText[item.tone]}`}>
+                    {item.title}
+                  </p>
+                  <p className="text-[10px] text-slate-400 mt-1 leading-relaxed line-clamp-2">
+                    {item.body}
+                  </p>
+                  {item.actionRoom && item.actionLabel && (
+                    <button
+                      type="button"
+                      onClick={() => onNavigate(item.actionRoom!)}
+                      className="mt-2 text-[9px] font-mono uppercase tracking-wider text-cyan-400/90 hover:text-cyan-300 cursor-pointer"
+                    >
+                      {item.actionLabel} →
+                    </button>
+                  )}
+                </div>
+              </div>
+            </motion.div>
+          );
+        })}
       </div>
     </div>
   );
