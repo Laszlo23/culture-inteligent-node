@@ -36,6 +36,7 @@ import PartnerProgram from './components/PartnerProgram';
 import OnboardingHub from './components/OnboardingHub';
 import NavMenu, { NavDestination, NavPhase } from './components/NavMenu';
 import LegalPages, { LegalPageId } from './components/LegalPages';
+import InstallPrompt from './components/InstallPrompt';
 import {
   AmbientField,
   AttentionBriefStrip,
@@ -229,7 +230,25 @@ export default function App() {
     partners: INITIAL_PARTNERS
   });
 
-  const [activeRoom, setActiveRoom] = useState<string>('map');
+  const [activeRoom, setActiveRoom] = useState<string>(() => {
+    if (typeof window === 'undefined') return 'map';
+    try {
+      const room = new URLSearchParams(window.location.search).get('room');
+      if (
+        room === 'legal-privacy' ||
+        room === 'legal-terms' ||
+        room === 'legal-disclaimer' ||
+        room === 'treasury' ||
+        room === 'lab' ||
+        room === 'map'
+      ) {
+        return room;
+      }
+    } catch {
+      // ignore
+    }
+    return 'map';
+  });
   const [menuOpen, setMenuOpen] = useState(false);
   const [showNotificationsDropdown, setShowNotificationsDropdown] = useState<boolean>(false);
   const [notificationTarget, setNotificationTarget] = useState<{ type: 'message' | 'ticket'; id: string } | null>(null);
@@ -1852,6 +1871,8 @@ export default function App() {
         }
         onAdmin={() => changeRoom('admin')}
       />
+
+      <InstallPrompt />
 
       <footer className="border-t border-white/5 bg-[#0a0a0c]/80 py-3 px-5 mx-4 mb-2 rounded-2xl text-slate-500 flex flex-col gap-2 shadow-lg z-10 relative backdrop-blur-md">
         <div className="flex flex-col sm:flex-row justify-between items-center gap-2 font-mono text-[9px] tracking-widest">

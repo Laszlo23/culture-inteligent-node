@@ -6,3 +6,11 @@ coverage/
 *.log
 .env*
 !.env.example
+
+# TWA / Android signing secrets
+mobile-twa/android.keystore
+mobile-twa/*.jks
+mobile-twa/*.apk
+mobile-twa/android/
+mobile-twa/.bubblewrap/
+mobile-twa/.keystore-env

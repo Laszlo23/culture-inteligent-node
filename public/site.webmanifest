@@ -1,12 +1,17 @@
 {
+  "id": "/",
   "name": "Building Culture — Culture Node",
   "short_name": "Culture Node",
-  "description": "Attention-powered cyber mining on Solana Devnet",
+  "description": "Proof of Attention OS — fuel your Solana Devnet node with verified learning. Mind ↔ Machine.",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
+  "orientation": "portrait-primary",
   "background_color": "#020617",
   "theme_color": "#020617",
   "lang": "en",
+  "dir": "ltr",
+  "categories": ["education", "games", "utilities"],
   "icons": [
     {
       "src": "/icon-192.png",
@@ -26,5 +31,23 @@
       "type": "image/png",
       "purpose": "maskable"
     }
-  ]
+  ],
+  "screenshots": [
+    {
+      "src": "/store/screenshot-facility.png",
+      "sizes": "1080x1920",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Culture Node facility — Proof of Attention OS"
+    },
+    {
+      "src": "/store/screenshot-duality.png",
+      "sizes": "1080x1920",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Mind ↔ Machine Duality Exchange"
+    }
+  ],
+  "related_applications": [],
+  "prefer_related_applications": false
 }
