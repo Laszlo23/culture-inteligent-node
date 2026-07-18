@@ -16,6 +16,7 @@
     "economy:bootstrap": "tsx scripts/devnet-bootstrap.ts"
   },
   "dependencies": {
+    "@farcaster/miniapp-sdk": "^0.3.0",
     "@google/genai": "^2.4.0",
     "@solana/spl-token": "^0.4.15",
     "@solana/web3.js": "^1.98.4",

@@ -95,6 +95,7 @@ import {
   inviteWelcomeLine,
   markInviteClaimed,
 } from './lib/community-invite';
+import { signalMiniAppReady } from './lib/farcaster/miniapp-ready';
 import { sendAttentionProofMemo } from './lib/poa-chain';
 import { BRAND, SLOGANS } from './lib/brand-slogans';
 import {
@@ -252,6 +253,11 @@ const INITIAL_MISSIONS: DailyMission[] = [
 ];
 
 export default function App() {
+  // Farcaster Mini App: hide host splash once React is alive
+  useEffect(() => {
+    void signalMiniAppReady('app-mount');
+  }, []);
+
   const [state, setState] = useState<GameState>({
     credits: 1200,
     miningPower: 154.8, // Base (4.8) + Initial owned Miner NFT (150)

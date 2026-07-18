@@ -119,9 +119,140 @@
         ]
       }
     </script>
+    <style>
+      html, body {
+        margin: 0;
+        min-height: 100%;
+        background: #050608;
+        color: #e2e8f0;
+      }
+      #boot-shell {
+        min-height: 100dvh;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 2rem 1.25rem;
+        text-align: center;
+        font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, sans-serif;
+        background:
+          radial-gradient(ellipse 80% 50% at 50% -10%, rgba(34, 211, 238, 0.12), transparent 55%),
+          #050608;
+      }
+      #boot-shell img {
+        width: 72px;
+        height: 72px;
+        border-radius: 18px;
+        margin-bottom: 1.25rem;
+        box-shadow: 0 0 40px rgba(34, 211, 238, 0.25);
+      }
+      #boot-shell .eyebrow {
+        font-size: 10px;
+        font-weight: 800;
+        letter-spacing: 0.28em;
+        text-transform: uppercase;
+        color: #22d3ee;
+        margin: 0;
+      }
+      #boot-shell h1 {
+        font-size: clamp(1.35rem, 4vw, 1.75rem);
+        font-weight: 800;
+        font-style: italic;
+        color: #fff;
+        margin: 0.75rem 0 0.5rem;
+        max-width: 18ch;
+        line-height: 1.15;
+      }
+      #boot-shell .sub {
+        font-size: 0.9rem;
+        color: #94a3b8;
+        max-width: 28ch;
+        line-height: 1.45;
+        margin: 0;
+      }
+      #boot-shell .status {
+        margin-top: 1.5rem;
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: #64748b;
+      }
+      #boot-shell .actions {
+        margin-top: 1.25rem;
+        display: none;
+        flex-direction: column;
+        gap: 0.6rem;
+        width: min(100%, 16rem);
+      }
+      #boot-shell .actions a,
+      #boot-shell .actions button {
+        display: block;
+        width: 100%;
+        box-sizing: border-box;
+        padding: 0.85rem 1rem;
+        border-radius: 0.75rem;
+        font-size: 11px;
+        font-weight: 800;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        text-decoration: none;
+        cursor: pointer;
+        border: none;
+      }
+      #boot-shell .actions .primary {
+        background: #22d3ee;
+        color: #000;
+      }
+      #boot-shell .actions .ghost {
+        background: transparent;
+        color: #94a3b8;
+        border: 1px solid rgba(255, 255, 255, 0.14);
+      }
+      #boot-shell.boot-slow .actions {
+        display: flex;
+      }
+    </style>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <!-- Visible before JS — phones / Mini Apps must never stare at pure black -->
+      <div id="boot-shell" role="status" aria-live="polite">
+        <img src="/icon-192.png" width="72" height="72" alt="Building Culture" />
+        <p class="eyebrow">Building Culture</p>
+        <h1>Human value was never measured correctly.</h1>
+        <p class="sub">Opening the Human Economy…</p>
+        <p class="status" id="boot-status">Loading</p>
+        <div class="actions" id="boot-actions">
+          <a class="primary" href="/?fc=1">Open Human Passport</a>
+          <a class="ghost" href="/?hear=1&fc=1">Try Hearing Mode</a>
+          <button class="ghost" type="button" id="boot-reload">Reload</button>
+        </div>
+        <noscript>
+          <p class="sub" style="margin-top:1.5rem;color:#fbbf24">
+            JavaScript is required. Open this link in Warpcast, Chrome, or Safari.
+          </p>
+        </noscript>
+      </div>
+    </div>
+    <script>
+      (function () {
+        var shell = document.getElementById('boot-shell');
+        var status = document.getElementById('boot-status');
+        var reload = document.getElementById('boot-reload');
+        if (reload) {
+          reload.addEventListener('click', function () {
+            location.reload();
+          });
+        }
+        // If the 1.5MB bundle is slow on mobile, still show a way in
+        setTimeout(function () {
+          if (!shell || !document.getElementById('boot-shell')) return;
+          shell.classList.add('boot-slow');
+          if (status) status.textContent = 'Still opening — tap below';
+        }, 8000);
+      })();
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
