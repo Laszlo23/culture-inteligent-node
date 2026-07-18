@@ -23,6 +23,7 @@ import { BRAND, SLOGANS } from '../lib/brand-slogans';
 import { copyTextFallback, shareCultureText } from '../lib/culture-broadcast';
 import { track } from '../lib/attention-metrics';
 import { useSound } from '../lib/sound/SoundContext';
+import FarcasterCastButton from './FarcasterCastButton';
 
 type Props = {
   initialTruthId?: string | null;
@@ -118,6 +119,28 @@ export default function HookLoopCampaign({
     } catch {
       addLog('HOOK LOOP: Clipboard blocked.', 'warn');
     }
+  };
+
+  const afterFarcasterCast = () => {
+    const { next, state: nextState, completedLap } = advanceHookLoopAfterShare(truth);
+    setState(nextState);
+    setJustUnlocked(next);
+    setFlash(true);
+    play('success');
+    track('hook_loop_share', {
+      truth: truth.id,
+      next: next.id,
+      how: 'farcaster',
+      shares: nextState.shares,
+      lap: completedLap,
+    });
+    addLog(
+      completedLap
+        ? `HOOK LOOP: Farcaster lap complete ×${nextState.shares}. Truth #${next.n} live.`
+        : `HOOK LOOP: Cast #${truth.n} — unlocked Hooking Truth #${next.n}.`,
+      'success'
+    );
+    window.setTimeout(() => setFlash(false), 900);
   };
 
   return (
@@ -235,6 +258,13 @@ export default function HookLoopCampaign({
           <Share2 className="w-4 h-4" />
           {sharing ? 'Opening share…' : 'Share · unlock next truth'}
         </button>
+        <FarcasterCastButton
+          truth={truth}
+          variant="primary"
+          label="Cast · unlock next"
+          onCast={afterFarcasterCast}
+          className="flex-1"
+        />
         <button
           type="button"
           onClick={() => void copyOnly()}

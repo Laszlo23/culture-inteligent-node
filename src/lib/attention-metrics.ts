@@ -31,7 +31,8 @@ export type AttentionEventName =
   | 'field_card_trade_intent'
   | 'hook_loop_view'
   | 'hook_loop_share'
-  | 'hook_loop_copy';
+  | 'hook_loop_copy'
+  | 'farcaster_cast';
 
 export type AttentionEvent = {
   name: AttentionEventName;

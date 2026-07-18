@@ -1,0 +1,34 @@
+{
+  "miniapp": {
+    "version": "1",
+    "name": "Building Culture",
+    "subtitle": "The Human Economy",
+    "description": "Human value was never measured correctly. Build a Human Passport through learning, creating, and contributing. Proof of Attention — own your digital reputation.",
+    "tagline": "Build your Human Passport",
+    "iconUrl": "https://mining.buildingcultureid.space/icon-512.png",
+    "splashImageUrl": "https://mining.buildingcultureid.space/icon-512.png",
+    "splashBackgroundColor": "#050608",
+    "homeUrl": "https://mining.buildingcultureid.space/?fc=1",
+    "imageUrl": "https://mining.buildingcultureid.space/og.jpg",
+    "heroImageUrl": "https://mining.buildingcultureid.space/og.jpg",
+    "buttonTitle": "Build Passport",
+    "primaryCategory": "social",
+    "tags": [
+      "human-economy",
+      "reputation",
+      "learning",
+      "attention",
+      "passport"
+    ],
+    "ogTitle": "Human value was never measured correctly",
+    "ogDescription": "Building Culture — Human Passport. Learn. Create. Contribute. Own your reputation.",
+    "ogImageUrl": "https://mining.buildingcultureid.space/og.jpg",
+    "screenshotUrls": [
+      "https://mining.buildingcultureid.space/campaign/mine-culture.png",
+      "https://mining.buildingcultureid.space/campaign/culture-club.png",
+      "https://mining.buildingcultureid.space/campaign/spread-love.png"
+    ],
+    "canonicalDomain": "mining.buildingcultureid.space",
+    "webhookUrl": "https://mining.buildingcultureid.space/api/farcaster/webhook"
+  }
+}

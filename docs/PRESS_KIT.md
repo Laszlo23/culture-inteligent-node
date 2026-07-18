@@ -93,13 +93,30 @@ https://mining.buildingcultureid.space/?hear=1
 
 ### Farcaster
 
+**Mini App:** `https://mining.buildingcultureid.space/?fc=1`  
+**Manifest:** `https://mining.buildingcultureid.space/.well-known/farcaster.json`  
+**Playbook:** `docs/FARCASTER_GROWTH.md`
+
 ```
-Culture Node shipped Hearing Mode — ears-first Proof of Attention.
+Human value was never measured correctly.
 
-Collectibles won the flex. We mine knowledge that fuels a Solana Devnet node.
-Open with ?hear=1 and say Help.
+For centuries we measured people by the hours they worked.
+The AI era needs a new measurement:
+what you learn · create · contribute.
 
-mining.buildingcultureid.space/?hear=1
+Building Culture = Human Economy.
+Build your Human Passport.
+
+https://mining.buildingcultureid.space/?fc=1
+```
+
+**Hook Loop:**
+
+```
+How they hook you into doomscrolling.
+Fun memes. Real mechanics. Cast a truth → unlock the next.
+
+https://mining.buildingcultureid.space/?room=hook-loop&fc=1
 ```
 
 ### Telegram / Discord

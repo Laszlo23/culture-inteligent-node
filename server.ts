@@ -764,6 +764,19 @@ async function startServer() {
   });
 
   /**
+   * Farcaster Mini App webhook — accepts notification / event payloads.
+   * Wire NEYNAR_WEBHOOK_SECRET + handlers when push notifs go live.
+   * See docs/FARCASTER_GROWTH.md
+   */
+  app.post("/api/farcaster/webhook", (req, res) => {
+    const event = typeof req.body?.event === "string" ? req.body.event : "unknown";
+    console.info("[farcaster.webhook]", event, {
+      keys: req.body && typeof req.body === "object" ? Object.keys(req.body) : [],
+    });
+    res.status(200).json({ ok: true, received: event });
+  });
+
+  /**
    * Readiness — settlement can co-sign when economy env is present.
    * 503 when mints/authority are set but authority fails to load (misconfig).
    * 200 with ready:false when bootstrap incomplete (practice mode OK).

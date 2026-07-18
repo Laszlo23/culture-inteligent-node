@@ -14,6 +14,7 @@ import {
   type PricingTierId,
 } from '../lib/human-economy';
 import { CinematicBackdrop } from './fx';
+import FarcasterCastButton, { FarcasterCastDeck } from './FarcasterCastButton';
 
 type Props = {
   onBuildPassport: () => void;
@@ -100,10 +101,19 @@ export default function HumanEconomyLanding({ onBuildPassport, onContinueSecure 
               {SLOGANS.ctaExplore}
               <ArrowRight className="w-4 h-4" />
             </button>
+            <FarcasterCastButton templateId="launch" variant="ghost" label="Cast the launch" />
           </motion.div>
           <p className="mt-6 text-[11px] text-slate-500 font-mono tracking-wide">
             {SLOGANS.equation} · You own your digital reputation.
           </p>
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.28 }}
+            className="mt-8 max-w-xl"
+          >
+            <FarcasterCastDeck />
+          </motion.div>
         </section>
 
         {/* Problem */}
