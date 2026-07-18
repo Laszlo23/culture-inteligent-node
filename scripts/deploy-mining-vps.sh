@@ -14,6 +14,10 @@ rsync -az --delete \
   --exclude 'dist' \
   --exclude '.DS_Store' \
   --exclude '*.swp' \
+  --exclude 'public/roadmap/*.mp4' \
+  --exclude 'culture-economy/target' \
+  --exclude 'culture-poa/target' \
+  --exclude '.agents' \
   "${ROOT}/" "${HOST}:${REMOTE}/"
 
 echo "==> Install + build + restart culture-node.service"
