@@ -81,7 +81,7 @@ export default function HumanEconomyLanding({ onBuildPassport, onContinueSecure 
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.05 }}
-            className="mt-5 font-display text-4xl sm:text-5xl md:text-6xl font-extrabold italic text-white tracking-tight leading-[1.05]"
+            className="mt-5 font-display text-4xl sm:text-5xl md:text-6xl font-bold italic text-white tracking-tight leading-[1.15]"
           >
             {SLOGANS.hero}
           </motion.h1>

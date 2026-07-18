@@ -3,12 +3,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-@import url('https://fonts.googleapis.com/css2?family=Syne:wght@500;600;700;800&family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700;800&family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
 @import "tailwindcss";
 
 @theme {
   --font-sans: "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
-  --font-display: "Syne", "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
+  /* Sora: futuristic geometry with open counters — readable at hero sizes */
+  --font-display: "Sora", "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
   --color-node-ink: #050608;
   --color-node-panel: #0a0c10;
@@ -42,6 +43,18 @@ body {
 
 h1, h2, .font-display {
   font-family: var(--font-display), var(--font-sans);
+  letter-spacing: -0.02em;
+  font-optical-sizing: auto;
+  text-rendering: optimizeLegibility;
+}
+
+/* Soften heavy italic display — keep presence, keep words clear */
+h1.italic,
+h2.italic,
+.font-display.italic {
+  font-style: italic;
+  font-synthesis: none;
+  letter-spacing: -0.015em;
 }
 
 /* Custom Scrollbar styling for an immersive feel */
