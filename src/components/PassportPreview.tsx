@@ -87,10 +87,10 @@ export default function PassportPreview({ payload, onStartPassport }: Props) {
           onClick={onStartPassport}
           className="mt-8 w-full px-6 py-4 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-black font-mono text-xs font-black uppercase tracking-wider cursor-pointer"
         >
-          Start Your Human Passport
+          {SLOGANS.ctaPassport}
         </button>
         <p className="mt-3 text-center text-[12px] text-slate-500">
-          Measure your first contribution. Own your reputation.
+          {SLOGANS.awakeningZero} Own your reputation.
         </p>
       </div>
     </div>

@@ -23,6 +23,9 @@ This folder is the source of truth. The root [README](../README.md) is the front
 | Human Reputation Engine (first 5 min) | [HUMAN_ECONOMY.md](./HUMAN_ECONOMY.md) |
 | Angel / diligence lens | [ANGEL_DILIGENCE.md](./ANGEL_DILIGENCE.md) |
 | Investor one-pager style | [INVESTOR_PARTNER_BRIEF.md](./INVESTOR_PARTNER_BRIEF.md) |
+| Investor numbers (ask / scenarios / burn) | [INVESTOR_NUMBERS.md](./INVESTOR_NUMBERS.md) |
+| Funding momentum (14-day raise + voice thesis) | [FUNDING_MOMENTUM.md](./FUNDING_MOMENTUM.md) |
+| Google AI / Gemini credits pack | [GOOGLE_AI_GRANT.md](./GOOGLE_AI_GRANT.md) |
 | Angel pitch deck (live HTML) | [`../pitch/index.html`](../pitch/index.html) |
 | Press blurbs | [PRESS_KIT.md](./PRESS_KIT.md) |
 

@@ -21,6 +21,12 @@ export type LoopBeatCta = {
   onGo: () => void;
 };
 
+export type LoopPassportScores = {
+  knowledge: number;
+  builder: number;
+  contribution: number;
+};
+
 type Props = {
   flags: MainLoopFlags;
   phase: 'ritual' | 'guided';
@@ -31,6 +37,8 @@ type Props = {
   fuelWin?: { from: number; to: number } | null;
   zenNote?: string | null;
   returnGreeting?: string | null;
+  /** Human Passport axes — potential becoming visible */
+  passportScores?: LoopPassportScores | null;
   cta: LoopBeatCta;
   /** Post-loop conversion rails (partner / toll / discord) */
   winRails?: WinRail[];
@@ -43,7 +51,7 @@ type Props = {
 
 const STEP_HINT: Record<LoopStepId, string> = {
   hear: 'Ears first — then prove.',
-  spark: 'Proof of Attention · ~2 min',
+  spark: SLOGANS.firstSparkSupport,
   zen: 'Knowledge first. Then decide.',
   spread: 'Pass the invite — love travels.',
   return: 'Claim Impact or prove again.',
@@ -59,6 +67,7 @@ export default function MainLoopStage({
   fuelWin,
   zenNote,
   returnGreeting,
+  passportScores,
   cta,
   winRails = [],
   onWinRail,
@@ -265,8 +274,34 @@ export default function MainLoopStage({
             </div>
           )}
 
+          {passportScores && flags.firstSparkDone && (
+            <div className="mt-6 grid grid-cols-3 gap-2">
+              {(
+                [
+                  { key: 'knowledge', label: 'Knowledge', value: passportScores.knowledge },
+                  { key: 'builder', label: 'Builder', value: passportScores.builder },
+                  {
+                    key: 'contribution',
+                    label: 'Contribution',
+                    value: passportScores.contribution,
+                  },
+                ] as const
+              ).map((s) => (
+                <div
+                  key={s.key}
+                  className="rounded-xl border border-cyan-400/20 bg-cyan-500/5 px-2.5 py-2.5 text-center"
+                >
+                  <p className="font-mono text-[8px] uppercase tracking-widest text-cyan-400/80">
+                    {s.label}
+                  </p>
+                  <p className="mt-0.5 font-display text-xl font-bold italic text-white">{s.value}</p>
+                </div>
+              ))}
+            </div>
+          )}
+
           {/* Compact reward chips */}
-          <div className="mt-6 flex flex-wrap gap-2">
+          <div className="mt-4 flex flex-wrap gap-2">
             <Chip
               icon={<Flame className="w-3 h-3 text-amber-300" />}
               label={`Impact ${Math.round(energy)}`}

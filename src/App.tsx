@@ -106,6 +106,7 @@ import {
   hasSharedPassport,
   readFirstContribution,
 } from './lib/first-contribution';
+import { computeHumanScores } from './lib/human-economy';
 import { decodePassportShare } from './lib/passport-share';
 import {
   captureInviteFromUrl,
@@ -1445,6 +1446,26 @@ export default function App() {
   });
   const showLoopStage =
     navPhase === 'ritual' || (navPhase === 'guided' && !loopFacilityOpen);
+  /** Hide facility chrome while the sacred loop owns the screen */
+  const loopSanctuary = showLoopStage;
+
+  const passportScores = useMemo(() => {
+    const seed = readFirstContribution()?.scores ?? null;
+    return computeHumanScores({
+      academyCompletedCount,
+      coreSessionTotal: CORE_ATTENTION_SESSIONS.length,
+      missionsCompleted: state.dailyMissions.filter((m) => m.completed).length,
+      missionsTotal: state.dailyMissions.length,
+      snapshot: buildAttentionSnapshot(30),
+      seed,
+    });
+  }, [
+    academyCompletedCount,
+    state.dailyMissions,
+    fuelWin,
+    zenNote,
+    spreadDone,
+  ]);
 
   const enterHearingFromLoop = () => {
     markHearTouched();
@@ -1457,15 +1478,23 @@ export default function App() {
     if (firstRitualPending) {
       return {
         id: 'lab' as NavDestination,
-        label: 'Start Proof of Attention',
-        reason: `${you}, one short challenge — then your Knowledge Score moves.`,
+        label: 'Begin your first Spark',
+        reason: `${SLOGANS.firstSpark} ${SLOGANS.firstSparkSupport}`,
       };
     }
+    // Self-executing chain: fuel → Zen → Hook Mirror → Spread (before claim/grind)
     if (fuelWin) {
+      const nextLabel = !zenDone
+        ? 'Continue to Zen'
+        : hookMirrorPending
+          ? 'Continue to Hook Mirror'
+          : spreadPending
+            ? 'Continue to Spread'
+            : 'Continue';
       return {
-        id: 'map' as NavDestination,
-        label: 'See your Impact',
-        reason: `Proof landed for you, ${you}. Your Impact Score moved — share your passport or prove again.`,
+        id: 'lab' as NavDestination,
+        label: nextLabel,
+        reason: `${SLOGANS.firstSpark} Your passport scores moved — next is awareness.`,
       };
     }
     if (firstSparkDone && !zenDone) {
@@ -1473,21 +1502,6 @@ export default function App() {
         id: 'lab' as NavDestination,
         label: 'Mind or Machine',
         reason: `${you}, knowledge first — hold it in Mind, or convert attention to Impact on Machine.`,
-      };
-    }
-    // Daily return: claim before grind
-    if (dailyClaimReady) {
-      return {
-        id: 'treasury' as NavDestination,
-        label: 'Claim today’s Impact',
-        reason: `Your free refill is ready, ${you} — +15 Impact · +50 BCC.`,
-      };
-    }
-    if (state.energy < 35) {
-      return {
-        id: 'lab' as NavDestination,
-        label: 'Continue learning',
-        reason: `${you}, keep proving attention — another short challenge grows your passport.`,
       };
     }
     if (hookMirrorPending) {
@@ -1501,7 +1515,22 @@ export default function App() {
       return {
         id: 'profile' as NavDestination,
         label: 'Pass the invite',
-        reason: `You’re in, ${you}. Copy your invite when you’re ready — love travels.`,
+        reason: `${you}, you saw the hook — now help someone else grow. Love travels.`,
+      };
+    }
+    // First loop closed — daily return / grind
+    if (dailyClaimReady) {
+      return {
+        id: 'treasury' as NavDestination,
+        label: 'Claim today’s Impact',
+        reason: `Your free refill is ready, ${you} — +15 Impact · +50 BCC.`,
+      };
+    }
+    if (state.energy < 35) {
+      return {
+        id: 'lab' as NavDestination,
+        label: 'Continue learning',
+        reason: `${you}, keep proving attention — another short challenge grows your passport.`,
       };
     }
     // Loop clear → Partner Session (first $) / toll / Discord — not empty reactor
@@ -1521,7 +1550,7 @@ export default function App() {
 
   const loopWinRails = (() => {
     if (firstRitualPending || fuelWin || spreadPending || state.energy < 35) return [];
-    if (dailyClaimReady || hookMirrorPending) return [];
+    if (dailyClaimReady || hookMirrorPending || !zenDone) return [];
     return clearLoopWinningNext({
       you: currentUser?.username?.replace(/^@/, '') || 'operator',
       tollReady: Boolean(economyStatus?.ready),
@@ -1530,6 +1559,37 @@ export default function App() {
       ),
     }).rails;
   })();
+
+  const continueLoopChain = () => {
+    setFuelWin(null);
+    if (!zenDone || hookMirrorPending) {
+      setLoopFacilityOpen(false);
+      changeRoom('lab');
+      addLog(
+        !zenDone
+          ? 'Zen next — Mind or Machine. Knowledge first.'
+          : 'Hook Mirror next — name what owns your attention.',
+        'info'
+      );
+      return;
+    }
+    if (spreadPending) {
+      runLoopSpreadInvite();
+      return;
+    }
+  };
+
+  const advanceLoopBeat = () => {
+    if (fuelWin) {
+      continueLoopChain();
+      return;
+    }
+    if (spreadPending && navNextStep.id === 'profile') {
+      runLoopSpreadInvite();
+      return;
+    }
+    handleNavNavigate(navNextStep.id);
+  };
 
   const runLoopSpreadInvite = () => {
     if (!currentUser?.walletAddress) {
@@ -1942,7 +2002,7 @@ export default function App() {
         </div>
       )}
 
-      {showCultureBroadcast && !focusMode && (
+      {showCultureBroadcast && !focusMode && !loopSanctuary && (
         <div className="relative z-50 mx-4 mt-2 rounded-2xl border border-amber-500/35 bg-gradient-to-r from-amber-950/80 via-[#0a0a0c]/95 to-cyan-950/50 px-4 py-3 flex flex-wrap items-center justify-between gap-3 shadow-[0_12px_40px_rgba(0,0,0,0.5)]">
           <div className="min-w-0">
             <p className="font-mono text-[9px] font-black tracking-[0.28em] uppercase text-amber-400">
@@ -2016,7 +2076,7 @@ export default function App() {
         </div>
       )}
 
-      {showHearingBanner && !hearing.active && (
+      {showHearingBanner && !hearing.active && !loopSanctuary && (
         <div className="relative z-50 mx-4 mt-2 rounded-xl border border-cyan-500/30 bg-cyan-950/40 px-4 py-2.5 flex flex-wrap items-center justify-between gap-2">
           <p className="text-xs text-cyan-100/90 font-medium">{hearingBannerLine()}</p>
           <div className="flex items-center gap-2 shrink-0">
@@ -2067,7 +2127,8 @@ export default function App() {
           </div>
         </div>
 
-        {/* Desktop facility metrics — hidden on phone (lives in bottom strip) */}
+        {/* Desktop facility metrics — hidden during loop sanctuary + phone */}
+        {!loopSanctuary && (
         <div
           className={`hidden md:flex flex-wrap items-center gap-4 lg:gap-8 font-mono text-xs transition-opacity ${
             focusMode ? 'opacity-40' : ''
@@ -2108,6 +2169,7 @@ export default function App() {
             </>
           )}
         </div>
+        )}
 
         {/* Actions — phone: Hear + bell only; desktop: full toolkit */}
         <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
@@ -2182,7 +2244,7 @@ export default function App() {
           ) : (
             <button
               type="button"
-              onClick={() => handleNavNavigate(navNextStep.id)}
+              onClick={() => advanceLoopBeat()}
               title={navNextStep.reason}
               className="hidden md:flex items-center gap-1.5 px-3 py-1.5 bg-cyan-600/15 border border-cyan-500/40 hover:bg-cyan-600/25 text-cyan-300 rounded-lg font-mono text-[10px] tracking-wider uppercase font-black transition-all cursor-pointer max-w-[11rem]"
             >
@@ -2211,6 +2273,7 @@ export default function App() {
             <span className="inline">{hearing.active ? 'Hearing' : 'Hear'}</span>
           </button>
 
+          {!loopSanctuary && (
           <button
             type="button"
             onClick={() => {
@@ -2234,7 +2297,9 @@ export default function App() {
             <Focus className="w-4 h-4" />
             <span className="hidden lg:inline">Focus</span>
           </button>
+          )}
 
+          {!loopSanctuary && (
           <button
             type="button"
             onClick={() => setShowMetricsPanel(true)}
@@ -2244,7 +2309,9 @@ export default function App() {
             <Activity className="w-4 h-4" />
             <span className="hidden xl:inline">Metrics</span>
           </button>
+          )}
 
+          {!loopSanctuary && (
           <button
             type="button"
             onClick={() => setMenuOpen(true)}
@@ -2256,6 +2323,7 @@ export default function App() {
             <Menu className="w-4 h-4" />
             <span>More</span>
           </button>
+          )}
 
           {!firstRitualPending && navPhase === 'open' && (
             <button
@@ -2392,13 +2460,15 @@ export default function App() {
               </button>
             </div>
           )}
-          <EconomyStatusBanner
-            status={economyStatus}
-            loading={economyStatusLoading}
-            onContinueAcademy={
-              economyStatus && !economyStatus.ready ? () => changeRoom('lab') : undefined
-            }
-          />
+          {!loopSanctuary && (
+            <EconomyStatusBanner
+              status={economyStatus}
+              loading={economyStatusLoading}
+              onContinueAcademy={
+                economyStatus && !economyStatus.ready ? () => changeRoom('lab') : undefined
+              }
+            />
+          )}
         </div>
 
         <AnimatePresence mode="wait">
@@ -2417,33 +2487,24 @@ export default function App() {
                   fuelWin={fuelWin}
                   zenNote={zenNote}
                   returnGreeting={returnGreeting}
+                  passportScores={passportScores}
                   cta={{
                     label: navNextStep.label,
                     reason: navNextStep.reason,
-                    onGo: () => {
-                      if (fuelWin && navNextStep.id === 'map') {
-                        setFuelWin(null);
-                        return;
-                      }
-                      if (spreadPending && navNextStep.id === 'profile') {
-                        runLoopSpreadInvite();
-                        return;
-                      }
-                      handleNavNavigate(navNextStep.id);
-                    },
+                    onGo: () => advanceLoopBeat(),
                   }}
                   winRails={loopWinRails}
                   onWinRail={(rail: WinRail) => {
                     if (rail.room) handleNavNavigate(rail.room as NavDestination);
                   }}
                   onHear={enterHearingFromLoop}
-                  onDismissFuel={() => setFuelWin(null)}
+                  onDismissFuel={() => continueLoopChain()}
                   showOpenFacility={
                     navPhase === 'guided' && (spreadDone || state.energy >= 40)
                   }
                   onOpenFacility={() => setLoopFacilityOpen(true)}
                 />
-                {!firstRitualPending && hasSharedPassport() && (
+                {!firstRitualPending && spreadDone && hasSharedPassport() && (
                   <MakeItRainDeck
                     compact
                     onOpenPartners={() => changeRoom('partners')}
@@ -2550,12 +2611,12 @@ export default function App() {
                         </span>
                         <h4 className="font-display text-xl font-extrabold italic text-white mt-1 tracking-tight">
                           {currentUser
-                            ? `${currentUser.username.replace(/^@/, '')}, prove what you learn`
-                            : 'Prove what you learn'}
+                            ? `${currentUser.username.replace(/^@/, '')}, your first Spark`
+                            : 'Your first Spark'}
                         </h4>
                         <p className="text-xs text-slate-400 mt-2 max-w-xl font-sans leading-relaxed">
-                          One short challenge (~2 min). Your Knowledge Score moves — then the workspace
-                          opens around your Human Passport.
+                          {SLOGANS.firstSpark} {SLOGANS.firstSparkSupport} Then the workspace opens
+                          around your Human Passport.
                         </p>
                         <div className="mt-3 flex flex-wrap gap-2 text-[9px] font-mono uppercase tracking-wider">
                           <span className="px-2 py-1 rounded-md border border-cyan-400/25 bg-cyan-500/10 text-cyan-200">
@@ -3208,13 +3269,25 @@ export default function App() {
                     setMetaView(meta);
                     grantMetaRewards(meta);
                     changeRoom('map');
-                    addLog('Proof accepted — your node has fuel. Feel that? Next step is on Home.', 'success');
+                    addLog(
+                      'Proof accepted — potential is visible. Continue when ready: Zen → awareness → Spread.',
+                      'success'
+                    );
+                  }}
+                  onAwarenessSessionComplete={(sessionId) => {
+                    if (sessionId !== 'ai_hook_mirror') return;
+                    setLoopFacilityOpen(false);
+                    changeRoom('map');
+                    addLog(
+                      'Awareness sealed — your next beat is Spread. Help someone else grow.',
+                      'success'
+                    );
                   }}
                   onZenDecision={(decision: LearningDecision) => {
                     setZenNote(
                       decision === 'hold_knowledge'
-                        ? 'Mind · knowledge held. Sit with it — then Spread when you’re ready.'
-                        : 'Machine · attention → fuel. Prove it, then Spread the invite.'
+                        ? 'Mind · knowledge held. Next: name the hook — then Spread.'
+                        : 'Machine · attention → fuel. Next: name the hook — then Spread.'
                     );
                     // Never yank mid–First Spark (Machine still needs Neural Snap)
                     if (isFirstRitualPending()) {
@@ -3226,12 +3299,32 @@ export default function App() {
                       );
                       return;
                     }
+                    setFuelWin(null);
                     setLoopFacilityOpen(false);
+                    // Self-executing: Zen → Hook Mirror (if pending) without hunting
+                    try {
+                      const completed = JSON.parse(
+                        localStorage.getItem('kronos_academy_completed') || '[]'
+                      ) as string[];
+                      const needsHook =
+                        completed.includes('ai_first_spark') &&
+                        !completed.includes('ai_hook_mirror');
+                      if (needsHook) {
+                        changeRoom('lab');
+                        addLog(
+                          'Zen sealed. Hook Mirror is open — name what owns your attention.',
+                          'success'
+                        );
+                        return;
+                      }
+                    } catch {
+                      // fall through to map
+                    }
                     changeRoom('map');
                     addLog(
                       decision === 'hold_knowledge'
-                        ? 'Zen · Mind. Back on the loop — decide when to Spread.'
-                        : 'Zen · Machine. Back on the loop — fuel path open.',
+                        ? 'Zen · Mind. Back on the loop — Spread when you’re ready.'
+                        : 'Zen · Machine. Back on the loop — Spread when you’re ready.',
                       'success'
                     );
                   }}
@@ -3413,17 +3506,19 @@ export default function App() {
         phase={navPhase}
         nextStep={navNextStep}
         walletShort={
-          currentUser?.walletAddress
-            ? `${currentUser.walletAddress.slice(0, 4)}…${currentUser.walletAddress.slice(-4)}`
-            : currentUser?.username
-              ? `@${currentUser.username}`
-              : null
+          loopSanctuary
+            ? null
+            : currentUser?.walletAddress
+              ? `${currentUser.walletAddress.slice(0, 4)}…${currentUser.walletAddress.slice(-4)}`
+              : currentUser?.username
+                ? `@${currentUser.username}`
+                : null
         }
-        bccBalance={firstRitualPending ? undefined : state.credits}
-        energy={state.energy}
+        bccBalance={loopSanctuary || firstRitualPending ? undefined : state.credits}
+        energy={loopSanctuary ? undefined : state.energy}
         onNavigate={handleNavNavigate}
         onOpenMore={() => setMenuOpen(true)}
-        onNext={() => handleNavNavigate(navNextStep.id)}
+        onNext={() => advanceLoopBeat()}
         onLockedHint={() =>
           addLog('First Spark unlocks that — ~2 min in Academy, just for you.', 'info')
         }
@@ -3433,7 +3528,9 @@ export default function App() {
       <InstallPrompt />
 
       <footer
-        className={`hidden md:flex border-t border-white/5 bg-[#0a0a0c]/80 py-3 px-5 mx-4 mb-2 rounded-2xl text-slate-500 flex-col gap-2 shadow-lg z-10 relative backdrop-blur-md transition-opacity ${
+        className={`${
+          loopSanctuary ? 'hidden' : 'hidden md:flex'
+        } border-t border-white/5 bg-[#0a0a0c]/80 py-3 px-5 mx-4 mb-2 rounded-2xl text-slate-500 flex-col gap-2 shadow-lg z-10 relative backdrop-blur-md transition-opacity ${
           focusMode ? 'opacity-25 pointer-events-none' : ''
         }`}
       >
@@ -3445,7 +3542,7 @@ export default function App() {
           <div className="flex flex-wrap gap-3 justify-center items-center">
             <button
               type="button"
-              onClick={() => handleNavNavigate(navNextStep.id)}
+              onClick={() => advanceLoopBeat()}
               className="hover:text-cyan-400 transition-colors cursor-pointer uppercase text-cyan-500/80"
             >
               {navNextStep.label}

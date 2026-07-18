@@ -72,6 +72,8 @@ Full table: [ANGEL_DILIGENCE.md](./ANGEL_DILIGENCE.md)
 
 ## For investors
 
+**Numbers pack:** [INVESTOR_NUMBERS.md](./INVESTOR_NUMBERS.md) — ask, Scenario A/B/C cash, funnel targets, burn, use of funds, milestone gates.
+
 ### Ask / answer
 
 | They ask | You answer |

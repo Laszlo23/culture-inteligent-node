@@ -91,12 +91,64 @@ export const PASSPORT_PRINCIPLES = [
   },
 ] as const;
 
+/** Passport score dimensions — discovery, not class-select. */
+export const PASSPORT_DIMENSIONS = [
+  { id: 'knowledge', title: 'Knowledge', line: 'What you learn and understand.' },
+  { id: 'builder', title: 'Builder', line: 'What you create and ship.' },
+  { id: 'contribution', title: 'Contribution', line: 'How you help others grow.' },
+] as const;
+
+/**
+ * Cold-start cinematic chapters — civilization story before any dashboard chrome.
+ * Keep in sync with HumanEconomyLanding story mode.
+ */
+export const STORY_CHAPTERS = [
+  {
+    id: 'opening',
+    eyebrow: 'Opening',
+    title: SLOGANS.hero,
+    body: SLOGANS.openingLede,
+    accent: SLOGANS.openingInvite,
+  },
+  {
+    id: 'problem',
+    eyebrow: 'Chapter 0 — The Problem',
+    title: 'The old system measured the wrong thing.',
+    body: 'The current economy says: your value = your time. Building Culture says: your value = your contribution.',
+    accent: SLOGANS.equation,
+  },
+  {
+    id: 'awakening',
+    eyebrow: 'Chapter 1 — Awakening',
+    title: 'Your Human Passport',
+    body: 'This is character creation for a new economy — not warrior or mage. You discover Knowledge, Builder, and Contribution. Your first score starts at zero.',
+    accent: SLOGANS.awakeningZero,
+  },
+  {
+    id: 'spark',
+    eyebrow: 'Chapter 2 — The First Spark',
+    title: 'Potential becomes visible',
+    body: SLOGANS.firstSpark,
+    accent: SLOGANS.firstSparkSupport,
+  },
+  {
+    id: 'evolution',
+    eyebrow: 'Chapter 3 — Growth',
+    title: 'How you evolve',
+    body: 'Not a control panel — a journey of becoming.',
+    accent: SLOGANS.potential,
+  },
+] as const;
+
+export type StoryChapterId = (typeof STORY_CHAPTERS)[number]['id'];
+
+/** Evolution framing for the Human Economy journey (member-facing). */
 export const JOURNEY_STEPS = [
-  { id: 'discover', title: 'Discover', line: 'Why does my attention have value?' },
-  { id: 'prove', title: 'Prove', line: 'Complete a Proof of Attention challenge.' },
-  { id: 'passport', title: 'Passport', line: 'Own your Human Passport identity.' },
-  { id: 'grow', title: 'Grow', line: 'Learn, build, contribute every day.' },
-  { id: 'reputation', title: 'Reputation', line: 'Status, access, opportunities.' },
+  { id: 'discover', title: 'Discover', line: 'I learn something new.' },
+  { id: 'spark', title: 'Spark', line: 'I prove understanding.' },
+  { id: 'build', title: 'Build', line: 'I create something.' },
+  { id: 'share', title: 'Share', line: 'I help others grow.' },
+  { id: 'reputation', title: 'Reputation', line: 'My contribution becomes visible.' },
 ] as const;
 
 export const PROOF_TYPES = [

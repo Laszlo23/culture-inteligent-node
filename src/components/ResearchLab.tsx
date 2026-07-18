@@ -20,6 +20,7 @@ import { GameState } from '../types';
 import AttentionAcademy from './AttentionAcademy';
 import SignalDesk from './SignalDesk';
 import { isFirstRitualPending } from '../lib/first-run';
+import { SLOGANS } from '../lib/brand-slogans';
 
 interface ResearchLabProps {
   state: GameState;
@@ -27,6 +28,7 @@ interface ResearchLabProps {
   addLog: (message: string, type: 'info' | 'success' | 'warn' | 'system') => void;
   onOpenRoadmap?: () => void;
   onFirstRitualComplete?: (detail?: { from: number; to: number }) => void;
+  onAwarenessSessionComplete?: (sessionId: string) => void;
   onOpenTollShop?: (sku?: 'academy_retake' | 'spark_refill') => void;
   onOpenVoid?: (draft?: string) => void;
   onRequestFocus?: (on: boolean) => void;
@@ -48,6 +50,7 @@ export default function ResearchLab({
   addLog,
   onOpenRoadmap,
   onFirstRitualComplete,
+  onAwarenessSessionComplete,
   onOpenTollShop,
   onOpenVoid,
   onRequestFocus,
@@ -158,7 +161,7 @@ export default function ResearchLab({
           </h2>
           <p className="mt-1.5 text-sm text-slate-400 max-w-xl">
             {ritualPending
-              ? 'Prove focused attention in ~2 min. Bias check + one honest line. Fuel moves when Proof of Attention lands — not before.'
+              ? `${SLOGANS.firstSpark} ${SLOGANS.firstSparkSupport} Bias check + one honest line — contribution becomes visible when Proof of Attention lands.`
               : 'Verified attention refills knowledge fuel. Complete sessions. Name your hooks. Zen-decide. Mining wakes when attention is live.'}
           </p>
           {ritualPending && (
@@ -228,6 +231,7 @@ export default function ResearchLab({
               addLog={addLog}
               onOpenRoadmap={onOpenRoadmap}
               onFirstRitualComplete={onFirstRitualComplete}
+              onAwarenessSessionComplete={onAwarenessSessionComplete}
               onOpenTollShop={onOpenTollShop}
               onRequestFocus={onRequestFocus}
               onZenDecision={onZenDecision}

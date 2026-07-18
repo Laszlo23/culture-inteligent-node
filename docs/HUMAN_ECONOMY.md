@@ -13,13 +13,15 @@ Live: https://mining.buildingcultureid.space/
 
 ## Magical first 5 minutes
 
-1. **Welcome** — “Let’s measure your first contribution.” → **Start Your Human Passport**  
-2. **Challenge** — open reflection; AI scores curiosity · creativity · reflection  
-3. **Reveal** — Knowledge / Creativity / Contribution / Human Value  
-4. **Share** — **See my Human Passport** (growth engine)  
-5. Soft keep (wallet / claim) after value — never before  
+1. **Cinematic story** — Opening → Problem → Awakening → First Spark → Evolution (full-viewport chapters; no dashboard chrome)  
+2. **Create Human Passport** — character creation; scores start at zero  
+3. **First Spark** — potential becomes visible (~2 min Proof of Attention)  
+4. **Reveal** — Knowledge / Builder / Contribution move on the passport  
+5. **Share** — invite so others can grow (growth engine)  
 
-Milestone: a random person understands it, finishes one challenge, gets a passport, shares with a friend — without the facility map.
+Milestone: a random person feels a new civilization story, creates a passport, finishes one Spark, shares with a friend — without the facility map.
+
+Cold-start code: `HumanEconomyLanding` · `STORY_CHAPTERS` · then Auth → `HumanPassportClaim` → Loop Stage.
 
 ## Problem
 
@@ -40,11 +42,15 @@ Blockchain is infrastructure for ownership, verification, and credential history
 
 ## Loop
 
-1. **Discover** — Why does my attention have value?  
-2. **First contribution** — measure → passport scores → share  
-3. **Prove** — Proof of Attention challenge (grow scores)  
-4. **Grow** — Daily quests (Learn / Create / Contribute)  
-5. **Reputation** — Status, access, opportunities (marketplace later)  
+Evolution (member story):
+
+1. **Discover** — I learn something new.  
+2. **Spark** — I prove understanding.  
+3. **Build** — I create something.  
+4. **Share** — I help others grow.  
+5. **Reputation** — My contribution becomes visible.  
+
+Operating loop (Loop Stage): Hear → Spark → Zen → Spread → Return.
 
 ## Monetization
 

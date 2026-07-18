@@ -69,6 +69,8 @@ interface AttentionAcademyProps {
   addLog: (message: string, type: 'info' | 'success' | 'warn' | 'system') => void;
   onOpenRoadmap?: () => void;
   onFirstRitualComplete?: (detail?: { from: number; to: number }) => void;
+  /** Hook Mirror (or other awareness session) sealed — hand off to loop */
+  onAwarenessSessionComplete?: (sessionId: string) => void;
   /** Open Treasury Attention Toll shop (e.g. academy_retake) */
   onOpenTollShop?: (sku?: 'academy_retake' | 'spark_refill') => void;
   /** Request facility Focus Mode (dim chrome) */
@@ -83,6 +85,7 @@ export default function AttentionAcademy({
   addLog,
   onOpenRoadmap,
   onFirstRitualComplete,
+  onAwarenessSessionComplete,
   onOpenTollShop,
   onRequestFocus,
   onZenDecision,
@@ -196,8 +199,11 @@ export default function AttentionAcademy({
       setActiveSessionIdx(nextIncompleteIdx);
       return;
     }
+    const current = catalog[activeSessionIdx];
+    const currentDone = Boolean(current && completedSessions.includes(current.id));
     const isCurrentLocked = isSessionLocked(activeSessionIdx);
-    if (isCurrentLocked || activeSessionIdx >= catalog.length) {
+    // Advance past completed sessions so Zen → Hook Mirror self-chains
+    if (currentDone || isCurrentLocked || activeSessionIdx >= catalog.length) {
       setActiveSessionIdx(nextIncompleteIdx);
     }
   }, [completedSessions, catalog, ritualPending, activeSessionIdx, isSessionLocked]);
@@ -500,6 +506,7 @@ export default function AttentionAcademy({
             : 'HOOK MIRROR: Proof of Hook Awareness sealed — bait, notice, why you stay.',
           'success'
         );
+        onAwarenessSessionComplete?.(session.id);
       }
 
       // Practice mode: still try a PoA memo when a wallet is present (cheap attention proof)

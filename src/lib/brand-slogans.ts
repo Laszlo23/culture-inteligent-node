@@ -29,8 +29,22 @@ export const SLOGANS = {
   hero: 'Human value was never measured correctly.',
   heroSub:
     'For centuries we measured people by the hours they worked. The AI era requires a new measurement: what you learn, what you create, what you contribute.',
-  ctaPassport: 'Start Your Human Passport',
-  ctaExplore: 'Explore The Human Economy',
+  /** Cinematic opening — civilization welcome */
+  openingLede:
+    'Every human carries invisible value. The things you learn. The things you create. The people you help. Until today, most of it was impossible to measure.',
+  openingInvite: 'Welcome to Building Culture. Your journey begins with your first Spark.',
+  mission:
+    'Humanity is entering a new economic era. Your mission is to discover and grow your potential.',
+  ctaPassport: 'Create Human Passport',
+  ctaExplore: 'Explore the world',
+  /** First Spark — potential becomes visible */
+  firstSpark:
+    'Every human begins with potential. Your first Spark is the moment your contribution becomes visible.',
+  firstSparkSupport: 'One short challenge (~2 min) — then your Knowledge Score moves.',
+  /** Passport awakening */
+  awakening: 'You are entering a new economy.',
+  awakeningZero: 'Your scores start at zero. Zero creates a journey.',
+  potential: 'Discover and grow your potential — you are not earning points to prove you are human.',
 
   /** Spine */
   primary: 'Own your digital reputation.',
@@ -41,7 +55,7 @@ export const SLOGANS = {
   curveLong:
     'Just because humanity wants the same failure curve does not mean you have to.',
   loop: 'Hear → Spark → Zen → Spread → Return.',
-  loopGrowth: 'Discover → Claim → Spark → Spread → Return.',
+  loopGrowth: 'Discover → Spark → Build → Share → Reputation.',
   loopLegacy: 'Discover → Prove → Passport → Grow → Reputation.',
   spread: 'Share knowledge. Lift others. Reputation compounds.',
   hook: 'Learn. Create. Contribute. Own it.',

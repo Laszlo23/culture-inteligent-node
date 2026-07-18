@@ -1,15 +1,17 @@
 /**
- * Public landing — Human Economy mission, loop, pricing.
+ * Public landing — cinematic story chapters first, then explore (pricing / community).
  */
 
-import React, { useEffect, useRef, useState } from 'react';
-import { motion } from 'motion/react';
-import { ArrowRight, Sparkles } from 'lucide-react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
+import { ArrowLeft, ArrowRight, Sparkles } from 'lucide-react';
 import { BRAND, SLOGANS } from '../lib/brand-slogans';
 import {
   JOURNEY_STEPS,
+  PASSPORT_DIMENSIONS,
   PRICING_TIERS,
   PROOF_TYPES,
+  STORY_CHAPTERS,
   joinWaitlist,
   type PricingTierId,
 } from '../lib/human-economy';
@@ -19,37 +21,234 @@ import {
   inviteWelcomeLine,
 } from '../lib/community-invite';
 import { CinematicBackdrop } from './fx';
-import FarcasterCastButton, { FarcasterCastDeck } from './FarcasterCastButton';
+import { FarcasterCastDeck } from './FarcasterCastButton';
+import MakeItRainDeck from './MakeItRainDeck';
 
 type Props = {
   onBuildPassport: () => void;
   onContinueSecure?: () => void;
 };
 
+type LandingMode = 'story' | 'explore';
+
 export default function HumanEconomyLanding({ onBuildPassport, onContinueSecure }: Props) {
+  const reduceMotion = useReducedMotion();
   const economyRef = useRef<HTMLElement | null>(null);
+  const [mode, setMode] = useState<LandingMode>('story');
+  const [chapter, setChapter] = useState(0);
   const [waitlistMsg, setWaitlistMsg] = useState<string | null>(null);
   const [inviteLine, setInviteLine] = useState<string | null>(null);
 
+  const lastIndex = STORY_CHAPTERS.length - 1;
+  const isLast = chapter >= lastIndex;
+  const current = STORY_CHAPTERS[chapter] ?? STORY_CHAPTERS[0];
+
   useEffect(() => {
     const { record } = captureInviteFromUrl();
-    setInviteLine(inviteWelcomeLine(record?.code) );
+    setInviteLine(inviteWelcomeLine(record?.code));
   }, []);
 
-  const scrollExplore = () => {
-    economyRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  };
+  const goExplore = useCallback(() => {
+    setMode('explore');
+  }, []);
+
+  const nextChapter = useCallback(() => {
+    setChapter((c) => Math.min(lastIndex, c + 1));
+  }, [lastIndex]);
+
+  const prevChapter = useCallback(() => {
+    setChapter((c) => Math.max(0, c - 1));
+  }, []);
+
+  useEffect(() => {
+    if (mode !== 'explore') return;
+    const id = window.requestAnimationFrame(() => {
+      economyRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+    return () => window.cancelAnimationFrame(id);
+  }, [mode]);
+
+  useEffect(() => {
+    if (mode !== 'story') return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowRight' || e.key === ' ') {
+        e.preventDefault();
+        if (isLast) onBuildPassport();
+        else nextChapter();
+      } else if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        prevChapter();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [mode, isLast, nextChapter, prevChapter, onBuildPassport]);
 
   const onWaitlist = (tier: PricingTierId) => {
     joinWaitlist(tier);
     setWaitlistMsg(
       tier === 'pro'
-        ? 'You\'re on the Human Passport Pro list — we\'ll reach out.'
+        ? "You're on the Human Passport Pro list — we'll reach out."
         : tier === 'company'
           ? 'Company interest recorded — Human Intelligence Platform waitlist.'
           : 'Creator marketplace interest recorded. Thank you.'
     );
   };
+
+  if (mode === 'story') {
+    return (
+      <div className="relative h-[100dvh] overflow-hidden bg-[#050608] text-slate-300">
+        <div className="fixed inset-0 pointer-events-none z-0">
+          <CinematicBackdrop variant="duality" />
+          <div className="absolute inset-0 bg-gradient-to-b from-[#050608]/35 via-[#050608]/80 to-[#050608]" />
+        </div>
+
+        <div className="relative z-10 flex h-full flex-col px-5 md:px-10 py-6 md:py-10 max-w-3xl mx-auto">
+          <header className="flex items-center justify-between gap-3 shrink-0">
+            <p className="font-mono text-[10px] font-black tracking-[0.32em] uppercase text-cyan-400/90">
+              {BRAND.parent}
+            </p>
+            <div className="flex items-center gap-1.5" aria-hidden>
+              {STORY_CHAPTERS.map((ch, i) => (
+                <span
+                  key={ch.id}
+                  className={`h-1 rounded-full transition-all duration-300 ${
+                    i === chapter
+                      ? 'w-6 bg-cyan-400'
+                      : i < chapter
+                        ? 'w-3 bg-cyan-400/50'
+                        : 'w-3 bg-white/15'
+                  }`}
+                />
+              ))}
+            </div>
+          </header>
+
+          {inviteLine && chapter === 0 && (
+            <p className="mt-4 shrink-0 max-w-xl rounded-xl border border-amber-400/25 bg-amber-950/35 px-4 py-3 text-sm text-amber-50/95 leading-relaxed">
+              {inviteLine}
+            </p>
+          )}
+
+          <div className="flex-1 flex flex-col justify-center min-h-0 py-6">
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={current.id}
+                initial={reduceMotion ? false : { opacity: 0, y: 18 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={reduceMotion ? undefined : { opacity: 0, y: -12 }}
+                transition={{ duration: 0.4 }}
+                className="space-y-5"
+              >
+                <p className="font-mono text-[9px] font-black tracking-[0.28em] uppercase text-amber-400/85">
+                  {current.eyebrow}
+                </p>
+                <h1 className="font-display text-3xl sm:text-4xl md:text-5xl font-bold italic text-white tracking-tight leading-[1.12]">
+                  {current.title}
+                </h1>
+                <p className="text-base sm:text-lg text-slate-400 max-w-2xl leading-relaxed font-sans">
+                  {current.body}
+                </p>
+                {current.accent && (
+                  <p className="text-sm sm:text-base text-slate-200 max-w-2xl leading-relaxed font-medium">
+                    {current.accent}
+                  </p>
+                )}
+
+                {current.id === 'awakening' && (
+                  <ul className="mt-2 grid grid-cols-1 sm:grid-cols-3 gap-2">
+                    {PASSPORT_DIMENSIONS.map((d) => (
+                      <li
+                        key={d.id}
+                        className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-3"
+                      >
+                        <p className="font-mono text-[9px] uppercase tracking-widest text-cyan-400/80">
+                          {d.title}
+                        </p>
+                        <p className="mt-1 text-[11px] text-slate-500 leading-snug">{d.line}</p>
+                        <p className="mt-2 font-display text-2xl italic text-white/90">0</p>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+
+                {current.id === 'evolution' && (
+                  <ol className="mt-2 grid grid-cols-1 sm:grid-cols-5 gap-2">
+                    {JOURNEY_STEPS.map((step, i) => (
+                      <li
+                        key={step.id}
+                        className="rounded-xl border border-white/8 bg-white/[0.03] px-3 py-3"
+                      >
+                        <span className="font-mono text-[9px] text-cyan-400/70 tracking-widest">
+                          0{i + 1}
+                        </span>
+                        <p className="mt-1.5 font-semibold text-white text-sm">{step.title}</p>
+                        <p className="mt-0.5 text-[11px] text-slate-500 leading-snug">{step.line}</p>
+                      </li>
+                    ))}
+                  </ol>
+                )}
+              </motion.div>
+            </AnimatePresence>
+          </div>
+
+          <footer className="shrink-0 flex flex-col gap-3 pb-2">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+              {isLast ? (
+                <button
+                  type="button"
+                  onClick={onBuildPassport}
+                  className="inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-black font-mono text-xs font-black uppercase tracking-wider cursor-pointer shadow-[0_0_40px_rgba(34,211,238,0.35)]"
+                >
+                  <Sparkles className="w-4 h-4" />
+                  {SLOGANS.ctaPassport}
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={nextChapter}
+                  className="inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-black font-mono text-xs font-black uppercase tracking-wider cursor-pointer shadow-[0_0_40px_rgba(34,211,238,0.35)]"
+                >
+                  Continue
+                  <ArrowRight className="w-4 h-4" />
+                </button>
+              )}
+              {chapter >= 2 && (
+                <button
+                  type="button"
+                  onClick={goExplore}
+                  className="inline-flex items-center justify-center gap-2 px-5 py-3 text-[10px] font-mono uppercase tracking-wider text-slate-500 hover:text-slate-300 cursor-pointer"
+                >
+                  {SLOGANS.ctaExplore}
+                </button>
+              )}
+            </div>
+            <div className="flex items-center justify-between gap-2">
+              <button
+                type="button"
+                onClick={prevChapter}
+                disabled={chapter === 0}
+                className="inline-flex items-center gap-1.5 px-2 py-1.5 text-[10px] font-mono uppercase tracking-wider text-slate-600 hover:text-slate-400 disabled:opacity-30 disabled:pointer-events-none cursor-pointer"
+                aria-label="Previous chapter"
+              >
+                <ArrowLeft className="w-3.5 h-3.5" />
+                Back
+              </button>
+              {chapter >= 2 && !isLast && (
+                <button
+                  type="button"
+                  onClick={onBuildPassport}
+                  className="text-[10px] font-mono uppercase tracking-wider text-slate-600 hover:text-cyan-400/80 cursor-pointer"
+                >
+                  Skip to passport
+                </button>
+              )}
+            </div>
+          </footer>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="relative min-h-[100dvh] overflow-y-auto bg-[#050608] text-slate-300">
@@ -59,52 +258,26 @@ export default function HumanEconomyLanding({ onBuildPassport, onContinueSecure 
       </div>
 
       <div className="relative z-10">
-        {/* Hero */}
-        <section className="min-h-[100dvh] flex flex-col justify-center px-5 md:px-10 py-16 max-w-4xl mx-auto">
-          <motion.p
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="font-mono text-[10px] font-black tracking-[0.32em] uppercase text-cyan-400/90"
+        <section className="px-5 md:px-10 pt-10 pb-8 max-w-4xl mx-auto">
+          <button
+            type="button"
+            onClick={() => {
+              setMode('story');
+              setChapter(0);
+            }}
+            className="inline-flex items-center gap-1.5 text-[10px] font-mono uppercase tracking-wider text-slate-500 hover:text-cyan-300 cursor-pointer"
           >
+            <ArrowLeft className="w-3.5 h-3.5" />
+            Back to story
+          </button>
+          <p className="mt-6 font-mono text-[10px] font-black tracking-[0.32em] uppercase text-cyan-400/90">
             {BRAND.parent} · {BRAND.product}
-          </motion.p>
-          {inviteLine && (
-            <motion.p
-              initial={{ opacity: 0, y: 6 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="mt-4 max-w-xl rounded-xl border border-amber-400/25 bg-amber-950/35 px-4 py-3 text-sm text-amber-50/95 leading-relaxed"
-            >
-              {inviteLine}
-            </motion.p>
-          )}
-          <motion.h1
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.05 }}
-            className="mt-5 font-display text-4xl sm:text-5xl md:text-6xl font-bold italic text-white tracking-tight leading-[1.15]"
-          >
+          </p>
+          <h1 className="mt-3 font-display text-3xl sm:text-4xl font-bold italic text-white tracking-tight">
             {SLOGANS.hero}
-          </motion.h1>
-          <motion.p
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.12 }}
-            className="mt-6 text-base sm:text-lg text-slate-400 max-w-2xl leading-relaxed font-sans"
-          >
-            For centuries we measured people by the hours they worked.
-            <br className="hidden sm:block" />
-            <span className="text-slate-300"> The AI era requires a new measurement:</span>
-            <br />
-            <span className="text-white font-medium">
-              What you learn. What you create. What you contribute.
-            </span>
-          </motion.p>
-          <motion.div
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2 }}
-            className="mt-10 flex flex-col sm:flex-row gap-3"
-          >
+          </h1>
+          <p className="mt-4 text-slate-400 max-w-2xl leading-relaxed">{SLOGANS.mission}</p>
+          <div className="mt-8 flex flex-col sm:flex-row gap-3">
             <button
               type="button"
               onClick={onBuildPassport}
@@ -113,34 +286,13 @@ export default function HumanEconomyLanding({ onBuildPassport, onContinueSecure 
               <Sparkles className="w-4 h-4" />
               {SLOGANS.ctaPassport}
             </button>
-            <button
-              type="button"
-              onClick={scrollExplore}
-              className="inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl border border-white/15 hover:border-white/30 text-slate-200 font-mono text-xs font-black uppercase tracking-wider cursor-pointer"
-            >
-              {SLOGANS.ctaExplore}
-              <ArrowRight className="w-4 h-4" />
-            </button>
-            <FarcasterCastButton templateId="rain" variant="ghost" label="Make it rain" />
-          </motion.div>
-          <p className="mt-6 text-[11px] text-slate-500 font-mono tracking-wide">
-            {SLOGANS.equation} · You own your digital reputation.
-          </p>
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.28 }}
-            className="mt-8 max-w-xl space-y-4"
-          >
-            <p className="text-sm text-slate-400 leading-relaxed border border-cyan-500/20 bg-cyan-500/5 rounded-xl px-4 py-3">
-              Human Reputation Engine — measure contribution, own your passport, share it.
-              Facility layers wait until after your first score.
-            </p>
+          </div>
+          <div className="mt-8 max-w-xl space-y-4">
+            <MakeItRainDeck />
             <FarcasterCastDeck />
-          </motion.div>
+          </div>
         </section>
 
-        {/* Problem */}
         <section className="px-5 md:px-10 py-20 border-t border-white/5 max-w-4xl mx-auto">
           <p className="font-mono text-[9px] font-black tracking-[0.28em] uppercase text-amber-400/80">
             The problem
@@ -155,7 +307,6 @@ export default function HumanEconomyLanding({ onBuildPassport, onContinueSecure 
           </p>
         </section>
 
-        {/* Loop */}
         <section
           ref={economyRef}
           id="human-economy"
@@ -165,7 +316,7 @@ export default function HumanEconomyLanding({ onBuildPassport, onContinueSecure 
             The Human Economy
           </p>
           <h2 className="mt-3 font-display text-2xl sm:text-3xl font-bold italic text-white">
-            How reputation is built
+            How you evolve
           </h2>
           <ol className="mt-8 grid sm:grid-cols-5 gap-3">
             {JOURNEY_STEPS.map((step, i) => (
@@ -183,7 +334,6 @@ export default function HumanEconomyLanding({ onBuildPassport, onContinueSecure 
           </ol>
         </section>
 
-        {/* Proof types */}
         <section className="px-5 md:px-10 py-16 border-t border-white/5 max-w-4xl mx-auto">
           <h2 className="font-display text-xl sm:text-2xl font-bold italic text-white">
             Proof of Attention
@@ -205,32 +355,26 @@ export default function HumanEconomyLanding({ onBuildPassport, onContinueSecure 
           </div>
         </section>
 
-        {/* Passport preview */}
         <section className="px-5 md:px-10 py-16 border-t border-white/5 max-w-4xl mx-auto">
           <h2 className="font-display text-xl sm:text-2xl font-bold italic text-white">
             Human Passport
           </h2>
-          <p className="mt-2 text-sm text-slate-400">Your human value — measurable and ownable.</p>
+          <p className="mt-2 text-sm text-slate-400">{SLOGANS.awakeningZero}</p>
           <div className="mt-6 grid grid-cols-3 gap-3">
-            {[
-              { label: 'Knowledge', v: 42 },
-              { label: 'Creativity', v: 28 },
-              { label: 'Contribution', v: 35 },
-            ].map((s) => (
+            {PASSPORT_DIMENSIONS.map((s) => (
               <div
-                key={s.label}
+                key={s.id}
                 className="rounded-2xl border border-cyan-500/20 bg-cyan-500/5 px-4 py-5 text-center"
               >
                 <p className="font-mono text-[9px] uppercase tracking-widest text-cyan-400/80">
-                  {s.label}
+                  {s.title}
                 </p>
-                <p className="mt-2 font-display text-3xl font-bold italic text-white">{s.v}</p>
+                <p className="mt-2 font-display text-3xl font-bold italic text-white">0</p>
               </div>
             ))}
           </div>
         </section>
 
-        {/* Pricing */}
         <section className="px-5 md:px-10 py-20 border-t border-white/5 max-w-5xl mx-auto">
           <p className="font-mono text-[9px] font-black tracking-[0.28em] uppercase text-amber-400/80">
             How we grow
@@ -310,7 +454,7 @@ export default function HumanEconomyLanding({ onBuildPassport, onContinueSecure 
             onClick={onContinueSecure || onBuildPassport}
             className="mt-6 inline-flex items-center gap-2 text-cyan-300 hover:text-cyan-200 font-mono text-[11px] font-bold uppercase tracking-wider cursor-pointer"
           >
-            Continue · secure your passport <ArrowRight className="w-3.5 h-3.5" />
+            Continue · create your passport <ArrowRight className="w-3.5 h-3.5" />
           </button>
         </footer>
       </div>

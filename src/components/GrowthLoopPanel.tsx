@@ -1,5 +1,5 @@
 /**
- * Growth loop — Discover → Claim → Spark → Spread → Return + live connections.
+ * Growth loop — Discover → Spark → Build → Share → Reputation + live connections.
  */
 
 import React, { useCallback, useEffect, useState } from 'react';
@@ -32,11 +32,11 @@ const STEPS: Array<{
   label: string;
   hint: string;
 }> = [
-  { id: 'discovered', label: 'Discover', hint: 'Land via invite or open the Mini App' },
-  { id: 'claimed', label: 'Claim', hint: 'Human Passport' },
-  { id: 'sparked', label: 'Spark', hint: 'First Proof of Attention' },
-  { id: 'spread', label: 'Spread', hint: 'Cast or copy your invite' },
-  { id: 'returned', label: 'Return', hint: 'Someone you invited claims' },
+  { id: 'discovered', label: 'Discover', hint: 'I learn something new.' },
+  { id: 'claimed', label: 'Build', hint: 'I create my Human Passport.' },
+  { id: 'sparked', label: 'Spark', hint: 'I prove understanding.' },
+  { id: 'spread', label: 'Share', hint: 'I help others grow.' },
+  { id: 'returned', label: 'Reputation', hint: 'My contribution becomes visible.' },
 ];
 
 export default function GrowthLoopPanel({
@@ -111,7 +111,7 @@ export default function GrowthLoopPanel({
             Connections growing
           </h3>
           <p className="mt-1 text-[12px] text-slate-400 max-w-md leading-relaxed">
-            Discover → Claim → Spark → Spread → they return. Watch the network fill in.
+            Discover → Spark → Build → Share → Reputation. Watch potential become visible.
           </p>
         </div>
         <button

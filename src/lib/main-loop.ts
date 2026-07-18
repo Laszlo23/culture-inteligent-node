@@ -134,21 +134,20 @@ export function resolveMainLoopFlags(input: {
   const spreadDone = input.spreadDone;
   const returnDone = input.returnTouched || (!input.dailyClaimReady && firstSparkDone);
 
+  // Awareness-first rail: close Zen → Hook → Spread before claim / grind.
   let current: LoopStepId = 'spark';
   if (input.firstRitualPending) {
     current = input.hearTouched ? 'spark' : 'hear';
-  } else if (input.fuelWin) {
-    current = zenDone ? 'zen' : 'zen';
-  } else if (!zenDone) {
+  } else if (input.fuelWin || !zenDone) {
     current = 'zen';
-  } else if (input.dailyClaimReady && firstSparkDone) {
-    current = 'return';
-  } else if (input.energyLow) {
-    current = 'spark';
   } else if (input.hookMirrorPending) {
     current = 'zen';
   } else if (!spreadDone) {
     current = 'spread';
+  } else if (input.dailyClaimReady && firstSparkDone) {
+    current = 'return';
+  } else if (input.energyLow) {
+    current = 'spark';
   } else {
     current = 'return';
   }

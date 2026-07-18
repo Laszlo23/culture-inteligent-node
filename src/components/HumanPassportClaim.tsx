@@ -1,5 +1,5 @@
 /**
- * Soft Human Passport claim — replaces Culture Club oath gate.
+ * Soft Human Passport claim — awakening / character-creation beat.
  */
 
 import React, { useState } from 'react';
@@ -7,7 +7,7 @@ import { motion } from 'motion/react';
 import { ArrowRight, Check, Loader2, Share2 } from 'lucide-react';
 import { Keypair } from '@solana/web3.js';
 import { BRAND, SLOGANS } from '../lib/brand-slogans';
-import { PASSPORT_PRINCIPLES } from '../lib/human-economy';
+import { PASSPORT_DIMENSIONS, PASSPORT_PRINCIPLES } from '../lib/human-economy';
 import {
   buildMemberInvitePost,
   claimHumanPassport,
@@ -126,7 +126,7 @@ export default function HumanPassportClaim({
         className="relative z-10 w-full max-w-lg rounded-3xl border border-white/10 bg-[#09090c]/90 backdrop-blur-md p-6 md:p-8 shadow-[0_25px_60px_rgba(0,0,0,0.75)]"
       >
         <p className="font-mono text-[9px] font-black tracking-[0.28em] uppercase text-cyan-400">
-          {BRAND.passport}
+          {BRAND.passport} · Awakening
         </p>
 
         {welcome && phase === 'claim' && (
@@ -138,16 +138,35 @@ export default function HumanPassportClaim({
         {phase === 'claim' ? (
           <>
             <h1 className="mt-3 font-display text-2xl md:text-3xl font-extrabold italic text-white tracking-tight">
-              Claim your Human Passport
+              {SLOGANS.awakening}
             </h1>
             <p className="mt-2 text-sm text-slate-400 leading-relaxed">
-              {SLOGANS.equation}. Three principles — then you own a portable reputation record.
+              Create your Human Passport — reputation you discover as you learn, build, and
+              contribute. {SLOGANS.awakeningZero}
             </p>
-            <ul className="mt-6 space-y-3">
+
+            <ul className="mt-5 grid grid-cols-3 gap-2">
+              {PASSPORT_DIMENSIONS.map((d) => (
+                <li
+                  key={d.id}
+                  className="rounded-xl border border-cyan-500/20 bg-cyan-500/5 px-2 py-3 text-center"
+                >
+                  <p className="font-mono text-[8px] uppercase tracking-widest text-cyan-400/85">
+                    {d.title}
+                  </p>
+                  <p className="mt-1 font-display text-2xl font-bold italic text-white">0</p>
+                </li>
+              ))}
+            </ul>
+            <p className="mt-2 text-[11px] text-slate-500 text-center leading-relaxed">
+              {SLOGANS.potential}
+            </p>
+
+            <ul className="mt-5 space-y-2">
               {PASSPORT_PRINCIPLES.map((p) => (
                 <li
                   key={p.id}
-                  className="rounded-xl border border-white/8 bg-white/[0.03] px-4 py-3"
+                  className="rounded-xl border border-white/8 bg-white/[0.03] px-4 py-2.5"
                 >
                   <p className="text-sm font-semibold text-white">{p.title}</p>
                   <p className="text-[12px] text-slate-500 mt-0.5">{p.line}</p>
@@ -168,7 +187,7 @@ export default function HumanPassportClaim({
               ) : (
                 <Check className="w-4 h-4" />
               )}
-              Build my passport · {short}
+              Create my passport · {short}
             </button>
             <p className="mt-3 text-[10px] text-slate-600 text-center font-mono">
               Secure ID · ownership record · practice network
@@ -180,7 +199,7 @@ export default function HumanPassportClaim({
               Passport ready
             </h1>
             <p className="mt-2 text-sm text-slate-400 leading-relaxed">
-              {SLOGANS.ownership} Next: prove attention — then invite one builder so the community grows.
+              {SLOGANS.firstSpark} Next: your first Spark — then invite someone so they can grow too.
             </p>
             <button
               type="button"
@@ -190,7 +209,7 @@ export default function HumanPassportClaim({
               }}
               className="mt-6 w-full py-3.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-black font-mono text-xs font-black uppercase tracking-wider cursor-pointer inline-flex items-center justify-center gap-2"
             >
-              Start Proof of Attention
+              Begin your first Spark
               <ArrowRight className="w-4 h-4" />
             </button>
             <div className="mt-3 grid gap-2 sm:grid-cols-2">

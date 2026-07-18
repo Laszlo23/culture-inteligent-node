@@ -5,7 +5,7 @@
 import React, { useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { ArrowRight, Loader2, Sparkles } from 'lucide-react';
-import { BRAND } from '../lib/brand-slogans';
+import { BRAND, SLOGANS } from '../lib/brand-slogans';
 import {
   ensureGuestId,
   pickFirstContributionPrompt,
@@ -129,7 +129,7 @@ export default function FirstContributionRitual({
                 onClick={() => setPhase('challenge')}
                 className="inline-flex items-center gap-2 px-7 py-4 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-black font-mono text-xs font-black uppercase tracking-wider cursor-pointer shadow-[0_0_32px_rgba(34,211,238,0.35)]"
               >
-                Start Your Human Passport
+                {SLOGANS.ctaPassport}
                 <ArrowRight className="w-4 h-4" />
               </button>
             </motion.div>
