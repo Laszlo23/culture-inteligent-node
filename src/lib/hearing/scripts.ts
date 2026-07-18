@@ -85,12 +85,12 @@ export function broadcastScript(): string {
 
 export function unsupportedScript(support: { tts: boolean; stt: boolean; neural?: boolean }): string {
   if (!support.tts && !support.stt) {
-    return 'Hearing Mode needs a mic and our warm neural guide voice. Try Chrome or Safari — and make sure the culture node has a Gemini key for speech.';
+    return 'Hearing Mode needs a mic and the voice guide. Try Chrome or Safari — text and on-screen controls still work if voice isn’t ready.';
   }
   if (!support.tts) {
-    return 'The warm guide voice is unavailable right now. You can still use the visual facility — nothing is lost.';
+    return 'Voice guide isn’t available right now. You can still use the visual facility — nothing is lost.';
   }
-  return 'I can speak with the neural guide, but this browser cannot hear the mic. Stay with the narration, and use the on-screen controls when you need to move.';
+  return 'I can speak with the voice guide, but this browser cannot hear the mic. Stay with the narration, and use the on-screen controls when you need to move.';
 }
 
 export function unknownCommandScript(): string {

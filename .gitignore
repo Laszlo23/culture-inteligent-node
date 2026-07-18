@@ -12,6 +12,7 @@ data/tts-cache/
 
 # Growth loop ledger (invite connections)
 data/growth-network.json
+data/attention-miner.json
 
 # TWA / Android signing secrets
 mobile-twa/android.keystore

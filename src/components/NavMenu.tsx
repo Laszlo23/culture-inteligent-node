@@ -272,9 +272,9 @@ function Collapsed({
 function phaseCopy(phase: NavPhase): { title: string; subtitle: string } {
   switch (phase) {
     case 'ritual':
-      return { title: 'Just for you', subtitle: 'Ignite First Spark — ~2 min' };
+      return { title: 'Just for you', subtitle: 'Hear → Spark → Zen → Spread' };
     case 'guided':
-      return { title: 'Your path', subtitle: 'What fits this moment' };
+      return { title: 'Main loop', subtitle: 'Claim · Prove · Zen · Spread' };
     case 'open':
       return { title: 'Navigate', subtitle: 'Rooms & account' };
     default: {
@@ -303,22 +303,24 @@ export default function NavMenu({
 
   const primaryIds: NavDestination[] =
     phase === 'ritual'
-      ? ['lab', 'passport', 'map']
+      ? ['map', 'lab', 'passport']
       : phase === 'guided'
-        ? ['lab', 'passport', 'missions', 'map']
+        ? ['map', 'lab', 'passport', 'treasury']
         : ['map', 'passport', 'lab', 'missions', 'profile'];
 
   const moreFacilityIds: NavDestination[] =
     phase === 'open'
       ? ['workshop', 'gallery', 'ai', 'guild', 'missions', 'leaderboard', 'roadmap']
       : phase === 'guided'
-        ? ['reactor', 'gallery', 'missions', 'workshop']
+        ? ['missions', 'reactor']
         : [];
 
   const accountIds: NavDestination[] =
     phase === 'ritual'
       ? ['hook-loop', 'field-deck']
-      : ['hook-loop', 'field-deck', 'treasury', 'onboarding', 'partners', 'feedback', 'void'];
+      : phase === 'guided'
+        ? ['hook-loop', 'field-deck', 'feedback']
+        : ['hook-loop', 'field-deck', 'treasury', 'onboarding', 'partners', 'feedback', 'void'];
 
   return (
     <AnimatePresence>

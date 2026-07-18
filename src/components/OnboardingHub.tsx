@@ -9,25 +9,38 @@ import {
   Sparkles, Wallet, Key, ShieldCheck, Trophy, HelpCircle, 
   ChevronRight, Copy, Check, ExternalLink, Cpu, Info, 
   Settings2, Rocket, ArrowRight, Share2, Network, Compass,
-  Flame, BookOpen, ShieldAlert, Terminal, CheckSquare, Globe, Coins
+  Flame, BookOpen, ShieldAlert, Terminal, CheckSquare, Globe, Coins,
+  MessageCircle,
 } from 'lucide-react';
 import { GameState, SoulboundReputation } from '../types';
 import SoulboundRitualOverlay from './SoulboundRitualOverlay';
+import EcosystemSlider from './EcosystemSlider';
+import DiscordCommunityHub from './DiscordCommunityHub';
 import { Keypair } from '@solana/web3.js';
+import { friendlyFailureDetail } from '../lib/user-errors';
 
 interface OnboardingHubProps {
   state: GameState;
   setState: React.Dispatch<React.SetStateAction<GameState>>;
   addLog: (message: string, type: 'info' | 'success' | 'warn' | 'system') => void;
   onEnterApp?: () => void;
+  onOpenGuild?: () => void;
 }
 
-export default function OnboardingHub({ state, setState, addLog, onEnterApp }: OnboardingHubProps) {
+export default function OnboardingHub({
+  state,
+  setState,
+  addLog,
+  onEnterApp,
+  onOpenGuild,
+}: OnboardingHubProps) {
   const [copied, setCopied] = useState(false);
   const [partnerCommunitySize, setPartnerCommunitySize] = useState<number>(500);
   const [partnerCustomDuration, setPartnerCustomDuration] = useState<number>(7);
   const [partnerTokenType, setPartnerTokenType] = useState<'meme' | 'utility' | 'nft'>('utility');
-  const [subTab, setSubTab] = useState<'economy' | 'proofs' | 'fairness' | 'partners'>('economy');
+  const [subTab, setSubTab] = useState<
+    'community' | 'economy' | 'proofs' | 'fairness' | 'partners'
+  >('community');
   const [mintingPoaId, setMintingPoaId] = useState<string | null>(null);
   const [showSoulboundRitual, setShowSoulboundRitual] = useState(false);
   const [ritualWallet, setRitualWallet] = useState<{
@@ -214,7 +227,7 @@ export default function OnboardingHub({ state, setState, addLog, onEnterApp }: O
       }));
       addLog(`POA ATTESTED (memo): https://solscan.io/tx/${signature}?cluster=devnet`, 'success');
     } catch (err: any) {
-      addLog(`POA ATTEST FAILED: ${err?.message || err}`, 'warn');
+      addLog(`POA ATTEST FAILED: ${friendlyFailureDetail(err)}`, 'warn');
     } finally {
       setMintingPoaId(null);
     }
@@ -337,8 +350,25 @@ export default function OnboardingHub({ state, setState, addLog, onEnterApp }: O
         </div>
       </div>
 
+      <EcosystemSlider
+        onSelect={(ally) =>
+          addLog(`ECOSYSTEM RAIL: ${ally.name} — ${ally.wow}`, 'info')
+        }
+      />
+
       {/* Sub-tab Selection Menu */}
       <div className="flex flex-wrap border-b border-white/5 gap-6 font-mono text-xs font-bold">
+        <button
+          onClick={() => setSubTab('community')}
+          className={`pb-3 px-1 transition-all relative cursor-pointer tracking-wider flex items-center gap-1.5 uppercase ${
+            subTab === 'community'
+              ? 'text-indigo-400 border-b-2 border-indigo-500'
+              : 'text-slate-500 hover:text-slate-300'
+          }`}
+        >
+          <MessageCircle className="w-4 h-4 text-indigo-400" />
+          1. Discord Community
+        </button>
         <button
           onClick={() => setSubTab('economy')}
           className={`pb-3 px-1 transition-all relative cursor-pointer tracking-wider flex items-center gap-1.5 uppercase ${
@@ -346,7 +376,7 @@ export default function OnboardingHub({ state, setState, addLog, onEnterApp }: O
           }`}
         >
           <Compass className="w-4 h-4 text-amber-400" />
-          1. Protocol Economy
+          2. Protocol Economy
         </button>
         <button
           onClick={() => setSubTab('proofs')}
@@ -355,7 +385,7 @@ export default function OnboardingHub({ state, setState, addLog, onEnterApp }: O
           }`}
         >
           <ShieldCheck className="w-4 h-4 text-cyan-400" />
-          2. Proof of Attention
+          3. Proof of Attention
         </button>
         <button
           onClick={() => setSubTab('fairness')}
@@ -364,7 +394,7 @@ export default function OnboardingHub({ state, setState, addLog, onEnterApp }: O
           }`}
         >
           <Terminal className="w-4 h-4 text-teal-400" />
-          3. Fair Mining Page
+          4. Fair Mining Page
         </button>
         <button
           onClick={() => setSubTab('partners')}
@@ -373,7 +403,7 @@ export default function OnboardingHub({ state, setState, addLog, onEnterApp }: O
           }`}
         >
           <Network className="w-4 h-4 text-fuchsia-400" />
-          4. Partners & Products
+          5. Partners & Products
         </button>
       </div>
 
@@ -388,6 +418,24 @@ export default function OnboardingHub({ state, setState, addLog, onEnterApp }: O
         >
           
           {/* SubTab 1: Protocol Economy */}
+          {subTab === 'community' && (
+            <div className="space-y-4">
+              <DiscordCommunityHub
+                variant="full"
+                activeGuildId={state.guilds.find((g) => g.selected)?.id}
+                onOpenGuild={onOpenGuild}
+                onJoinLogged={(channel) =>
+                  addLog(`DISCORD: Opening ${channel} — community home for all houses.`, 'info')
+                }
+              />
+              <p className="text-[11px] text-slate-500 font-sans leading-relaxed max-w-2xl">
+                Discord is where onboarding meets the living community: welcome, weekly Hearing,
+                faction houses for Apex Summit, and partner pilots. Telegram stays the light daily
+                pulse — houses and deeper builder threads live here.
+              </p>
+            </div>
+          )}
+
           {subTab === 'economy' && (
             <div className="space-y-8">
               {/* Q&A Cards */}

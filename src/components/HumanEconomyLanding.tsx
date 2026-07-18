@@ -121,7 +121,7 @@ export default function HumanEconomyLanding({ onBuildPassport, onContinueSecure 
               {SLOGANS.ctaExplore}
               <ArrowRight className="w-4 h-4" />
             </button>
-            <FarcasterCastButton templateId="launch" variant="ghost" label="Cast the launch" />
+            <FarcasterCastButton templateId="rain" variant="ghost" label="Make it rain" />
           </motion.div>
           <p className="mt-6 text-[11px] text-slate-500 font-mono tracking-wide">
             {SLOGANS.equation} · You own your digital reputation.
@@ -130,8 +130,12 @@ export default function HumanEconomyLanding({ onBuildPassport, onContinueSecure 
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.28 }}
-            className="mt-8 max-w-xl"
+            className="mt-8 max-w-xl space-y-4"
           >
+            <p className="text-sm text-slate-400 leading-relaxed border border-cyan-500/20 bg-cyan-500/5 rounded-xl px-4 py-3">
+              Human Reputation Engine — measure contribution, own your passport, share it.
+              Facility layers wait until after your first score.
+            </p>
             <FarcasterCastDeck />
           </motion.div>
         </section>
@@ -210,7 +214,7 @@ export default function HumanEconomyLanding({ onBuildPassport, onContinueSecure 
           <div className="mt-6 grid grid-cols-3 gap-3">
             {[
               { label: 'Knowledge', v: 42 },
-              { label: 'Builder', v: 28 },
+              { label: 'Creativity', v: 28 },
               { label: 'Contribution', v: 35 },
             ].map((s) => (
               <div

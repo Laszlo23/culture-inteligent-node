@@ -12,8 +12,10 @@ import {
   skillChipsFromScores,
 } from '../lib/human-economy';
 import { buildAttentionSnapshot } from '../lib/attention-metrics';
+import { readFirstContribution } from '../lib/first-contribution';
 import ReputationGraph from './ReputationGraph';
 import GrowthLoopPanel from './GrowthLoopPanel';
+import PassportShareCard from './PassportShareCard';
 import { GlowPulse } from './fx';
 
 export type PassportNextStep = {
@@ -33,6 +35,8 @@ type Props = {
   compact?: boolean;
   nextStep: PassportNextStep;
   onOpenFull?: () => void;
+  onOpenPartners?: () => void;
+  onOpenHearing?: () => void;
 };
 
 function ScoreCard({
@@ -69,24 +73,26 @@ export default function HumanPassportDashboard({
   compact = false,
   nextStep,
   onOpenFull,
+  onOpenPartners,
+  onOpenHearing,
 }: Props) {
   const missionsCompleted = state.dailyMissions.filter((m) => m.completed).length;
-  const scores = useMemo(
-    () =>
-      computeHumanScores({
-        academyCompletedCount,
-        coreSessionTotal,
-        missionsCompleted,
-        missionsTotal: state.dailyMissions.length,
-        snapshot: buildAttentionSnapshot(30),
-      }),
-    [
+  const scores = useMemo(() => {
+    const seed = readFirstContribution()?.scores ?? null;
+    return computeHumanScores({
       academyCompletedCount,
       coreSessionTotal,
       missionsCompleted,
-      state.dailyMissions.length,
-    ]
-  );
+      missionsTotal: state.dailyMissions.length,
+      snapshot: buildAttentionSnapshot(30),
+      seed,
+    });
+  }, [
+    academyCompletedCount,
+    coreSessionTotal,
+    missionsCompleted,
+    state.dailyMissions.length,
+  ]);
   const skills = skillChipsFromScores(scores);
   const handle = username.replace(/^@/, '');
 
@@ -138,8 +144,8 @@ export default function HumanPassportDashboard({
             accentClass="border-cyan-500/25 bg-cyan-500/5 text-cyan-400"
           />
           <ScoreCard
-            label="Builder"
-            value={scores.builder}
+            label="Creativity"
+            value={scores.creativity ?? scores.builder}
             accentClass="border-amber-500/25 bg-amber-500/5 text-amber-400"
           />
           <ScoreCard
@@ -194,10 +200,16 @@ export default function HumanPassportDashboard({
         <p className="mt-2 text-[11px] text-slate-500">{nextStep.reason}</p>
 
         <div className="mt-5">
+          <PassportShareCard name={handle} scores={scores} compact={compact} />
+        </div>
+
+        <div className="mt-5">
           <GrowthLoopPanel
             walletAddress={walletAddress}
             displayName={username}
             compact={compact}
+            onOpenPartners={onOpenPartners}
+            onOpenHearing={onOpenHearing}
           />
         </div>
       </div>

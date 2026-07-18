@@ -14,6 +14,10 @@ export type StoredAttentionVerification = {
   reason: string;
   model?: string;
   attestSignature?: string;
+  /** Set when /api/economy/grant-energy issued a partial tx for this proof. */
+  energyGranted?: boolean;
+  /** ISO time of last grant-energy build (allows client retry within window). */
+  energyGrantedAt?: string;
   createdAt: string;
 };
 
@@ -47,8 +51,37 @@ export function updateAttentionAttest(id: string, attestSignature: string) {
   return row || null;
 }
 
+/** Mark proof as used for grant-energy (client may retry within GRANT_RETRY_MS). */
+export const GRANT_RETRY_MS = 15 * 60 * 1000;
+
+export function markAttentionEnergyGranted(id: string) {
+  const row = attentionStore.find((r) => r.id === id);
+  if (!row) return null;
+  row.energyGranted = true;
+  row.energyGrantedAt = new Date().toISOString();
+  return row;
+}
+
+export function canReuseAttentionGrant(row: StoredAttentionVerification): boolean {
+  if (!row.passed) return false;
+  // Proofs older than 24h cannot mint more fuel
+  const created = Date.parse(row.createdAt);
+  if (!Number.isNaN(created) && Date.now() - created > 24 * 60 * 60 * 1000) {
+    return false;
+  }
+  if (!row.energyGranted) return true;
+  if (!row.energyGrantedAt) return true; // allow client retry after hydrate without timestamp
+  const ts = Date.parse(row.energyGrantedAt);
+  if (Number.isNaN(ts)) return true;
+  return Date.now() - ts < GRANT_RETRY_MS;
+}
+
 export function listAttentionForUid(uid: string) {
   return attentionStore.filter((r) => r.uid === uid);
+}
+
+export function getAttentionById(id: string) {
+  return attentionStore.find((r) => r.id === id) || null;
 }
 
 export function saveKpiProof(row: Omit<StoredKpiProof, 'createdAt'> & { createdAt?: string }) {

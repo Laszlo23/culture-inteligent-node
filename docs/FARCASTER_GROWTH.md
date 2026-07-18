@@ -2,25 +2,46 @@
 
 **Live Mini App domain:** `mining.buildingcultureid.space`  
 **Manifest:** `https://mining.buildingcultureid.space/.well-known/farcaster.json`  
-**Product surface:** `?fc=1` (home), Hook Loop, Human Passport
+**Product surface:** `?fc=1` (home), Hook Loop, Human Passport  
+**Manifest Tool:** [Claim ownership](https://farcaster.xyz/~/developers/mini-apps/manifest?domain=mining.buildingcultureid.space)
 
-This is the maximum-growth launch kit. Ship the unsigned manifest first, **sign ownership**, then rain casts.
+This is the marketplace launch kit. Metadata + store assets ship in-repo; **you must sign ownership once** (phone custody), then redeploy.
 
 ---
 
-## 0) You must do once (custody sign)
+## 0) Marketplace go-live (do this once)
 
-1. Confirm manifest is live:
+### Already prepared in-repo
+- Schema-valid `miniapp` + identical `frame` block
+- Icon `1024×1024` PNG (no alpha) → `/miniapp/icon-1024.png`
+- Splash `200×200` → `/miniapp/splash-200.png`
+- Hero / OG `1200×630` → `/miniapp/hero-1200x630.png`
+- Store screenshots portrait `1284×2778` (×3) → `/miniapp/screenshot-*.png`
+- Category `education`, tags, webhook, cast share URL
+- Embed meta in `index.html` (`fc:miniapp` + `fc:frame`)
+- Validate: `npm run farcaster:validate`
+
+### Your one blocking step — sign ownership
+1. **Deploy** this branch so production serves the new `/miniapp/*` assets + updated `farcaster.json`.
+2. Confirm:
    ```bash
    curl -s https://mining.buildingcultureid.space/.well-known/farcaster.json | head
+   curl -sI https://mining.buildingcultureid.space/miniapp/icon-1024.png | head -5
    ```
-2. Open the Manifest Tool with your domain:
+3. Open the Manifest Tool:
    [https://farcaster.xyz/~/developers/mini-apps/manifest?domain=mining.buildingcultureid.space](https://farcaster.xyz/~/developers/mini-apps/manifest?domain=mining.buildingcultureid.space)
-3. **Claim Ownership** → sign with your Farcaster custody address (phone).
-4. Paste the returned `accountAssociation` into `public/.well-known/farcaster.json` and redeploy.
-5. Green check = verified Mini App → eligible for Warpcast developer rewards.
+4. **Claim Ownership** → sign with your Farcaster custody address (phone).
+5. Save the tool JSON (or copy `accountAssociation`) and merge:
+   ```bash
+   # if you saved the full tool output as signed.json
+   npm run farcaster:apply-association -- ./signed.json
+   # or paste from clipboard
+   pbpaste | npm run farcaster:apply-association -- -
+   npm run farcaster:validate:signed
+   ```
+6. Redeploy. Re-open the Manifest Tool → green ownership check = **in the Mini App market / discovery**.
 
-Until step 4, discovery works but the app is **not verified**.
+Until step 5–6, embeds can work but the app is **not verified** for the store.
 
 ---
 
@@ -29,9 +50,13 @@ Until step 4, discovery works but the app is **not verified**.
 | Piece | Where |
 | --- | --- |
 | Mini App manifest | `public/.well-known/farcaster.json` |
+| Marketplace assets | `public/miniapp/` (icon, splash, hero, screenshots) |
+| Validate / sign merge | `npm run farcaster:validate` · `farcaster:apply-association` |
 | Cast compose helpers | `src/lib/farcaster.ts` |
 | Cast buttons + growth deck | `src/components/FarcasterCastButton.tsx` |
 | Landing rain deck | `HumanEconomyLanding` |
+| Make it rain deck | `MakeItRainDeck` · landing, Loop Stage, Passport growth panel |
+| Rain cast templates | `rain`, `weekly_hearing`, `partner_pilot`, `spread_club` |
 | Hook Loop → Cast unlocks | `HookLoopCampaign` |
 | Embed meta | `index.html` (`fc:miniapp` + `fc:frame`) |
 | Webhook stub | `POST /api/farcaster/webhook` |
@@ -201,14 +226,17 @@ Docs: [Neynar Mini Apps](https://docs.neynar.com/docs/convert-web-app-to-mini-ap
 
 ---
 
-## 6) Checklist before “we’re live”
+## 6) Checklist before “we’re in the market”
 
-- [ ] `curl` manifest → 200 JSON with `miniapp`
-- [ ] `accountAssociation` signed + redeployed
+- [ ] Deploy new `/miniapp/*` assets + manifest
+- [ ] `npm run farcaster:validate` locally (and after sign: `farcaster:validate:signed`)
+- [ ] `curl` live manifest → 200 JSON with `miniapp` + `frame`
+- [ ] Icon / splash / screenshots return `image/png`
+- [ ] `accountAssociation` signed + redeployed (green in Manifest Tool)
 - [ ] Cast with `?fc=1` shows **Build Passport** embed button
-- [ ] Landing Growth Deck opens compose
+- [ ] Landing **Make it rain** / Growth Deck opens compose
 - [ ] Hook Loop Cast unlocks next truth
 - [ ] Launch thread (3 casts) posted
 - [ ] 10 DMs / replies to early openers same day
 
-Rain starts after the signed manifest + launch thread. Everything else is amplification.
+Store listing needs signed ownership. Rain starts after that + launch thread.

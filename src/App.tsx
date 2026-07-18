@@ -13,6 +13,7 @@ import {
 
 import { clearWalletToken, ensureWalletApiSession, getWalletToken } from './lib/api';
 import type { Keypair } from '@solana/web3.js';
+import { isEconomyConfigured } from './lib/solana-economy';
 import { GameState, HardwareModule, AIWorker, FacilityRoom, Guild, DailyMission, InspectionLog } from './types';
 import MainReactor from './components/MainReactor';
 import Workshop from './components/Workshop';
@@ -33,6 +34,8 @@ import AdminPanel from './components/AdminPanel';
 import FeedbackPortal from './components/FeedbackPortal';
 import PartnerProgram from './components/PartnerProgram';
 import OnboardingHub from './components/OnboardingHub';
+import { mergePartnerSeeds } from './lib/ecosystem-allies';
+import { guildsFromDiscordHouses } from './lib/discord-community';
 import NavMenu, { NavDestination, NavPhase } from './components/NavMenu';
 import MobileBottomNav from './components/MobileBottomNav';
 import LegalPages, { LegalPageId } from './components/LegalPages';
@@ -63,6 +66,11 @@ import {
   isStoryDismissed,
 } from './lib/first-run';
 import {
+  friendlyFailureDetail,
+  isRecoverableUserErrorMessage,
+  recoverableToastCooldownMs,
+} from './lib/user-errors';
+import {
   classifySuccessBeat,
   peekMomentum,
   tickMomentum,
@@ -84,6 +92,9 @@ import AnonymousChamber from './components/AnonymousChamber';
 import HumanEconomyLanding from './components/HumanEconomyLanding';
 import HumanPassportClaim from './components/HumanPassportClaim';
 import HumanPassportDashboard from './components/HumanPassportDashboard';
+import FirstContributionRitual from './components/FirstContributionRitual';
+import PassportPreview from './components/PassportPreview';
+import PassportShareCard from './components/PassportShareCard';
 import {
   buildMemberInvitePost,
   hasHumanPassport,
@@ -91,11 +102,18 @@ import {
   markSpreadLove,
 } from './lib/human-passport';
 import {
+  hasCompletedFirstContribution,
+  hasSharedPassport,
+  readFirstContribution,
+} from './lib/first-contribution';
+import { decodePassportShare } from './lib/passport-share';
+import {
   captureInviteFromUrl,
   inviteWelcomeLine,
   markInviteClaimed,
 } from './lib/community-invite';
 import {
+  fetchMyGrowthStats,
   inviteCodeFromWallet,
   reportGrowthEvent,
 } from './lib/growth-loop';
@@ -126,7 +144,20 @@ import {
   setZenMode,
   zenModeOffScript,
   zenModeOnScript,
+  type LearningDecision,
 } from './lib/zen-duality';
+import {
+  hasAnyZenDecision,
+  hasZenForFirstSpark,
+  isHearTouched,
+  markHearTouched,
+  peekReturnGreetingNeeded,
+  resolveMainLoopFlags,
+  touchLoopVisit,
+} from './lib/main-loop';
+import { clearLoopWinningNext, type WinRail } from './lib/winning-flows';
+import MainLoopStage from './components/MainLoopStage';
+import MakeItRainDeck from './components/MakeItRainDeck';
 import {
   buildAttentionSnapshot,
   isFocusModeStored,
@@ -209,9 +240,42 @@ const INITIAL_FEEDBACK = [
 ];
 
 const INITIAL_PARTNERS = [
-  { id: 'p_1', name: 'Solana Devnet Syndicate', logo: 'https://images.unsplash.com/photo-1639762681485-074b7f938ba0?w=300&auto=format&fit=crop&q=80', bonus: '+5% Global Efficiency Multiplier', bccRequired: 500, active: false, description: 'Direct data pipeline bridge to the devnet cluster validator.' },
-  { id: 'p_2', name: 'Rust Core Foundation', logo: 'https://images.unsplash.com/photo-1607799279861-4dd421887fb3?w=300&auto=format&fit=crop&q=80', bonus: '+15 PH/s Core Mining Power boost', bccRequired: 1200, active: false, description: 'Optimizes microcode loops using high-performance compiler tools.' },
-  { id: 'p_3', name: 'Jupiter Aggregator', logo: 'https://images.unsplash.com/photo-1621761191319-c6fb62004040?w=300&auto=format&fit=crop&q=80', bonus: '+10% Global Efficiency booster', bccRequired: 800, active: false, description: 'Routes and pools swap volume across multiple decentralized DEX platforms.' }
+  {
+    id: 'p_1',
+    name: 'Solana',
+    logo: '/ecosystem/solana-mark.svg',
+    url: 'https://solana.com/',
+    role: 'Settlement Layer',
+    bonus: '+5% Global Efficiency Multiplier',
+    bccRequired: 500,
+    active: false,
+    description: 'Culture Node settles Proof of Attention on Solana Devnet — sub-second blocks, cheap memos, one shared ledger.',
+    wow: 'Blocks land in ~400ms. No L2 maze — attention proofs can feel instant.',
+  },
+  {
+    id: 'p_2',
+    name: 'Rust',
+    logo: '/ecosystem/rust-mark.svg',
+    url: 'https://www.rust-lang.org/',
+    role: 'Program Language',
+    bonus: '+15 PH/s Core Mining Power boost',
+    bccRequired: 1200,
+    active: false,
+    description: 'Solana programs are written in Rust — memory-safe systems code underwriting on-chain attention proofs.',
+    wow: 'The language of Solana programs is the same “fearless concurrency” stack that shipped Firefox and Cloudflare.',
+  },
+  {
+    id: 'p_3',
+    name: 'Jupiter',
+    logo: '/ecosystem/jupiter.svg',
+    url: 'https://jup.ag/',
+    role: 'Liquidity Meta-Router',
+    bonus: '+10% Global Efficiency booster',
+    bccRequired: 800,
+    active: false,
+    description: 'Jupiter meta-aggregates Solana DEX liquidity so facility yield can meet the deepest route in one quote.',
+    wow: 'One Jupiter quote can beat any single DEX — the default swap brain of Solana.',
+  },
 ];
 
 const INITIAL_HARDWARE: HardwareModule[] = [
@@ -242,11 +306,8 @@ const INITIAL_ROOMS: FacilityRoom[] = [
   { id: 'guild', name: 'Apex Summit', level: 1, maxLevel: 1, unlocked: true, costToUnlock: 0, costToUpgrade: 0, description: 'Monthly chamber for the top of the top — faction houses feed the Apex Circle.', perk: '+10% Team Output · Apex seating' },
 ];
 
-const INITIAL_GUILDS: Guild[] = [
-  { id: 'guild_builders', name: 'Web3 Builders', region: 'Global', members: 2420, output: 6.8, bonus: '+10% Construction Speed Boost', selected: true },
-  { id: 'guild_developers', name: 'Rust Core Developers', region: 'Europe', members: 1980, output: 6.2, bonus: '+10% Protocol Deserialization Boost', selected: false },
-  { id: 'guild_analysts', name: 'Quant Researchers', region: 'America', members: 1450, output: 5.5, bonus: '+10% Data Pipeline Yield', selected: false },
-];
+/** Faction houses — mirrored from Discord HQ (`discord-community.ts`) */
+const INITIAL_GUILDS: Guild[] = guildsFromDiscordHouses();
 
 const INITIAL_MISSIONS: DailyMission[] = [
   { id: 'm_kpi', label: 'BUILD: Verify a real contribution on-chain (practice network)', completed: false, energyReward: 25, powerReward: 15, category: 'build' },
@@ -262,9 +323,11 @@ export default function App() {
     void signalMiniAppReady('app-mount');
   }, []);
 
+  const settlementConfigured = isEconomyConfigured();
   const [state, setState] = useState<GameState>({
-    credits: 1200,
-    miningPower: 154.8, // Base (4.8) + Initial owned Miner NFT (150)
+    // When Devnet mints are baked, start at zero — hydrate from chain after login
+    credits: settlementConfigured ? 0 : 1200,
+    miningPower: settlementConfigured ? 4.8 : 154.8,
     energy: 0, // Empty until First Spark / Academy earn
     efficiency: 1.0,
     facilityLevel: 1,
@@ -289,8 +352,10 @@ export default function App() {
       discordJoinClaimed: false,
       xPostInteractionClaimed: false
     },
-    cognitiveTokens: 250, // Starting COGNITIVE utility tokens (CGT)
-    minerNFTs: [
+    cognitiveTokens: settlementConfigured ? 0 : 250,
+    minerNFTs: settlementConfigured
+      ? []
+      : [
       {
         id: 'miner_1',
         name: 'Obsidian Pulse-Core',
@@ -399,6 +464,7 @@ export default function App() {
   const notificationsPanelRef = useRef<HTMLDivElement | null>(null);
   const shownToastsRef = useRef<Set<string>>(new Set());
   const successToastAtRef = useRef<globalThis.Map<string, number>>(new globalThis.Map());
+  const recoverableWarnToastAtRef = useRef<globalThis.Map<string, number>>(new globalThis.Map());
   const flowToastTimerRef = useRef<number | null>(null);
   const [momentumUi, setMomentumUi] = useState(() => {
     const p = peekMomentum();
@@ -439,6 +505,14 @@ export default function App() {
   const [showMintMinerCta, setShowMintMinerCta] = useState(false);
   /** After First Spark: show from→to fuel strip before economy CTAs */
   const [fuelWin, setFuelWin] = useState<{ from: number; to: number } | null>(null);
+  /** Loop Stage: Zen celebration line after Mind/Machine */
+  const [zenNote, setZenNote] = useState<string | null>(null);
+  /** Loop Stage: return after 20h+ away */
+  const [returnGreeting, setReturnGreeting] = useState<string | null>(null);
+  const [hearTouched, setHearTouched] = useState(() => isHearTouched());
+  const [loopConnections, setLoopConnections] = useState<number | null>(null);
+  /** Guided: peek facility without leaving Loop Stage default */
+  const [loopFacilityOpen, setLoopFacilityOpen] = useState(false);
   /** Attention Toll shop deep-link highlight */
   const [tollHighlightSku, setTollHighlightSku] = useState<
     'spark_refill' | 'academy_retake' | 'claim_turbo' | 'list_slot' | 'spark_pack_100' | null
@@ -464,6 +538,20 @@ export default function App() {
       return false;
     }
   });
+  /** Magical first 5 min — First Contribution before claim / facility */
+  const [firstContributionDone, setFirstContributionDone] = useState(() =>
+    hasCompletedFirstContribution()
+  );
+  const [ritualStarted, setRitualStarted] = useState(() => hasCompletedFirstContribution());
+  const [passportPreview, setPassportPreview] = useState(() => {
+    if (typeof window === 'undefined') return null;
+    try {
+      const code = new URLSearchParams(window.location.search).get('passport');
+      return code ? decodePassportShare(code) : null;
+    } catch {
+      return null;
+    }
+  });
   const [showCultureBroadcast, setShowCultureBroadcast] = useState(
     () => !hasSeenCultureBroadcast()
   );
@@ -481,6 +569,30 @@ export default function App() {
     ensureFirstRitualPending();
     setFirstRitualPending(isFirstRitualPending());
   }, [currentUser]);
+
+  // Main loop — return greeting (20h+) + connection chip
+  useEffect(() => {
+    if (!currentUser) return;
+    const needed = peekReturnGreetingNeeded();
+    touchLoopVisit();
+    if (needed) {
+      try {
+        const streak = Number(localStorage.getItem('solana_daily_streak_v1') || '0');
+        setReturnGreeting(
+          streak > 0
+            ? `Day ${streak} — claim Impact or prove again. The loop is waiting.`
+            : 'Welcome back — claim Impact or prove again. One clear next step.'
+        );
+      } catch {
+        setReturnGreeting('Welcome back — one clear next step on the loop.');
+      }
+    }
+    const code = inviteCodeFromWallet(currentUser.walletAddress);
+    if (!code) return;
+    void fetchMyGrowthStats(code).then((stats) => {
+      if (stats) setLoopConnections(stats.connections);
+    });
+  }, [currentUser?.walletAddress]);
 
   useEffect(() => {
     if (!currentUser?.walletAddress) {
@@ -543,7 +655,7 @@ export default function App() {
       setApiSessionMissing(false);
       addLog('API SESSION: restored — Academy proofs can attach.', 'success');
     } catch (e: any) {
-      addLog(`API SESSION RETRY FAILED: ${e?.message || e}`, 'warn');
+      addLog(`API SESSION RETRY FAILED: ${friendlyFailureDetail(e)}`, 'warn');
     } finally {
       setRetryingApiSession(false);
     }
@@ -598,7 +710,7 @@ export default function App() {
             cgtMint: null,
             reasons: [e?.message || 'Failed to reach /api/economy/status'],
           });
-          addLog(`ECONOMY SYNC deferred: ${e?.message || e}`, 'warn');
+          addLog(`ECONOMY SYNC deferred: ${friendlyFailureDetail(e)}`, 'warn');
         }
       } finally {
         if (!cancelled) setEconomyStatusLoading(false);
@@ -639,7 +751,7 @@ export default function App() {
           notifications: stripLegacySeedNotifications(parsed.notifications),
           messages: parsed.messages || INITIAL_MESSAGES,
           feedback: parsed.feedback || INITIAL_FEEDBACK,
-          partners: parsed.partners || INITIAL_PARTNERS
+          partners: mergePartnerSeeds(parsed.partners, INITIAL_PARTNERS)
         });
         addLog(`DATA SYNCHRONIZED: Loaded facility state for wallet operator "${user.username}".`, "success");
       } catch (e) {
@@ -860,6 +972,14 @@ export default function App() {
 
     const fp = toastFingerprint(message);
     if (type === 'warn') {
+      // Recoverable API/credit errors: cooldown only (Hearing lastLine is primary for voice).
+      if (isRecoverableUserErrorMessage(message)) {
+        const lastAt = recoverableWarnToastAtRef.current.get(fp) || 0;
+        if (Date.now() - lastAt < recoverableToastCooldownMs()) return;
+        recoverableWarnToastAtRef.current.set(fp, Date.now());
+        pushFlowToast(message, 'warn');
+        return;
+      }
       if (shownToastsRef.current.has(fp) || hasSeenToastOnce(fp)) return;
       shownToastsRef.current.add(fp);
       markToastSeenOnce(fp);
@@ -925,7 +1045,7 @@ export default function App() {
           notifications: stripLegacySeedNotifications(parsed.notifications),
           messages: parsed.messages || INITIAL_MESSAGES,
           feedback: parsed.feedback || INITIAL_FEEDBACK,
-          partners: parsed.partners || INITIAL_PARTNERS
+          partners: mergePartnerSeeds(parsed.partners, INITIAL_PARTNERS)
         });
       } catch (e) {
         console.error("Failed to parse local storage game state.", e);
@@ -936,7 +1056,7 @@ export default function App() {
     addLog('Facility online. Attention channel stable.', 'system');
     if (state.energy < 40) {
       addLog(
-        `NOTICE: Knowledge fuel at ${state.energy}%. First Spark in Academy restores reserves.`,
+        `NOTICE: Impact Score at ${state.energy}. First Spark in Academy restores reserves.`,
         'warn'
       );
     }
@@ -1298,6 +1418,40 @@ export default function App() {
       ? 'guided'
       : 'open';
 
+  const zenDone = hasZenForFirstSpark() || hasAnyZenDecision();
+  const firstSparkDone =
+    !firstRitualPending || academyCompletedIds.includes('ai_first_spark');
+  const spreadDone = Boolean(
+    currentUser?.walletAddress && hasSpreadLove(currentUser.walletAddress)
+  );
+  const returnTouched = (() => {
+    try {
+      return Number(localStorage.getItem('solana_daily_last_claim_v1') || '0') > 0;
+    } catch {
+      return false;
+    }
+  })();
+  const loopFlags = resolveMainLoopFlags({
+    hearTouched,
+    firstRitualPending,
+    firstSparkDone,
+    zenDone,
+    spreadDone,
+    returnTouched,
+    dailyClaimReady,
+    fuelWin: Boolean(fuelWin),
+    hookMirrorPending,
+    energyLow: state.energy < 35,
+  });
+  const showLoopStage =
+    navPhase === 'ritual' || (navPhase === 'guided' && !loopFacilityOpen);
+
+  const enterHearingFromLoop = () => {
+    markHearTouched();
+    setHearTouched(true);
+    if (!hearing.active) hearing.toggle();
+  };
+
   const navNextStep = (() => {
     const you = currentUser?.username?.replace(/^@/, '') || 'operator';
     if (firstRitualPending) {
@@ -1310,8 +1464,23 @@ export default function App() {
     if (fuelWin) {
       return {
         id: 'map' as NavDestination,
-        label: 'See your fuel',
-        reason: `Proof landed for you, ${you}. Feel the strip move — then decide.`,
+        label: 'See your Impact',
+        reason: `Proof landed for you, ${you}. Your Impact Score moved — share your passport or prove again.`,
+      };
+    }
+    if (firstSparkDone && !zenDone) {
+      return {
+        id: 'lab' as NavDestination,
+        label: 'Mind or Machine',
+        reason: `${you}, knowledge first — hold it in Mind, or convert attention to Impact on Machine.`,
+      };
+    }
+    // Daily return: claim before grind
+    if (dailyClaimReady) {
+      return {
+        id: 'treasury' as NavDestination,
+        label: 'Claim today’s Impact',
+        reason: `Your free refill is ready, ${you} — +15 Impact · +50 BCC.`,
       };
     }
     if (state.energy < 35) {
@@ -1319,13 +1488,6 @@ export default function App() {
         id: 'lab' as NavDestination,
         label: 'Continue learning',
         reason: `${you}, keep proving attention — another short challenge grows your passport.`,
-      };
-    }
-    if (dailyClaimReady) {
-      return {
-        id: 'treasury' as NavDestination,
-        label: 'Claim today’s fuel',
-        reason: `Your free refill is ready, ${you} — +15% energy · +50 BCC.`,
       };
     }
     if (hookMirrorPending) {
@@ -1342,39 +1504,68 @@ export default function App() {
         reason: `You’re in, ${you}. Copy your invite when you’re ready — love travels.`,
       };
     }
-    if (showMintMinerCta && (state.credits > 0 || (state.bccTokens ?? 0) > 0)) {
-      return {
-        id: 'profile' as NavDestination,
-        label: 'Mint your first miner',
-        reason: `You have fuel, ${you} — turn it into a rig when it feels right.`,
-      };
-    }
-    if (
-      metaView.discovered &&
-      !metaView.sealed &&
-      metaView.current &&
-      state.energy >= 40
-    ) {
-      const room = metaView.current.room as NavDestination;
-      return {
-        id: room,
-        label: 'A quieter path waits',
-        reason: metaView.current.whisper,
-      };
-    }
-    if (economyStatus?.ready) {
-      return {
-        id: 'treasury' as NavDestination,
-        label: 'Open the Vault',
-        reason: `${you}, check balances, swap, or when your next refill lands.`,
-      };
-    }
+    // Loop clear → Partner Session (first $) / toll / Discord — not empty reactor
+    const clearWin = clearLoopWinningNext({
+      you,
+      tollReady: Boolean(economyStatus?.ready),
+      hasPassport: Boolean(
+        currentUser?.walletAddress && hasHumanPassport(currentUser.walletAddress)
+      ),
+    });
     return {
-      id: 'reactor' as NavDestination,
-      label: 'Check the Reactor',
-      reason: `${you}, your node is warm — peek at output and keep the loop going.`,
+      id: clearWin.id as NavDestination,
+      label: clearWin.label,
+      reason: clearWin.reason,
     };
   })();
+
+  const loopWinRails = (() => {
+    if (firstRitualPending || fuelWin || spreadPending || state.energy < 35) return [];
+    if (dailyClaimReady || hookMirrorPending) return [];
+    return clearLoopWinningNext({
+      you: currentUser?.username?.replace(/^@/, '') || 'operator',
+      tollReady: Boolean(economyStatus?.ready),
+      hasPassport: Boolean(
+        currentUser?.walletAddress && hasHumanPassport(currentUser.walletAddress)
+      ),
+    }).rails;
+  })();
+
+  const runLoopSpreadInvite = () => {
+    if (!currentUser?.walletAddress) {
+      addLog('Connect a wallet to copy your invite.', 'warn');
+      return;
+    }
+    const post = buildMemberInvitePost({
+      displayName: currentUser.username,
+      walletAddress: currentUser.walletAddress,
+    });
+    void navigator.clipboard?.writeText(post).then(async () => {
+      const first = !hasSpreadLove(currentUser.walletAddress!);
+      markSpreadLove(currentUser.walletAddress!);
+      track('spread_copy', { channel: 'loop_stage', first });
+      void reportGrowthEvent({
+        type: 'spread',
+        actorCode: inviteCodeFromWallet(currentUser.walletAddress),
+        nonce: `spread:loop:${currentUser.walletAddress}:${first ? '1' : Date.now()}`,
+      });
+      addLog(
+        first
+          ? 'Invite copied — pass it to someone who needs the hook.'
+          : 'Invite copied — love & knowledge on the move.',
+        'success'
+      );
+      if (first) {
+        const res = await sendAttentionProofMemo({
+          kind: 'spread',
+          parts: { channel: 'loop_stage' },
+        });
+        if ('signature' in res) {
+          addLog(`Spread sealed on Devnet — ${res.solscan}`, 'success');
+        }
+      }
+    });
+  };
 
   const handleNavNavigate = (id: NavDestination) => {
     if (firstRitualPending) {
@@ -1457,8 +1648,9 @@ export default function App() {
 
   const resetProgress = () => {
     if (confirm("Reset operations? This will clear all upgrades, workers, and credits.")) {
+      const configured = isEconomyConfigured();
       setState({
-        credits: 1200,
+        credits: configured ? 0 : 1200,
         miningPower: 4.8,
         energy: 0,
         efficiency: 1.0,
@@ -1484,8 +1676,10 @@ export default function App() {
           discordJoinClaimed: false,
           xPostInteractionClaimed: false
         },
-        cognitiveTokens: 250,
-        minerNFTs: [
+        cognitiveTokens: configured ? 0 : 250,
+        minerNFTs: configured
+          ? []
+          : [
           {
             id: 'miner_1',
             name: 'Obsidian Pulse-Core',
@@ -1543,22 +1737,70 @@ export default function App() {
     }
   };
 
-  // Cold start: Human Economy landing → secure ID — no workspace behind the gate
+  // Shared passport deep link — growth land (no facility)
+  if (passportPreview) {
+    return (
+      <HearingModeContext.Provider value={hearing}>
+        <PassportPreview
+          payload={passportPreview}
+          onStartPassport={() => {
+            setPassportPreview(null);
+            try {
+              const u = new URL(window.location.href);
+              u.searchParams.delete('passport');
+              window.history.replaceState({}, '', u.pathname + u.search);
+            } catch {
+              // ignore
+            }
+            dismissStory();
+            setStoryDismissed(true);
+            setShowStory(false);
+            setRitualStarted(true);
+            addLog('PASSPORT: Shared passport viewed — measure your first contribution.', 'info');
+          }}
+        />
+        <HearingModeShell />
+      </HearingModeContext.Provider>
+    );
+  }
+
+  // Cold start: Landing → First Contribution ritual → secure ID (soft keep)
   if (!currentUser) {
+    const showFirstRitual = ritualStarted && !firstContributionDone;
     return (
       <HearingModeContext.Provider value={hearing}>
         <div className="min-h-screen bg-[#050608] text-slate-300 font-sans selection:bg-cyan-500/30 selection:text-cyan-300 relative overflow-hidden">
           <AnimatePresence mode="wait">
-            {showStory ? (
+            {showFirstRitual ? (
+              <FirstContributionRitual
+                key="first-contribution-guest"
+                onComplete={() => {
+                  /* scores persisted; stay on reveal until Keep / Continue */
+                }}
+                onKeepPassport={() => {
+                  setFirstContributionDone(true);
+                  dismissStoryToAuth(null);
+                  addLog('PASSPORT: Keep your scores — secure your identity.', 'info');
+                }}
+                onContinueWorkspace={() => {
+                  setFirstContributionDone(true);
+                  dismissStoryToAuth(null);
+                  addLog('PASSPORT: Continue — secure ID to improve your Human Value.', 'info');
+                }}
+              />
+            ) : showStory && !ritualStarted ? (
               <HumanEconomyLanding
                 key="cold-landing"
                 onBuildPassport={() => {
-                  dismissStoryToAuth('phantom');
-                  addLog('HUMAN ECONOMY: Building Human Passport — secure your identity…', 'info');
+                  dismissStory();
+                  setStoryDismissed(true);
+                  setShowStory(false);
+                  setRitualStarted(true);
+                  addLog('HUMAN ECONOMY: First contribution — measure your Human Passport.', 'info');
                 }}
                 onContinueSecure={() => {
                   dismissStoryToAuth(null);
-                  addLog('HUMAN ECONOMY: Continue — claim your passport after secure ID.', 'info');
+                  addLog('HUMAN ECONOMY: Secure ID — then measure your first contribution.', 'info');
                 }}
               />
             ) : (
@@ -1575,7 +1817,39 @@ export default function App() {
     );
   }
 
-  // Human Passport: claim once per identity before the workspace opens
+  // Magical path: First Contribution before claim wall / facility
+  if (!firstContributionDone) {
+    return (
+      <HearingModeContext.Provider value={hearing}>
+        <div className="min-h-screen bg-[#050608] text-slate-300 font-sans selection:bg-cyan-500/30 selection:text-cyan-300 relative overflow-hidden">
+          <FirstContributionRitual
+            displayName={currentUser.username}
+            walletAddress={currentUser.walletAddress}
+            onComplete={() => {
+              /* persist only — reveal stays until Continue */
+            }}
+            onKeepPassport={() => {
+              setFirstContributionDone(true);
+              if (currentUser.walletAddress && !hasHumanPassport(currentUser.walletAddress)) {
+                setPassportPending(true);
+              }
+            }}
+            onContinueWorkspace={() => {
+              setFirstContributionDone(true);
+              if (currentUser.walletAddress && !hasHumanPassport(currentUser.walletAddress)) {
+                setPassportPending(true);
+              } else {
+                changeRoom('lab');
+              }
+            }}
+          />
+          <HearingModeShell />
+        </div>
+      </HearingModeContext.Provider>
+    );
+  }
+
+  // Soft keep: claim passport after first contribution (not before value)
   if (passportPending && currentUser.walletAddress) {
     return (
       <HearingModeContext.Provider value={hearing}>
@@ -1605,10 +1879,10 @@ export default function App() {
                     id: `passport_${Date.now()}`,
                     title: 'Human Passport',
                     message: invited
-                      ? 'Passport ready — you invited a builder. Start Proof of Attention when ready.'
+                      ? 'Passport kept — share it, then prove attention to grow.'
                       : inviteCode
-                        ? `Passport ready — welcome from builder ${inviteCode}. Prove attention next.`
-                        : 'Passport ready. Prove attention to grow your Knowledge Score.',
+                        ? `Passport kept — welcome from ${inviteCode}. Improve your Human Value next.`
+                        : 'Passport kept. Share it — then prove attention to grow scores.',
                     timestamp: new Date().toLocaleTimeString([], {
                       hour: '2-digit',
                       minute: '2-digit',
@@ -1621,8 +1895,8 @@ export default function App() {
               }));
               addLog(
                 inviteCode
-                  ? `PASSPORT: Welcome via invite ${inviteCode}. Prove attention, then pass the light on.`
-                  : 'PASSPORT: Workspace open. Own your digital reputation — prove attention next.',
+                  ? `PASSPORT: Welcome via invite ${inviteCode}. Share your passport, then prove attention.`
+                  : 'PASSPORT: Kept. Share your Human Passport — then improve it.',
                 'system'
               );
             }}
@@ -1809,7 +2083,7 @@ export default function App() {
           )}
 
           <div className="flex flex-col min-w-[120px]">
-            <span className="text-[9px] font-mono tracking-widest uppercase text-orange-500">KNOWLEDGE FUEL</span>
+            <span className="text-[9px] font-mono tracking-widest uppercase text-orange-500">IMPACT SCORE</span>
             <div className="flex items-center gap-2">
               <span className={`text-lg font-black italic ${state.energy < 40 ? 'text-red-400 animate-pulse' : 'text-white'}`}>
                 {state.energy}%
@@ -1920,7 +2194,11 @@ export default function App() {
 
           <button
             type="button"
-            onClick={() => hearing.toggle()}
+            onClick={() => {
+              markHearTouched();
+              setHearTouched(true);
+              hearing.toggle();
+            }}
             title={hearing.active ? 'Exit Hearing Mode' : 'Enter Hearing Mode — ears first'}
             aria-pressed={hearing.active}
             className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg font-mono text-[10px] tracking-wider uppercase font-black transition-all cursor-pointer border ${
@@ -2127,6 +2405,67 @@ export default function App() {
           {activeRoom === 'map' ? (
             <RoomEnter key="map-view" roomKey="map-view">
               <div className="space-y-6">
+              {showLoopStage ? (
+                <>
+                <MainLoopStage
+                  flags={loopFlags}
+                  phase={navPhase === 'ritual' ? 'ritual' : 'guided'}
+                  username={currentUser?.username}
+                  energy={state.energy}
+                  streak={dailyStreak}
+                  connections={loopConnections}
+                  fuelWin={fuelWin}
+                  zenNote={zenNote}
+                  returnGreeting={returnGreeting}
+                  cta={{
+                    label: navNextStep.label,
+                    reason: navNextStep.reason,
+                    onGo: () => {
+                      if (fuelWin && navNextStep.id === 'map') {
+                        setFuelWin(null);
+                        return;
+                      }
+                      if (spreadPending && navNextStep.id === 'profile') {
+                        runLoopSpreadInvite();
+                        return;
+                      }
+                      handleNavNavigate(navNextStep.id);
+                    },
+                  }}
+                  winRails={loopWinRails}
+                  onWinRail={(rail: WinRail) => {
+                    if (rail.room) handleNavNavigate(rail.room as NavDestination);
+                  }}
+                  onHear={enterHearingFromLoop}
+                  onDismissFuel={() => setFuelWin(null)}
+                  showOpenFacility={
+                    navPhase === 'guided' && (spreadDone || state.energy >= 40)
+                  }
+                  onOpenFacility={() => setLoopFacilityOpen(true)}
+                />
+                {!firstRitualPending && hasSharedPassport() && (
+                  <MakeItRainDeck
+                    compact
+                    onOpenPartners={() => changeRoom('partners')}
+                    onOpenHearing={() => {
+                      markHearTouched();
+                      setHearTouched(true);
+                      if (!hearing.active) hearing.toggle();
+                    }}
+                  />
+                )}
+                </>
+              ) : (
+              <>
+              {navPhase === 'guided' && loopFacilityOpen && (
+                <button
+                  type="button"
+                  onClick={() => setLoopFacilityOpen(false)}
+                  className="text-[10px] font-mono text-cyan-400 hover:text-cyan-300 uppercase tracking-wider cursor-pointer"
+                >
+                  ← Back to main loop
+                </button>
+              )}
               {currentUser && (
                 <HumanPassportDashboard
                   username={currentUser.username}
@@ -2143,10 +2482,16 @@ export default function App() {
                     onGo: () => handleNavNavigate(navNextStep.id),
                   }}
                   onOpenFull={() => changeRoom('passport')}
+                  onOpenPartners={() => changeRoom('partners')}
+                  onOpenHearing={() => {
+                    markHearTouched();
+                    setHearTouched(true);
+                    if (!hearing.active) hearing.toggle();
+                  }}
                 />
               )}
 
-              {!focusMode && (
+              {!focusMode && navPhase === 'open' && (
                 <motion.div
                   initial={{ opacity: 0, y: 8 }}
                   animate={{ opacity: 1, y: 0 }}
@@ -2240,7 +2585,7 @@ export default function App() {
                     show={!!fuelWin}
                     label={
                       fuelWin
-                        ? `FUEL +${Math.max(0, fuelWin.to - fuelWin.from)}% · PROOF ACCEPTED`
+                        ? `IMPACT +${Math.max(0, fuelWin.to - fuelWin.from)} · PROOF ACCEPTED`
                         : ''
                     }
                   />
@@ -2254,7 +2599,7 @@ export default function App() {
                       <div className="relative z-10 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-5">
                         <div className="min-w-0 flex-1">
                           <span className="text-[10px] font-mono font-bold text-emerald-400 block tracking-widest uppercase">
-                            Proof accepted — your node has fuel
+                            Proof accepted — your Impact Score moved
                           </span>
                           <h4 className="font-display text-xl font-extrabold italic text-white mt-1">
                             Attention → energy · live
@@ -2372,7 +2717,7 @@ export default function App() {
                       onClick={() => changeRoom('treasury')}
                       className="px-4 py-2 bg-cyan-500 hover:bg-cyan-400 text-black font-mono text-[10px] font-black uppercase tracking-wider rounded-lg cursor-pointer shrink-0"
                     >
-                      Claim today&apos;s fuel →
+                      Claim today&apos;s Impact →
                     </button>
                   </div>
                   )}
@@ -2410,7 +2755,7 @@ export default function App() {
                         </div>
                         <div>
                           <span className="text-[10px] font-mono font-bold text-orange-400 block tracking-widest uppercase">
-                            Knowledge fuel low
+                            Impact Score low
                           </span>
                           <h4 className="text-sm font-semibold font-mono text-slate-200 mt-0.5">
                             Core reserves at {state.energy}%.
@@ -2459,21 +2804,21 @@ export default function App() {
                         <>
                           Your rigs can wake —{' '}
                           <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-300 to-amber-300">
-                            fuel is live
+                            Impact is live
                           </span>
                         </>
                       ) : (
                         <>
                           Your art stays still until{' '}
                           <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-300 to-amber-300">
-                            you earn fuel
+                            you earn Impact
                           </span>
                         </>
                       )}
                     </h2>
                     <p className="text-xs text-slate-400 font-sans mt-2 leading-relaxed">
-                      Academy fills your reactor. Owned NFTs loop their mining feed only while your
-                      knowledge fuel lasts.
+                      Academy fills your reactor. Owned NFTs loop their feed only while your
+                      Impact Score lasts.
                     </p>
                     <div className="flex flex-wrap gap-2 mt-4 font-mono text-xs">
                       <button
@@ -2804,6 +3149,8 @@ export default function App() {
                   )}
                 </div>
               </div>
+              </>
+              )}
               </div>
             </RoomEnter>
           ) : (
@@ -2855,11 +3202,38 @@ export default function App() {
                       from: detail?.from ?? 0,
                       to: detail?.to ?? Math.min(100, state.energy + 18),
                     });
+                    setLoopFacilityOpen(false);
+                    setZenNote(null);
                     const meta = advanceMetaQuest('first_spark');
                     setMetaView(meta);
                     grantMetaRewards(meta);
                     changeRoom('map');
                     addLog('Proof accepted — your node has fuel. Feel that? Next step is on Home.', 'success');
+                  }}
+                  onZenDecision={(decision: LearningDecision) => {
+                    setZenNote(
+                      decision === 'hold_knowledge'
+                        ? 'Mind · knowledge held. Sit with it — then Spread when you’re ready.'
+                        : 'Machine · attention → fuel. Prove it, then Spread the invite.'
+                    );
+                    // Never yank mid–First Spark (Machine still needs Neural Snap)
+                    if (isFirstRitualPending()) {
+                      addLog(
+                        decision === 'hold_knowledge'
+                          ? 'Zen · Mind. Finish the proof when you’re ready — Home holds the loop.'
+                          : 'Zen · Machine. Submit Neural Snap — then Home celebrates fuel.',
+                        'system'
+                      );
+                      return;
+                    }
+                    setLoopFacilityOpen(false);
+                    changeRoom('map');
+                    addLog(
+                      decision === 'hold_knowledge'
+                        ? 'Zen · Mind. Back on the loop — decide when to Spread.'
+                        : 'Zen · Machine. Back on the loop — fuel path open.',
+                      'success'
+                    );
                   }}
                 />
               )}
@@ -2957,6 +3331,12 @@ export default function App() {
                     reason: navNextStep.reason,
                     onGo: () => handleNavNavigate(navNextStep.id),
                   }}
+                  onOpenPartners={() => changeRoom('partners')}
+                  onOpenHearing={() => {
+                    markHearTouched();
+                    setHearTouched(true);
+                    if (!hearing.active) hearing.toggle();
+                  }}
                 />
               )}
               {activeRoom === 'partners' && <PartnerProgram state={state} setState={setState} addLog={addLog} />}
@@ -2966,6 +3346,7 @@ export default function App() {
                   setState={setState}
                   addLog={addLog}
                   onEnterApp={() => changeRoom('reactor')}
+                  onOpenGuild={() => changeRoom('guild')}
                 />
               )}
               {(activeRoom === 'legal-privacy' || activeRoom === 'legal-terms' || activeRoom === 'legal-disclaimer') && (

@@ -28,6 +28,7 @@ import {
   type TollStatsResponse,
 } from '../lib/api.ts';
 import { syncLedgerToState } from '../lib/economy-actions';
+import { friendlyFailureDetail } from '../lib/user-errors';
 import { resolveEconomyWallet } from '../lib/economy-wallet';
 import type { TollSkuId } from '../lib/toll-catalog';
 
@@ -68,32 +69,39 @@ export function persistTollInventory(inv: {
 /** Spend one spark credit for a named perk (client inventory). */
 export function spendSparkCredit(
   kind: 'retake' | 'list' | 'refill'
-): { ok: boolean; inv: ReturnType<typeof loadTollInventory> } {
+): { ok: boolean; inv: ReturnType<typeof loadTollInventory>; spent: 'retake' | 'list' | 'spark' | null } {
   const inv = loadTollInventory();
   if (kind === 'retake' && inv.academyRetakeCredits > 0) {
     inv.academyRetakeCredits -= 1;
     persistTollInventory(inv);
-    return { ok: true, inv };
+    return { ok: true, inv, spent: 'retake' };
   }
   if (kind === 'list' && inv.listSlotCredits > 0) {
     inv.listSlotCredits -= 1;
     persistTollInventory(inv);
-    return { ok: true, inv };
+    return { ok: true, inv, spent: 'list' };
   }
   if (inv.sparkCredits > 0) {
     inv.sparkCredits -= 1;
-    if (kind === 'retake') {
-      /* spark pack credit covers retake */
-    } else if (kind === 'list') {
-      /* spark pack credit covers list */
-    }
     persistTollInventory(inv);
-    return { ok: true, inv };
+    return { ok: true, inv, spent: 'spark' };
   }
   if (kind === 'retake' || kind === 'list') {
-    return { ok: false, inv };
+    return { ok: false, inv, spent: null };
   }
-  return { ok: false, inv };
+  return { ok: false, inv, spent: null };
+}
+
+/** Restore a credit after a failed on-chain action. */
+export function refundSparkCredit(
+  spent: 'retake' | 'list' | 'spark'
+): ReturnType<typeof loadTollInventory> {
+  const inv = loadTollInventory();
+  if (spent === 'retake') inv.academyRetakeCredits += 1;
+  else if (spent === 'list') inv.listSlotCredits += 1;
+  else inv.sparkCredits += 1;
+  persistTollInventory(inv);
+  return inv;
 }
 
 interface AttentionTollShopProps {
@@ -131,8 +139,7 @@ export default function AttentionTollShop({
       setCatalog(c);
       setStats(s);
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : 'toll catalog error';
-      addLog(`TOLL: ${msg}`, 'warn');
+      addLog(`TOLL: ${friendlyFailureDetail(e)}`, 'warn');
     }
   }, [addLog]);
 
@@ -175,34 +182,50 @@ export default function AttentionTollShop({
           localKeypair,
         });
         await syncLedgerToState(setState);
+        setState((prev) => ({
+          ...prev,
+          sparkCredits: inv.sparkCredits,
+          academyRetakeCredits: inv.academyRetakeCredits,
+          listSlotCredits: inv.listSlotCredits,
+          claimTurboActive: e.claimTurbo || prev.claimTurboActive,
+        }));
+        return;
       } catch (econErr: unknown) {
-        const msg = econErr instanceof Error ? econErr.message : String(econErr);
-        if (e.energyPercent > 0) {
-          setState((prev) => ({
-            ...prev,
-            energy: Math.min(100, prev.energy + e.energyPercent),
-            sparkCredits: inv.sparkCredits,
-            academyRetakeCredits: inv.academyRetakeCredits,
-            listSlotCredits: inv.listSlotCredits,
-            claimTurboActive: e.claimTurbo || prev.claimTurboActive,
-          }));
-          addLog(`TOLL fuel applied locally (economy settle failed): ${msg}`, 'warn');
-          return;
-        }
+        // Honest: credits land, but never invent on-chain fuel when settle failed
+        setState((prev) => ({
+          ...prev,
+          sparkCredits: inv.sparkCredits,
+          academyRetakeCredits: inv.academyRetakeCredits,
+          listSlotCredits: inv.listSlotCredits,
+          claimTurboActive: e.claimTurbo || prev.claimTurboActive,
+        }));
+        addLog(
+          `TOLL credits saved — fuel grant failed (retry from shop): ${friendlyFailureDetail(econErr)}`,
+          'warn'
+        );
+        return;
       }
     }
 
+    // Local energy only when economy did not offer a grant tx (practice / non-energy SKUs)
+    const applyLocalEnergy =
+      e.energyPercent > 0 && !data.economyTx && !data.economyReady;
     setState((prev) => ({
       ...prev,
-      energy:
-        e.energyPercent > 0 && !data.economyTx
-          ? Math.min(100, prev.energy + e.energyPercent)
-          : prev.energy,
+      energy: applyLocalEnergy
+        ? Math.min(100, prev.energy + e.energyPercent)
+        : prev.energy,
       sparkCredits: inv.sparkCredits,
       academyRetakeCredits: inv.academyRetakeCredits,
       listSlotCredits: inv.listSlotCredits,
       claimTurboActive: e.claimTurbo || prev.claimTurboActive,
     }));
+    if (e.energyPercent > 0 && data.economyReady && !data.economyTx) {
+      addLog(
+        'TOLL: credits applied — energy SKU needs settlement grant; open Academy or claim_daily for on-chain fuel.',
+        'warn'
+      );
+    }
   };
 
   const buySku = async (skuId: string, priceMicroUsdc: number) => {
@@ -289,8 +312,7 @@ export default function AttentionTollShop({
       );
       await refresh();
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : String(e);
-      addLog(`TOLL FAILED: ${msg}`, 'warn');
+      addLog(`TOLL FAILED: ${friendlyFailureDetail(e)}`, 'warn');
     } finally {
       setBusySku(null);
       setStep('');

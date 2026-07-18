@@ -29,7 +29,7 @@ export const SLOGANS = {
   hero: 'Human value was never measured correctly.',
   heroSub:
     'For centuries we measured people by the hours they worked. The AI era requires a new measurement: what you learn, what you create, what you contribute.',
-  ctaPassport: 'Build Your Human Passport',
+  ctaPassport: 'Start Your Human Passport',
   ctaExplore: 'Explore The Human Economy',
 
   /** Spine */
@@ -40,7 +40,9 @@ export const SLOGANS = {
   curve: 'Their failure curve is optional.',
   curveLong:
     'Just because humanity wants the same failure curve does not mean you have to.',
-  loop: 'Discover → Prove → Passport → Grow → Reputation.',
+  loop: 'Hear → Spark → Zen → Spread → Return.',
+  loopGrowth: 'Discover → Claim → Spark → Spread → Return.',
+  loopLegacy: 'Discover → Prove → Passport → Grow → Reputation.',
   spread: 'Share knowledge. Lift others. Reputation compounds.',
   hook: 'Learn. Create. Contribute. Own it.',
   fuel: 'Contribution becomes reputation.',

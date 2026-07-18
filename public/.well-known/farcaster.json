@@ -1,18 +1,23 @@
 {
+  "accountAssociation": {
+    "header": "eyJmaWQiOjg3Mzk0NCwidHlwZSI6ImN1c3RvZHkiLCJrZXkiOiIweDYzYzU1YmVmYWI2OEJhMjJlRDcyQjFhOUZFMzJBNDE3RTU5NWIyNzUifQ",
+    "payload": "eyJkb21haW4iOiJtaW5pbmcuYnVpbGRpbmdjdWx0dXJlaWQuc3BhY2UifQ",
+    "signature": "mSTb6yJtR90Q2IWjscoAdmQzt+EtmBjHVAqezJUzGwhWexiDkVw8bHCIrrFtdzRej1ab3iCoEPXTphpXSiQ2NBs="
+  },
   "miniapp": {
     "version": "1",
     "name": "Building Culture",
     "subtitle": "The Human Economy",
-    "description": "Human value was never measured correctly. Build a Human Passport through learning, creating, and contributing. Proof of Attention — own your digital reputation.",
+    "description": "Build a Human Passport through learning, creating, and contributing. Proof of Attention. Own your digital reputation.",
     "tagline": "Build your Human Passport",
-    "iconUrl": "https://mining.buildingcultureid.space/icon-512.png",
-    "splashImageUrl": "https://mining.buildingcultureid.space/icon-512.png",
+    "iconUrl": "https://mining.buildingcultureid.space/miniapp/icon-1024.png",
+    "splashImageUrl": "https://mining.buildingcultureid.space/miniapp/splash-200.png",
     "splashBackgroundColor": "#050608",
     "homeUrl": "https://mining.buildingcultureid.space/?fc=1",
-    "imageUrl": "https://mining.buildingcultureid.space/og.jpg",
-    "heroImageUrl": "https://mining.buildingcultureid.space/og.jpg",
+    "imageUrl": "https://mining.buildingcultureid.space/miniapp/hero-1200x630.png",
+    "heroImageUrl": "https://mining.buildingcultureid.space/miniapp/hero-1200x630.png",
     "buttonTitle": "Build Passport",
-    "primaryCategory": "social",
+    "primaryCategory": "education",
     "tags": [
       "human-economy",
       "reputation",
@@ -20,15 +25,49 @@
       "attention",
       "passport"
     ],
-    "ogTitle": "Human value was never measured correctly",
-    "ogDescription": "Building Culture — Human Passport. Learn. Create. Contribute. Own your reputation.",
-    "ogImageUrl": "https://mining.buildingcultureid.space/og.jpg",
+    "ogTitle": "Human Passport",
+    "ogDescription": "Learn. Create. Contribute. Own your reputation in the Human Economy.",
+    "ogImageUrl": "https://mining.buildingcultureid.space/miniapp/hero-1200x630.png",
     "screenshotUrls": [
-      "https://mining.buildingcultureid.space/campaign/mine-culture.png",
-      "https://mining.buildingcultureid.space/campaign/culture-club.png",
-      "https://mining.buildingcultureid.space/campaign/spread-love.png"
+      "https://mining.buildingcultureid.space/miniapp/screenshot-1.png",
+      "https://mining.buildingcultureid.space/miniapp/screenshot-2.png",
+      "https://mining.buildingcultureid.space/miniapp/screenshot-3.png"
     ],
     "canonicalDomain": "mining.buildingcultureid.space",
-    "webhookUrl": "https://mining.buildingcultureid.space/api/farcaster/webhook"
+    "webhookUrl": "https://mining.buildingcultureid.space/api/farcaster/webhook",
+    "castShareUrl": "https://mining.buildingcultureid.space/?fc=1"
+  },
+  "frame": {
+    "version": "1",
+    "name": "Building Culture",
+    "subtitle": "The Human Economy",
+    "description": "Build a Human Passport through learning, creating, and contributing. Proof of Attention. Own your digital reputation.",
+    "tagline": "Build your Human Passport",
+    "iconUrl": "https://mining.buildingcultureid.space/miniapp/icon-1024.png",
+    "splashImageUrl": "https://mining.buildingcultureid.space/miniapp/splash-200.png",
+    "splashBackgroundColor": "#050608",
+    "homeUrl": "https://mining.buildingcultureid.space/?fc=1",
+    "imageUrl": "https://mining.buildingcultureid.space/miniapp/hero-1200x630.png",
+    "heroImageUrl": "https://mining.buildingcultureid.space/miniapp/hero-1200x630.png",
+    "buttonTitle": "Build Passport",
+    "primaryCategory": "education",
+    "tags": [
+      "human-economy",
+      "reputation",
+      "learning",
+      "attention",
+      "passport"
+    ],
+    "ogTitle": "Human Passport",
+    "ogDescription": "Learn. Create. Contribute. Own your reputation in the Human Economy.",
+    "ogImageUrl": "https://mining.buildingcultureid.space/miniapp/hero-1200x630.png",
+    "screenshotUrls": [
+      "https://mining.buildingcultureid.space/miniapp/screenshot-1.png",
+      "https://mining.buildingcultureid.space/miniapp/screenshot-2.png",
+      "https://mining.buildingcultureid.space/miniapp/screenshot-3.png"
+    ],
+    "canonicalDomain": "mining.buildingcultureid.space",
+    "webhookUrl": "https://mining.buildingcultureid.space/api/farcaster/webhook",
+    "castShareUrl": "https://mining.buildingcultureid.space/?fc=1"
   }
 }

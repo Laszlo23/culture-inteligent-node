@@ -5,7 +5,8 @@
 **Live:** https://mining.buildingcultureid.space/  
 **Hearing Mode:** https://mining.buildingcultureid.space/?hear=1  
 **Angel diligence (cons / not-so-cons):** [ANGEL_DILIGENCE.md](./ANGEL_DILIGENCE.md)  
-**Partner one-pager:** [PARTNER_ATTENTION_SESSION.md](./PARTNER_ATTENTION_SESSION.md)  
+**Pitch deck (HTML):** [`pitch/index.html`](../pitch/index.html)  
+**Partner one-pager:** [PARTNER_ATTENTION_SESSION.md](./PARTNER_ATTENTION_SESSION.md) · [`pitch/partner-one-pager.html`](../pitch/partner-one-pager.html)  
 **Press kit:** [PRESS_KIT.md](./PRESS_KIT.md)  
 **Brand lock:** [BRAND_STRATEGY.md](./BRAND_STRATEGY.md)
 
@@ -119,7 +120,7 @@ No gallery tour. Script: `okx-genesis-submission/04-demo-script-90s.md`
 
 ## Contact / next step
 
-1. Send this brief + [ANGEL_DILIGENCE.md](./ANGEL_DILIGENCE.md) + Hearing link.  
+1. Send this brief + [pitch deck](../pitch/index.html) + [ANGEL_DILIGENCE.md](./ANGEL_DILIGENCE.md) + Hearing link.  
 2. Attach 90s demo.  
 3. Partners: propose a **pilot week**, not a retainer first.  
 4. Angels: Scenario B as working path; A as floor; checklist in the diligence doc.

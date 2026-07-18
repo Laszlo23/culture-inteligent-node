@@ -61,6 +61,7 @@ import { setZenDecisionHandler } from '../lib/hearing/zen-bridge';
 import { useHearing } from '../lib/hearing/context';
 import { track } from '../lib/attention-metrics';
 import { inviteCodeFromWallet, reportGrowthEvent } from '../lib/growth-loop';
+import { friendlyFailureDetail, thrownToUserError } from '../lib/user-errors';
 
 interface AttentionAcademyProps {
   state: GameState;
@@ -72,6 +73,8 @@ interface AttentionAcademyProps {
   onOpenTollShop?: (sku?: 'academy_retake' | 'spark_refill') => void;
   /** Request facility Focus Mode (dim chrome) */
   onRequestFocus?: (on: boolean) => void;
+  /** Zen Mind/Machine chosen — return to Loop Stage */
+  onZenDecision?: (decision: LearningDecision) => void;
 }
 
 export default function AttentionAcademy({
@@ -82,6 +85,7 @@ export default function AttentionAcademy({
   onFirstRitualComplete,
   onOpenTollShop,
   onRequestFocus,
+  onZenDecision,
 }: AttentionAcademyProps) {
   const [published, setPublished] = useState<AttentionSession[]>([]);
   const [isAdmin, setIsAdmin] = useState(false);
@@ -244,8 +248,9 @@ export default function AttentionAcademy({
           }
         });
       }
+      onZenDecision?.(decision);
     },
-    [activeSession, addLog, hearing]
+    [activeSession, addLog, hearing, onZenDecision]
   );
 
   const academyStartedRef = React.useRef<string | null>(null);
@@ -436,7 +441,7 @@ export default function AttentionAcademy({
     } catch (e: any) {
       setGrantRetry({ index, agent });
       addLog(
-        `Energy grant failed — ${e?.message || e}. Tap Retry grant so fuel lands on-chain.`,
+        `Energy grant failed — ${friendlyFailureDetail(e)}. Tap Retry grant so fuel lands on-chain.`,
         'warn'
       );
     }
@@ -725,10 +730,10 @@ export default function AttentionAcademy({
       });
     } catch (err: any) {
       setIsScanningOverlay(false);
-      const fallback =
-        `Confidential pass (Arcium band ${arcium.scoreBand}). Coach unreachable: ${err?.message || 'API unavailable'}`;
+      const coachMsg = thrownToUserError(err, 'coach');
+      const fallback = `Confidential pass (Arcium band ${arcium.scoreBand}). ${coachMsg}`;
       setAgentVerifyMsg(fallback);
-      addLog(`COACH API FALLBACK: ${err?.message || 'unavailable'}`, 'warn');
+      addLog(`COACH: ${coachMsg}`, 'warn');
       applyPendingRewards(index, {
         verification: fallback,
         score: pctScore,

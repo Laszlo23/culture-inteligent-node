@@ -16,12 +16,15 @@ import {
 } from '../lib/growth-loop';
 import { buildCommunityInviteCast } from '../lib/community-invite';
 import FarcasterCastButton from './FarcasterCastButton';
+import MakeItRainDeck from './MakeItRainDeck';
 import { subscribeAttentionMetrics } from '../lib/attention-metrics';
 
 type Props = {
   walletAddress?: string | null;
   displayName?: string;
   compact?: boolean;
+  onOpenPartners?: () => void;
+  onOpenHearing?: () => void;
 };
 
 const STEPS: Array<{
@@ -40,6 +43,8 @@ export default function GrowthLoopPanel({
   walletAddress,
   displayName,
   compact = false,
+  onOpenPartners,
+  onOpenHearing,
 }: Props) {
   const myCode = inviteCodeFromWallet(walletAddress);
   const [local, setLocal] = useState<LocalLoopProgress>(() => buildLocalLoopProgress());
@@ -210,6 +215,17 @@ export default function GrowthLoopPanel({
               Your code · {myCode}
             </p>
           )}
+        </div>
+      )}
+
+      {!compact && (
+        <div className="mt-5">
+          {/* Rain deck stays available on full passport after first share path */}
+          <MakeItRainDeck
+            compact
+            onOpenPartners={onOpenPartners}
+            onOpenHearing={onOpenHearing}
+          />
         </div>
       )}
     </motion.section>

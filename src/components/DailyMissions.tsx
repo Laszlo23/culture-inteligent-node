@@ -125,48 +125,94 @@ export default function DailyMissions({ state, setState, addLog }: DailyMissions
     }, 200);
   };
 
-  const completeQuest = (mission: DailyMission) => {
+  const completeQuest = async (mission: DailyMission) => {
     setRunningQuestId(null);
-    setState(prev => {
-      const updatedMissions = prev.dailyMissions.map(m => {
-        if (m.id === mission.id) {
-          return { ...m, completed: true };
+
+    // Always mark mission complete in UI
+    setState((prev) => ({
+      ...prev,
+      dailyMissions: prev.dailyMissions.map((m) =>
+        m.id === mission.id ? { ...m, completed: true } : m
+      ),
+      miningPower: prev.miningPower + mission.powerReward,
+    }));
+
+    try {
+      const { fetchEconomyStatus } = await import('../lib/api');
+      const status = await fetchEconomyStatus();
+      if (status.ready) {
+        // Settlement live: settle fuel/BCC on-chain (no silent local printers)
+        try {
+          const { rewardOnChain, syncLedgerToState } = await import('../lib/economy-actions');
+          const result = await rewardOnChain({
+            energyPercent: mission.energyReward,
+            bcc: Math.min(250, 50 + mission.energyReward * 2),
+            reason: `mission:${mission.id}`,
+          });
+          if ('skipped' in result) {
+            addLog(
+              `DIRECTIVE LOGGED: "${mission.label}" — settlement skipped (${result.reason}). No local BCC/fuel.`,
+              'warn'
+            );
+            setClaimBurst({ show: true, label: 'MISSION LOGGED · SETTLE OFF' });
+            return;
+          }
+          await syncLedgerToState(setState);
+          markEnergySurge();
+          setClaimBurst({
+            show: true,
+            label: `+${mission.energyReward}% ON-CHAIN`,
+          });
+          addLog(
+            `DIRECTIVE ON-CHAIN: "${mission.label}" — ${result.solscan}`,
+            'success'
+          );
+          return;
+        } catch (e: unknown) {
+          const msg = e instanceof Error ? e.message : String(e);
+          addLog(
+            `DIRECTIVE LOGGED (no local fuel): "${mission.label}" — on-chain reward failed: ${msg}`,
+            'warn'
+          );
+          setClaimBurst({ show: true, label: 'MISSION LOGGED' });
+          return;
         }
-        return m;
-      });
+      }
+    } catch {
+      /* treat as practice if status unreachable */
+    }
 
-      // Refuel reactor core
-      const newEnergy = Math.min(100, prev.energy + mission.energyReward);
-      
-      // Award credits and system power
-      const newCredits = prev.credits + 250; 
-      const currentHardwarePower = prev.hardware
-        .filter(h => h.installed && h.unlocked)
-        .reduce((sum, h) => sum + h.bonusPower, 0);
-      const currentWorkerPower = prev.workers
-        .filter(w => w.unlocked)
-        .reduce((sum, w) => sum + w.powerBonus, 0);
-
-      const newBasePower = prev.miningPower + (mission.powerReward);
-
-      return {
-        ...prev,
-        dailyMissions: updatedMissions,
-        energy: newEnergy,
-        credits: newCredits,
-        miningPower: currentHardwarePower + currentWorkerPower + newBasePower - prev.hardware.filter(h=>h.installed && h.unlocked).reduce((s, h)=>s+h.bonusPower, 0) - prev.workers.filter(w=>w.unlocked).reduce((s, w)=>s+w.powerBonus, 0)
-      };
-    });
-
+    // Practice mode only when economy is not ready
+    setState((prev) => ({
+      ...prev,
+      energy: Math.min(100, prev.energy + mission.energyReward),
+      credits: prev.credits + 250,
+    }));
     markEnergySurge();
     setClaimBurst({
       show: true,
       label: `+${mission.energyReward}% FUEL · +250 BCC`,
     });
-    addLog(`DIRECTIVE COMPLETE: "${mission.label}" — +${mission.energyReward}% knowledge fuel routed to reactor.`, 'success');
+    addLog(
+      `DIRECTIVE [PRACTICE]: "${mission.label}" — +${mission.energyReward}% fuel / +250 BCC (not on-chain).`,
+      'warn'
+    );
   };
 
-  const triggerEmergencyReboot = () => {
+  const triggerEmergencyReboot = async () => {
+    try {
+      const { fetchEconomyStatus } = await import('../lib/api');
+      const status = await fetchEconomyStatus();
+      if (status.ready) {
+        addLog(
+          'REBOOT BLOCKED: Settlement is live — use Academy, claim_daily, or Penny Protocol Spark Refill for on-chain fuel.',
+          'warn'
+        );
+        return;
+      }
+    } catch {
+      /* practice path */
+    }
     if (state.credits < 300) {
       addLog("REBOOT REJECTED: Insufficient backup credits. Need 300 credits for custom fuel capsules.", "warn");
       return;
@@ -176,7 +222,7 @@ export default function DailyMissions({ state, setState, addLog }: DailyMissions
       credits: prev.credits - 300,
       energy: 100
     }));
-    addLog("EMERGENCY REBOOT ENGAGED: Purging backup capsules. Reactor energy forced to 100%.", "success");
+    addLog("EMERGENCY REBOOT [PRACTICE]: Reactor energy forced to 100% (not on-chain).", "warn");
   };
 
   // Lucky Wheelspin Trigger
@@ -204,38 +250,59 @@ export default function DailyMissions({ state, setState, addLog }: DailyMissions
     setSpinAngle(targetRotation);
 
     setTimeout(() => {
-      // Execute reward after 3.2s spin
-      setPrizeIndexWon(prizeIndex);
-      setShowPrizeModal(true);
-      setIsSpinning(false);
+      void (async () => {
+        setPrizeIndexWon(prizeIndex);
+        setShowPrizeModal(true);
+        setIsSpinning(false);
 
-      const prize = WHEEL_PRIZES[prizeIndex];
-
-      setState(prev => {
-        const nextState = prize.action(prev);
-        
-        // Push notification of won prize
+        const prize = WHEEL_PRIZES[prizeIndex];
         const newNotification = {
           id: 'n_' + Date.now(),
           title: 'Daily Wheel Prize!',
           message: prize.logMessage,
           timestamp: new Date().toLocaleTimeString(),
           read: false,
-          type: 'success' as const
+          type: 'success' as const,
         };
 
-        return {
-          ...nextState,
-          lastWheelSpinTime: Date.now().toString(),
-          notifications: [newNotification, ...(prev.notifications || [])]
-        };
-      });
+        let settlementReady = false;
+        try {
+          const { fetchEconomyStatus } = await import('../lib/api');
+          settlementReady = Boolean((await fetchEconomyStatus()).ready);
+        } catch {
+          settlementReady = false;
+        }
 
-      addLog(prize.logMessage, 'success');
-      if (prize.label.includes('Energy')) {
-        markEnergySurge();
-      }
-      setClaimBurst({ show: true, label: `CLAIMED · ${prize.label}` });
+        if (settlementReady) {
+          // Cosmetic spin only — no local BCC/energy printers when Devnet settlement is live
+          setState((prev) => ({
+            ...prev,
+            lastWheelSpinTime: Date.now().toString(),
+            notifications: [newNotification, ...(prev.notifications || [])],
+          }));
+          addLog(
+            `WHEEL [COSMETIC]: ${prize.label} — practice RNG while settlement is live. Sole free drip is claim_daily.`,
+            'warn'
+          );
+          setClaimBurst({ show: true, label: `SPIN · ${prize.label}` });
+          return;
+        }
+
+        setState((prev) => {
+          const nextState = prize.action(prev);
+          return {
+            ...nextState,
+            lastWheelSpinTime: Date.now().toString(),
+            notifications: [newNotification, ...(prev.notifications || [])],
+          };
+        });
+
+        addLog(`${prize.logMessage} (practice — not on-chain)`, 'warn');
+        if (prize.label.includes('Energy')) {
+          markEnergySurge();
+        }
+        setClaimBurst({ show: true, label: `CLAIMED · ${prize.label}` });
+      })();
     }, 3200);
   };
 

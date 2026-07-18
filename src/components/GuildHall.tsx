@@ -16,6 +16,7 @@ import {
   Lock,
   ChevronRight,
   Radio,
+  ExternalLink,
 } from 'lucide-react';
 import { GameState } from '../types';
 import {
@@ -26,6 +27,11 @@ import {
   readApexClaim,
   writeApexClaim,
 } from '../lib/apex-summit';
+import {
+  factionHouseByGuildId,
+  openDiscord,
+} from '../lib/discord-community';
+import DiscordCommunityHub from './DiscordCommunityHub';
 
 interface GuildHallProps {
   state: GameState;
@@ -126,13 +132,12 @@ export default function GuildHall({
         miningPower: parseFloat((baseCombined * 1.1).toFixed(1)),
       };
     });
-    const newlyJoined = state.guilds.find((g) => g.id === guildId);
-    if (newlyJoined) {
-      addLog(
-        `FACTION HOUSE: enlisted with "${newlyJoined.name}". +10% facility power · feeds Apex score.`,
-        'success'
-      );
-    }
+    const house = factionHouseByGuildId(guildId);
+    const name = house?.name || state.guilds.find((g) => g.id === guildId)?.name || 'house';
+    addLog(
+      `FACTION HOUSE: enlisted with "${name}". Meet them in Discord ${house?.channel || ''} · feeds Apex score.`,
+      'success'
+    );
   };
 
   const claimSeat = () => {
@@ -178,8 +183,18 @@ export default function GuildHall({
         ? 'text-cyan-300 border-cyan-400/35 bg-cyan-950/25'
         : 'text-slate-400 border-white/10 bg-white/5';
 
+  const activeHouse = activeGuild ? factionHouseByGuildId(activeGuild.id) : undefined;
+
   return (
     <div id="guild-hall-room" className="space-y-6">
+      <DiscordCommunityHub
+        variant="compact"
+        activeGuildId={activeGuild?.id}
+        onJoinLogged={(channel) =>
+          addLog(`DISCORD: Opening ${channel} — faction houses live here.`, 'info')
+        }
+      />
+
       {/* Apex Summit hero */}
       <motion.div
         initial={{ opacity: 0, y: 10 }}
@@ -424,8 +439,8 @@ export default function GuildHall({
                 Faction houses
               </span>
               <span className="text-[11px] text-slate-500 font-sans">
-                Enlist to feed Apex score · shared output bonus
-                {activeGuild ? ` · ${activeGuild.name}` : ''}
+                Enlist in-app · live together in Discord
+                {activeHouse ? ` · ${activeHouse.channel}` : activeGuild ? ` · ${activeGuild.name}` : ''}
               </span>
             </div>
           </div>
@@ -443,7 +458,9 @@ export default function GuildHall({
               className="overflow-hidden"
             >
               <div className="px-5 pb-5 space-y-2.5 border-t border-white/5 pt-3">
-                {state.guilds.map((g, index) => (
+                {state.guilds.map((g, index) => {
+                  const house = factionHouseByGuildId(g.id);
+                  return (
                   <div
                     key={g.id}
                     className={`p-3.5 border rounded-2xl flex flex-wrap items-center justify-between gap-4 transition-all ${
@@ -460,29 +477,44 @@ export default function GuildHall({
                       <div>
                         <span className="text-sm font-bold text-slate-100 font-sans">{g.name}</span>
                         <span className="text-[10px] text-slate-500 font-mono block">
-                          {g.region} · {g.members.toLocaleString()} members · {g.output} EH/s
+                          {house?.channel || 'Discord'} · {g.region} · {g.members.toLocaleString()} members
                         </span>
                       </div>
                     </div>
-                    {g.selected ? (
-                      <span className="px-3 py-1.5 rounded-xl border border-emerald-500/30 bg-emerald-950/40 text-emerald-400 text-[10px] font-mono font-bold inline-flex items-center gap-1">
-                        <Check className="w-3.5 h-3.5" />
-                        Your house
-                      </span>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => selectGuild(g.id)}
-                        className="px-3 py-1.5 rounded-xl border border-white/10 hover:border-cyan-400/40 text-slate-300 text-[10px] font-mono font-bold cursor-pointer"
-                      >
-                        Enlist
-                      </button>
-                    )}
+                    <div className="flex flex-wrap items-center gap-2">
+                      {house && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            openDiscord(house.href);
+                            addLog(`DISCORD: Opening ${house.channel}`, 'info');
+                          }}
+                          className="px-3 py-1.5 rounded-xl border border-indigo-400/30 bg-indigo-500/10 text-indigo-200 text-[10px] font-mono font-bold cursor-pointer inline-flex items-center gap-1"
+                        >
+                          Discord <ExternalLink className="w-3 h-3" />
+                        </button>
+                      )}
+                      {g.selected ? (
+                        <span className="px-3 py-1.5 rounded-xl border border-emerald-500/30 bg-emerald-950/40 text-emerald-400 text-[10px] font-mono font-bold inline-flex items-center gap-1">
+                          <Check className="w-3.5 h-3.5" />
+                          Your house
+                        </span>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => selectGuild(g.id)}
+                          className="px-3 py-1.5 rounded-xl border border-white/10 hover:border-cyan-400/40 text-slate-300 text-[10px] font-mono font-bold cursor-pointer"
+                        >
+                          Enlist
+                        </button>
+                      )}
+                    </div>
                   </div>
-                ))}
+                  );
+                })}
                 <p className="text-[9px] text-slate-600 font-mono flex items-center gap-1.5 pt-1">
                   <Radio className="w-3 h-3" />
-                  Houses compete all month — Apex Circle is the monthly crown above them.
+                  Houses live in Discord — Apex Circle is the monthly crown above them.
                 </p>
               </div>
             </motion.div>

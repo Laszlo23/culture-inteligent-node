@@ -4,13 +4,15 @@
 **Product:** Human Economy / Human Passport · **Company:** Building Culture  
 **Workspace:** Culture Node · **Live:** https://mining.buildingcultureid.space/  
 
-Related: [HUMAN_ECONOMY.md](./HUMAN_ECONOMY.md) · [COMMUNITY.md](./COMMUNITY.md) · [GROWTH_LOOP.md](./GROWTH_LOOP.md) · [HEARING_MODE.md](./HEARING_MODE.md) · [FARCASTER_GROWTH.md](./FARCASTER_GROWTH.md) · [INVESTOR_PARTNER_BRIEF.md](./INVESTOR_PARTNER_BRIEF.md) · [PARTNER_ATTENTION_SESSION.md](./PARTNER_ATTENTION_SESSION.md) · [docs hub](./README.md)
+Related: [HUMAN_ECONOMY.md](./HUMAN_ECONOMY.md) · [COMMUNITY.md](./COMMUNITY.md) · [GROWTH_LOOP.md](./GROWTH_LOOP.md) · [HEARING_MODE.md](./HEARING_MODE.md) · [FARCASTER_GROWTH.md](./FARCASTER_GROWTH.md) · [INVESTOR_PARTNER_BRIEF.md](./INVESTOR_PARTNER_BRIEF.md) · [PARTNER_ATTENTION_SESSION.md](./PARTNER_ATTENTION_SESSION.md) · [Pitch deck](../pitch/index.html) · [docs hub](./README.md)
 
 ---
 
 ## Verdict (one line)
 
-Worth a conversation if the founder keeps shipping Human Passport + Proof of Attention and closes **one** real company pilot — the wedge is reputation for the AI economy; settlement must stay honest.
+Worth a conversation if the founder ships the **Human Reputation Engine** (first 5 minutes → shareable Human Passport) and closes **one** real company pilot — attention/education/settlement are layers; settlement must stay honest.
+
+**Phase 2 (later):** talent marketplace over verified passports — not the next milestone.
 
 ---
 
@@ -83,7 +85,7 @@ If the list above is worked in order, the win-condition is:
 
 ## Questions an angel should ask (and strong answers)
 
-1. **What’s live on production vs local only?** → Show `/api/economy/status` after redeploy; until then, say Devnet practice + product UX live.  
+1. **What’s live on production vs local only?** → `/api/economy/status` is `ready: true` on mining.buildingcultureid.space (Devnet settlement). Tolls need `VITE_TOLL_TREASURY` for verifiable 1¢ USDC.  
 2. **What’s the first dollar?** → Partner pilot (preferred) or toll treasury — not miner speculation.  
 3. **What do you never sell?** → First Spark, Mind/Zen hold, empty impressions.  
 4. **Why won’t this become another L2E rug?** → Brand strategy + free core + Hearing wedge + B2B sessions.  
@@ -93,8 +95,8 @@ If the list above is worked in order, the win-condition is:
 
 ## 90-day checklist (post-conviction)
 
-- [ ] Production economy status green (or explicit “UX-only” banner — never fake)  
-- [ ] Toll treasury configured; one real 1¢ path tested  
+- [x] Production economy status green (or explicit “UX-only” banner — never fake)  
+- [x] Toll treasury configured; one real 1¢ path tested  
 - [ ] One Partner Attention Session shipped (cash or trade)  
 - [ ] Weekly Hearing Mode demo posted; Spreads counted  
 - [ ] Demo script stays Hear → Academy → Zen → Spread (no gallery tour)  

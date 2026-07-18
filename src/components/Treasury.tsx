@@ -15,6 +15,7 @@ import { GameState } from '../types';
 import SolanaPortal from './SolanaPortal';
 import AttentionTollShop from './AttentionTollShop';
 import { fetchMarketPulse, MarketPulseResponse } from '../lib/api';
+import { friendlyFailureDetail } from '../lib/user-errors';
 
 interface TreasuryProps {
   state: GameState;
@@ -175,7 +176,7 @@ export default function Treasury({
         );
       }
     } catch (e: any) {
-      addLog(`SWAP FAILED: ${e?.message || e}`, 'warn');
+      addLog(`SWAP FAILED: ${friendlyFailureDetail(e)}`, 'warn');
     } finally {
       setIsSwapping(false);
       setSwapStep('');
@@ -217,7 +218,7 @@ export default function Treasury({
         'success'
       );
     } catch (e: any) {
-      addLog(`Claim didn’t land — ${e?.message || e}. Try again when you’re ready.`, 'warn');
+      addLog(`Claim didn’t land — ${friendlyFailureDetail(e)}. Try again when you’re ready.`, 'warn');
     } finally {
       setIsSigning(false);
       setSigStep('');
@@ -250,6 +251,13 @@ export default function Treasury({
   }, [state.miningPower, state.efficiency, state.energy]);
 
   const claimRewards = () => {
+    if (economyReady) {
+      addLog(
+        'BUFFER LOCKED: Settlement is live — use claim_daily (free on-chain drip) or Academy. Practice buffer disabled.',
+        'warn'
+      );
+      return;
+    }
     if (state.accumulatedRewards <= 0) {
       addLog('CLAIM DENIED: Practice buffer empty.', 'warn');
       return;
@@ -302,8 +310,10 @@ export default function Treasury({
             </div>
 
             <p className="text-xs text-slate-400 font-sans mb-8 leading-relaxed">
-              Simulated dashboard yield. The only free on-chain drip is{' '}
-              <span className="text-cyan-300 font-mono">claim_daily</span> (20h program cooldown) —
+              {economyReady
+                ? 'Settlement is live — practice buffer is locked. The only free on-chain drip is '
+                : 'Simulated dashboard yield. The only free on-chain drip is '}
+              <span className="text-cyan-300 font-mono">claim_daily</span> (20h program cooldown).
               Lucky Wheel stays practice RNG.
             </p>
 
@@ -328,15 +338,15 @@ export default function Treasury({
           <div className="mt-6">
             <button
               onClick={claimRewards}
-              disabled={state.accumulatedRewards < 1.0}
+              disabled={economyReady || state.accumulatedRewards < 1.0}
               className={`w-full py-3.5 rounded-xl font-bold font-mono text-xs tracking-widest flex items-center justify-center gap-2 transition-all cursor-pointer ${
-                state.accumulatedRewards >= 1.0
+                !economyReady && state.accumulatedRewards >= 1.0
                   ? 'bg-gradient-to-r from-emerald-400 to-teal-600 hover:from-emerald-500 hover:to-teal-700 text-slate-950 shadow-lg shadow-emerald-950/40 font-bold'
                   : 'bg-[#050506] border border-white/5 text-slate-500 cursor-not-allowed'
               }`}
             >
               <Download className="w-4 h-4" />
-              CLAIM ACCUMULATED REWARDS (CP)
+              {economyReady ? 'BUFFER LOCKED · USE CLAIM_DAILY' : 'CLAIM ACCUMULATED REWARDS (CP)'}
             </button>
           </div>
         </div>

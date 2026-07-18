@@ -75,7 +75,7 @@ Required env (see [`.env.example`](../.env.example)):
 4. Smoke First Spark → Solscan `grant_energy`.
 5. Prefer Postgres (`SQL_*`) for Academy/KPI proofs across restarts; in-memory store is lost on redeploy.
 
-**Live probe (2026-07-18):** `https://mining.buildingcultureid.space/api/economy/status` (and `/api/health`, `/api/ready`) still return the SPA HTML shell — the host has not been rebuilt with economy env + new routes. Local Devnet (`localhost:3040`) reports `ready: true`. Push host env + redeploy before calling production settlement live.
+**Live probe (2026-07-18):** Production `https://mining.buildingcultureid.space/api/economy/status` returns `ready: true` with BCC/CGT mints + authority. Toll catalog requires `VITE_TOLL_TREASURY` (Devnet USDC receiver) for verifiable 1¢ settlement — practice tolls are blocked in production when treasury is set.
 
 Reward constants live in [`src/lib/economy-rewards.ts`](../src/lib/economy-rewards.ts) (aligned with the program). 2-year projection: `npx tsx scripts/economy-2yr-model.ts` + canvas `economy-2yr-projection`.
 

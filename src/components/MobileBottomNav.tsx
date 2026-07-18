@@ -56,7 +56,7 @@ function tabActive(tab: Tab, activeRoom: string): boolean {
 }
 
 function shortNextLabel(step: NextStep, phase: NavPhase): string {
-  if (phase === 'ritual') return 'Start Proof of Attention';
+  if (phase === 'ritual' && !step.label) return 'Start Proof of Attention';
   if (/quieter path/i.test(step.label)) return 'Quieter path';
   if (step.label.length <= 24) return step.label;
   return step.label.slice(0, 22).trimEnd() + '…';

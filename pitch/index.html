@@ -3,52 +3,44 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Building Culture — Pitch</title>
+  <title>Building Culture — Angel Pitch</title>
+  <meta name="description" content="Building Culture · Human Economy — Proof of Attention OS. Hearing Mode. Zen. Human Passport." />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=Syne:wght@600;700;800&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,500&family=Fraunces:ital,opsz,wght@0,9..144,600;0,9..144,700;1,9..144,600;1,9..144,700&display=swap" rel="stylesheet" />
   <style>
     :root {
-      --bg: #050508;
-      --bg-elev: #0c0c12;
-      --emerald: #10f5a0;
-      --emerald-dim: rgba(16, 245, 160, 0.14);
-      --violet: #7b5cff;
-      --violet-deep: #3a1f8a;
-      --gold: #f0b429;
-      --cyan: #3de0ff;
-      --text: #f4f6fb;
-      --muted: #8b92a8;
-      --glass: rgba(255, 255, 255, 0.04);
-      --glass-border: rgba(255, 255, 255, 0.1);
-      --radius: 20px;
+      --void: #050608;
+      --signal: #22d3ee;
+      --ember: #f59e0b;
+      --heart: #fb7185;
+      --bone: #f8fafc;
+      --mute: #94a3b8;
+      --line: rgba(248, 250, 252, 0.1);
+      --glass: rgba(248, 250, 252, 0.03);
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
     html, body {
       height: 100%;
-      background: var(--bg);
-      color: var(--text);
-      font-family: "Instrument Sans", system-ui, sans-serif;
+      background: var(--void);
+      color: var(--bone);
+      font-family: "DM Sans", system-ui, sans-serif;
       overflow: hidden;
       -webkit-font-smoothing: antialiased;
     }
 
-    .deck {
-      height: 100%;
-      width: 100%;
-      position: relative;
-    }
+    .deck { height: 100%; width: 100%; position: relative; }
 
     .slide {
       position: absolute;
       inset: 0;
       opacity: 0;
       pointer-events: none;
-      transform: translateY(18px) scale(0.985);
-      transition: opacity 0.55s ease, transform 0.55s ease;
-      padding: clamp(2rem, 4vw, 4.5rem);
+      transform: translateY(14px);
+      transition: opacity 0.5s ease, transform 0.5s ease;
+      padding: clamp(2rem, 4.5vw, 4.25rem);
       display: grid;
       align-content: center;
       overflow: hidden;
@@ -66,458 +58,364 @@
       position: absolute;
       inset: 0;
       background:
-        radial-gradient(ellipse 70% 50% at 15% 10%, rgba(123, 92, 255, 0.18), transparent 55%),
-        radial-gradient(ellipse 55% 45% at 90% 85%, rgba(16, 245, 160, 0.12), transparent 50%),
-        radial-gradient(ellipse 40% 30% at 50% 50%, rgba(61, 224, 255, 0.04), transparent 60%);
+        radial-gradient(ellipse 75% 55% at 12% 8%, rgba(245, 158, 11, 0.14), transparent 55%),
+        radial-gradient(ellipse 60% 50% at 92% 88%, rgba(34, 211, 238, 0.1), transparent 50%),
+        radial-gradient(ellipse 40% 35% at 55% 45%, rgba(251, 113, 133, 0.04), transparent 60%);
       pointer-events: none;
       z-index: 0;
+    }
+
+    .slide.hero::before {
+      background:
+        radial-gradient(ellipse 90% 70% at 50% 0%, rgba(245, 158, 11, 0.16), transparent 55%),
+        radial-gradient(ellipse 70% 55% at 80% 100%, rgba(34, 211, 238, 0.12), transparent 50%),
+        var(--void);
     }
 
     .slide > * { position: relative; z-index: 1; }
 
     .eyebrow {
-      font-size: 0.75rem;
+      font-size: 0.72rem;
       letter-spacing: 0.28em;
       text-transform: uppercase;
-      color: var(--emerald);
-      font-weight: 600;
+      color: var(--ember);
+      font-weight: 700;
       margin-bottom: 1rem;
     }
 
+    .eyebrow.signal { color: var(--signal); }
+
     h1, h2 {
-      font-family: Syne, sans-serif;
-      font-weight: 800;
+      font-family: "Fraunces", Georgia, serif;
+      font-weight: 700;
+      font-style: italic;
       letter-spacing: -0.03em;
-      line-height: 0.98;
+      line-height: 1.05;
     }
 
-    h1 { font-size: clamp(2.8rem, 7vw, 5.6rem); }
-    h2 { font-size: clamp(2.2rem, 5vw, 4rem); margin-bottom: 1.25rem; }
+    h1 { font-size: clamp(2.6rem, 7vw, 5.2rem); }
+    h2 { font-size: clamp(2rem, 4.8vw, 3.6rem); margin-bottom: 1.1rem; }
 
     .tagline {
-      font-size: clamp(1.1rem, 2.2vw, 1.65rem);
-      color: var(--muted);
+      font-size: clamp(1.05rem, 2vw, 1.45rem);
+      color: var(--mute);
       font-weight: 500;
-      margin-top: 0.75rem;
+      margin-top: 0.85rem;
+      max-width: 36rem;
     }
 
     .lede {
-      max-width: 38rem;
-      font-size: clamp(1rem, 1.4vw, 1.2rem);
+      max-width: 36rem;
+      font-size: clamp(1rem, 1.35vw, 1.15rem);
       line-height: 1.65;
-      color: var(--muted);
-      margin-top: 1.5rem;
+      color: var(--mute);
+      margin-top: 1.25rem;
     }
 
-    .layout-split {
+    .lede strong { color: var(--bone); font-weight: 600; }
+
+    .split {
       display: grid;
-      grid-template-columns: 1.05fr 1fr;
-      gap: clamp(1.5rem, 4vw, 4rem);
+      grid-template-columns: 1.1fr 0.9fr;
+      gap: clamp(1.5rem, 4vw, 3.5rem);
       align-items: center;
-      height: 100%;
-      max-width: 1280px;
+      max-width: 1200px;
       margin: 0 auto;
       width: 100%;
     }
 
     @media (max-width: 900px) {
-      .layout-split { grid-template-columns: 1fr; align-content: start; overflow-y: auto; }
+      .split { grid-template-columns: 1fr; align-content: start; }
       .slide { overflow-y: auto; align-content: start; }
+      .slide.hero { align-content: center; }
     }
 
-    .glass {
-      background: var(--glass);
-      border: 1px solid var(--glass-border);
-      border-radius: var(--radius);
-      backdrop-filter: blur(18px);
-      -webkit-backdrop-filter: blur(18px);
-      box-shadow: 0 24px 80px rgba(0, 0, 0, 0.45);
-    }
-
-    .shot {
-      width: 100%;
-      border-radius: 16px;
-      border: 1px solid var(--glass-border);
-      display: block;
-      box-shadow:
-        0 0 0 1px rgba(16, 245, 160, 0.08),
-        0 30px 80px rgba(0, 0, 0, 0.55);
-      animation: floatShot 7s ease-in-out infinite;
-    }
-
-    @keyframes floatShot {
-      0%, 100% { transform: translateY(0); }
-      50% { transform: translateY(-8px); }
-    }
-
-    .shot-wrap {
-      position: relative;
-      padding: 0.5rem;
-    }
-
-    .shot-wrap::after {
-      content: "";
-      position: absolute;
-      inset: 8% 10% auto;
-      height: 60%;
-      background: radial-gradient(ellipse, rgba(16, 245, 160, 0.2), transparent 70%);
-      filter: blur(40px);
-      z-index: -1;
-      pointer-events: none;
-    }
-
-    .hero-slide {
+    .hero {
       text-align: center;
       justify-items: center;
     }
 
+    .hero .tagline { margin-left: auto; margin-right: auto; }
+    .hero .lede { margin-left: auto; margin-right: auto; }
+
     .hero-art {
-      width: min(420px, 70vw);
-      margin: 1.5rem auto 0;
-      border-radius: 24px;
-      box-shadow:
-        0 0 60px rgba(123, 92, 255, 0.35),
-        0 0 100px rgba(240, 180, 41, 0.15);
-      animation: pulseGlow 5s ease-in-out infinite;
+      width: min(480px, 78vw);
+      margin: 1.75rem auto 0;
+      border-radius: 4px;
+      display: block;
+      animation: rise 8s ease-in-out infinite;
     }
 
-    @keyframes pulseGlow {
-      0%, 100% { filter: brightness(1); }
-      50% { filter: brightness(1.08); }
+    @keyframes rise {
+      0%, 100% { transform: translateY(0); opacity: 1; }
+      50% { transform: translateY(-6px); opacity: 0.96; }
     }
 
-    .hero-copy {
-      max-width: 44rem;
-      margin: 1.25rem auto 0;
-      color: var(--muted);
-      line-height: 1.7;
-      font-size: 1.05rem;
+    .shot {
+      width: 100%;
+      border-radius: 4px;
+      border: 1px solid var(--line);
+      display: block;
+      animation: rise 9s ease-in-out infinite;
     }
 
     .site-link {
       display: inline-flex;
       align-items: center;
-      gap: 0.5rem;
-      margin-top: 1.75rem;
-      color: var(--cyan);
+      gap: 0.4rem;
+      margin-top: 1.5rem;
+      color: var(--signal);
       text-decoration: none;
-      font-size: 0.9rem;
-      letter-spacing: 0.04em;
-      opacity: 0.85;
+      font-size: 0.92rem;
+      font-weight: 600;
+      letter-spacing: 0.02em;
       border-bottom: 1px solid transparent;
-      transition: opacity 0.2s, border-color 0.2s;
+      transition: border-color 0.2s;
     }
 
-    .site-link:hover {
-      opacity: 1;
-      border-color: rgba(61, 224, 255, 0.5);
-    }
+    .site-link:hover { border-color: rgba(34, 211, 238, 0.5); }
 
-    .problem-list {
+    .list {
       list-style: none;
       display: grid;
-      gap: 0.65rem;
-      margin-top: 1.5rem;
+      gap: 0.55rem;
+      margin-top: 1.4rem;
     }
 
-    .problem-list li {
+    .list li {
       display: flex;
-      align-items: center;
-      gap: 0.85rem;
-      padding: 0.85rem 1.1rem;
-      border-radius: 14px;
+      align-items: flex-start;
+      gap: 0.75rem;
+      padding: 0.8rem 1rem;
+      border: 1px solid var(--line);
       background: var(--glass);
-      border: 1px solid var(--glass-border);
-      font-size: 1.05rem;
+      font-size: 1rem;
+      line-height: 1.4;
+      color: var(--mute);
     }
 
-    .problem-list li::before {
+    .list li strong { color: var(--bone); font-weight: 600; }
+
+    .list li::before {
       content: "";
-      width: 8px;
-      height: 8px;
+      width: 7px;
+      height: 7px;
+      margin-top: 0.45rem;
       border-radius: 50%;
-      background: #ff5c7a;
-      box-shadow: 0 0 12px #ff5c7a;
+      background: var(--heart);
       flex-shrink: 0;
     }
 
-    .callout {
-      margin-top: 1.5rem;
-      padding: 1rem 1.25rem;
-      border-radius: 14px;
-      border: 1px solid rgba(123, 92, 255, 0.35);
-      background: rgba(123, 92, 255, 0.08);
-      color: #c9c0ff;
-      font-size: 0.98rem;
-      line-height: 1.5;
-    }
+    .list.good li::before { background: var(--signal); }
+    .list.ember li::before { background: var(--ember); }
 
-    .islands {
-      display: grid;
-      grid-template-columns: repeat(2, 1fr);
-      gap: 1rem;
-      padding: 1.5rem;
-    }
-
-    .island {
-      padding: 1.4rem;
-      border-radius: 16px;
-      border: 1px dashed rgba(255, 92, 122, 0.35);
-      background: rgba(255, 92, 122, 0.05);
-      text-align: center;
-      font-size: 0.9rem;
-      color: var(--muted);
-      position: relative;
-    }
-
-    .island strong {
-      display: block;
-      color: var(--text);
-      margin-bottom: 0.35rem;
-      font-family: Syne, sans-serif;
-    }
-
-    .bridge {
-      position: absolute;
-      width: 40%;
-      height: 1px;
-      background: linear-gradient(90deg, transparent, rgba(255, 92, 122, 0.5), transparent);
-      top: 50%;
-      left: 80%;
-      opacity: 0.5;
-    }
-
-    .wheel {
-      position: relative;
-      width: min(420px, 90vw);
-      height: min(420px, 90vw);
-      margin: 0 auto;
-    }
-
-    .wheel-core {
-      position: absolute;
-      inset: 32%;
-      border-radius: 50%;
-      display: grid;
-      place-items: center;
-      text-align: center;
-      background: linear-gradient(145deg, rgba(16, 245, 160, 0.2), rgba(123, 92, 255, 0.25));
-      border: 1px solid rgba(16, 245, 160, 0.4);
-      box-shadow: 0 0 50px rgba(16, 245, 160, 0.2);
-      font-family: Syne, sans-serif;
-      font-weight: 700;
-      font-size: 0.95rem;
-      line-height: 1.2;
-      animation: spinSlow 40s linear infinite;
-      animation-direction: reverse;
-    }
-
-    .wheel-core span { animation: spinSlow 40s linear infinite; }
-
-    @keyframes spinSlow {
-      from { transform: rotate(0deg); }
-      to { transform: rotate(360deg); }
-    }
-
-    .spoke {
-      position: absolute;
-      left: 50%;
-      top: 50%;
-      width: 118px;
-      margin-left: -59px;
-      margin-top: -18px;
-      transform-origin: center;
-      text-align: center;
-      font-size: 0.72rem;
-      font-weight: 600;
-      letter-spacing: 0.02em;
-      padding: 0.45rem 0.5rem;
-      border-radius: 999px;
-      background: rgba(12, 12, 18, 0.9);
-      border: 1px solid var(--glass-border);
-      color: var(--text);
-      white-space: nowrap;
-    }
-
-    .pill-grid {
+    .pills {
       display: flex;
       flex-wrap: wrap;
-      gap: 0.6rem;
-      margin-top: 1.5rem;
+      gap: 0.5rem;
+      margin-top: 1.4rem;
     }
 
     .pill {
-      padding: 0.55rem 0.95rem;
-      border-radius: 999px;
-      border: 1px solid rgba(16, 245, 160, 0.3);
-      background: var(--emerald-dim);
-      color: var(--emerald);
-      font-size: 0.88rem;
+      padding: 0.45rem 0.85rem;
+      border: 1px solid rgba(34, 211, 238, 0.35);
+      background: rgba(34, 211, 238, 0.08);
+      color: var(--signal);
+      font-size: 0.82rem;
       font-weight: 600;
+      letter-spacing: 0.02em;
     }
 
-    .steps {
+    .pill.ember {
+      border-color: rgba(245, 158, 11, 0.4);
+      background: rgba(245, 158, 11, 0.1);
+      color: var(--ember);
+    }
+
+    .loop {
       display: grid;
-      gap: 0.7rem;
-      margin-top: 1.4rem;
+      gap: 0.5rem;
+      margin-top: 1.35rem;
       counter-reset: step;
     }
 
-    .steps li {
+    .loop li {
       list-style: none;
       display: flex;
-      gap: 0.9rem;
+      gap: 0.85rem;
       align-items: flex-start;
-      padding: 0.85rem 1rem;
-      border-radius: 14px;
+      padding: 0.75rem 0.95rem;
+      border: 1px solid var(--line);
       background: var(--glass);
-      border: 1px solid var(--glass-border);
       counter-increment: step;
+      color: var(--mute);
+      font-size: 0.95rem;
+      line-height: 1.4;
     }
 
-    .steps li::before {
+    .loop li strong { color: var(--bone); }
+
+    .loop li::before {
       content: counter(step);
-      width: 1.6rem;
-      height: 1.6rem;
-      border-radius: 50%;
+      width: 1.5rem;
+      height: 1.5rem;
       display: grid;
       place-items: center;
-      background: rgba(123, 92, 255, 0.25);
-      color: #d4caff;
-      font-size: 0.75rem;
+      border: 1px solid rgba(245, 158, 11, 0.45);
+      color: var(--ember);
+      font-size: 0.72rem;
       font-weight: 700;
       flex-shrink: 0;
+      margin-top: 0.05rem;
     }
 
-    .xp-grid {
+    .dual {
       display: grid;
-      grid-template-columns: repeat(2, 1fr);
-      gap: 0.7rem;
-      margin-top: 1.25rem;
-    }
-
-    .xp-card {
-      padding: 1rem;
-      border-radius: 14px;
-      background: var(--glass);
-      border: 1px solid var(--glass-border);
-      font-size: 0.92rem;
-      font-weight: 600;
-    }
-
-    .xp-card span {
-      display: block;
-      font-size: 0.7rem;
-      color: var(--muted);
-      font-weight: 500;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      margin-bottom: 0.3rem;
-    }
-
-    .level-bar {
-      display: flex;
-      align-items: center;
+      grid-template-columns: 1fr 1fr;
       gap: 0.75rem;
-      margin-top: 1.5rem;
+      margin-top: 1.35rem;
+    }
+
+    @media (max-width: 560px) { .dual { grid-template-columns: 1fr; } }
+
+    .panel {
+      padding: 1.15rem 1.2rem;
+      border: 1px solid var(--line);
+      background: var(--glass);
+    }
+
+    .panel.mind { border-color: rgba(245, 158, 11, 0.4); }
+    .panel.machine { border-color: rgba(34, 211, 238, 0.4); }
+
+    .panel h3 {
+      font-size: 0.68rem;
+      font-weight: 700;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      margin-bottom: 0.45rem;
+    }
+
+    .panel.mind h3 { color: var(--ember); }
+    .panel.machine h3 { color: var(--signal); }
+
+    .panel p {
+      font-size: 0.92rem;
+      color: var(--mute);
+      line-height: 1.45;
+    }
+
+    .panel p strong { color: var(--bone); }
+
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 0.65rem;
+      margin-top: 1.4rem;
+    }
+
+    @media (max-width: 700px) { .stats { grid-template-columns: 1fr; } }
+
+    .stat {
       padding: 1rem;
-      border-radius: 14px;
-      background: linear-gradient(90deg, rgba(16, 245, 160, 0.12), rgba(123, 92, 255, 0.15));
-      border: 1px solid var(--glass-border);
-      font-family: Syne, sans-serif;
+      border: 1px solid var(--line);
+      background: var(--glass);
+    }
+
+    .stat span {
+      display: block;
+      font-size: 0.65rem;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--mute);
+      font-weight: 700;
+      margin-bottom: 0.35rem;
+    }
+
+    .stat strong {
+      font-family: "Fraunces", Georgia, serif;
+      font-style: italic;
+      font-size: 1.15rem;
+      color: var(--bone);
+      line-height: 1.25;
+    }
+
+    .table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 1.35rem;
+      font-size: 0.9rem;
+    }
+
+    .table th, .table td {
+      text-align: left;
+      padding: 0.7rem 0.6rem;
+      border-bottom: 1px solid var(--line);
+      color: var(--mute);
+    }
+
+    .table th {
+      font-size: 0.65rem;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: var(--ember);
       font-weight: 700;
     }
 
-    .level-bar .bar {
-      flex: 1;
-      height: 6px;
-      border-radius: 99px;
-      background: rgba(255, 255, 255, 0.08);
-      overflow: hidden;
+    .table td:first-child { color: var(--bone); font-weight: 600; }
+
+    .callout {
+      margin-top: 1.35rem;
+      padding: 1rem 1.15rem;
+      border-left: 2px solid var(--ember);
+      background: rgba(245, 158, 11, 0.06);
+      color: var(--mute);
+      font-size: 0.95rem;
+      line-height: 1.5;
     }
 
-    .level-bar .bar i {
-      display: block;
-      height: 100%;
-      width: 42%;
-      background: linear-gradient(90deg, var(--emerald), var(--violet));
-      border-radius: 99px;
-      animation: growBar 2.5s ease-in-out infinite alternate;
+    .callout strong { color: var(--bone); }
+
+    .gates {
+      display: grid;
+      gap: 0.55rem;
+      margin-top: 1.35rem;
     }
 
-    @keyframes growBar {
-      from { width: 28%; }
-      to { width: 72%; }
+    .gate {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 0.85rem;
+      align-items: start;
+      padding: 0.85rem 1rem;
+      border: 1px solid var(--line);
+      background: var(--glass);
     }
 
-    .vision-chips {
+    .gate .n {
+      font-family: "Fraunces", Georgia, serif;
+      font-style: italic;
+      font-size: 1.35rem;
+      color: var(--signal);
+      line-height: 1;
+    }
+
+    .gate p { color: var(--mute); font-size: 0.92rem; line-height: 1.4; }
+    .gate p strong { color: var(--bone); }
+
+    .closing {
+      margin-top: 1.6rem;
+      font-family: "Fraunces", Georgia, serif;
+      font-style: italic;
+      font-size: clamp(1.15rem, 2.2vw, 1.55rem);
+      color: var(--ember);
+      font-weight: 700;
+    }
+
+    .links {
       display: flex;
       flex-wrap: wrap;
-      gap: 0.55rem;
-      margin-top: 1.5rem;
-    }
-
-    .vision-chips span {
-      padding: 0.5rem 0.9rem;
-      border-radius: 10px;
-      border: 1px solid rgba(61, 224, 255, 0.25);
-      background: rgba(61, 224, 255, 0.06);
-      font-size: 0.88rem;
-    }
-
-    .network {
-      position: relative;
-      height: min(420px, 55vh);
-      border-radius: 20px;
-      overflow: hidden;
-      background:
-        radial-gradient(circle at 50% 50%, rgba(16, 245, 160, 0.15), transparent 45%),
-        radial-gradient(circle at 20% 30%, rgba(123, 92, 255, 0.2), transparent 40%),
-        #08080e;
-      border: 1px solid var(--glass-border);
-    }
-
-    .node-dot {
-      position: absolute;
-      width: 10px;
-      height: 10px;
-      border-radius: 50%;
-      background: var(--emerald);
-      box-shadow: 0 0 16px var(--emerald);
-      animation: blink 3s ease-in-out infinite;
-    }
-
-    @keyframes blink {
-      0%, 100% { opacity: 0.45; transform: scale(0.9); }
-      50% { opacity: 1; transform: scale(1.15); }
-    }
-
-    .join-list {
-      display: grid;
-      grid-template-columns: repeat(2, 1fr);
-      gap: 0.65rem;
-      margin-top: 1.5rem;
-      list-style: none;
-    }
-
-    .join-list li {
-      padding: 0.9rem 1rem;
-      border-radius: 14px;
-      background: var(--glass);
-      border: 1px solid var(--glass-border);
-      font-weight: 600;
-    }
-
-    .closing-tag {
-      margin-top: 1.75rem;
-      font-family: Syne, sans-serif;
-      font-size: clamp(1.1rem, 2vw, 1.45rem);
-      background: linear-gradient(90deg, var(--gold), var(--emerald), var(--cyan));
-      -webkit-background-clip: text;
-      background-clip: text;
-      color: transparent;
-      font-weight: 700;
-      letter-spacing: -0.02em;
+      gap: 1rem 1.5rem;
+      margin-top: 1.25rem;
     }
 
     .chrome {
@@ -531,7 +429,7 @@
       align-items: center;
       justify-content: space-between;
       gap: 1rem;
-      background: linear-gradient(transparent, rgba(5, 5, 8, 0.92));
+      background: linear-gradient(transparent, rgba(5, 6, 8, 0.95));
       pointer-events: none;
     }
 
@@ -546,38 +444,37 @@
     }
 
     .dots button {
-      width: 8px;
-      height: 8px;
+      width: 7px;
+      height: 7px;
       border-radius: 50%;
       border: none;
-      background: rgba(255, 255, 255, 0.2);
+      background: rgba(248, 250, 252, 0.2);
       cursor: pointer;
       padding: 0;
       transition: transform 0.2s, background 0.2s;
     }
 
     .dots button.active {
-      background: var(--emerald);
+      background: var(--ember);
       transform: scale(1.35);
-      box-shadow: 0 0 10px var(--emerald);
     }
 
     .nav-btn {
-      border: 1px solid var(--glass-border);
-      background: rgba(255, 255, 255, 0.04);
-      color: var(--text);
-      border-radius: 999px;
-      padding: 0.55rem 1rem;
-      font-size: 0.8rem;
+      border: 1px solid var(--line);
+      background: transparent;
+      color: var(--bone);
+      padding: 0.5rem 0.95rem;
+      font-size: 0.78rem;
       font-weight: 600;
       letter-spacing: 0.06em;
       cursor: pointer;
       font-family: inherit;
+      text-transform: uppercase;
     }
 
     .nav-btn:hover {
-      border-color: rgba(16, 245, 160, 0.4);
-      color: var(--emerald);
+      border-color: rgba(34, 211, 238, 0.45);
+      color: var(--signal);
     }
 
     .brand-chip {
@@ -585,11 +482,11 @@
       top: 1.25rem;
       left: 1.5rem;
       z-index: 50;
-      font-size: 0.7rem;
-      letter-spacing: 0.2em;
+      font-size: 0.68rem;
+      letter-spacing: 0.22em;
       text-transform: uppercase;
-      color: var(--muted);
-      font-weight: 600;
+      color: var(--mute);
+      font-weight: 700;
     }
 
     .brand-chip a {
@@ -597,7 +494,7 @@
       text-decoration: none;
     }
 
-    .brand-chip a:hover { color: var(--cyan); }
+    .brand-chip a:hover { color: var(--signal); }
 
     .slide-num {
       position: fixed;
@@ -605,20 +502,20 @@
       right: 1.5rem;
       z-index: 50;
       font-size: 0.75rem;
-      color: var(--muted);
+      color: var(--mute);
       font-variant-numeric: tabular-nums;
       letter-spacing: 0.08em;
     }
 
     .hint {
       position: fixed;
-      bottom: 3.6rem;
+      bottom: 3.5rem;
       left: 50%;
       transform: translateX(-50%);
       z-index: 40;
-      font-size: 0.7rem;
-      color: rgba(139, 146, 168, 0.7);
-      letter-spacing: 0.12em;
+      font-size: 0.68rem;
+      color: rgba(148, 163, 184, 0.65);
+      letter-spacing: 0.14em;
       text-transform: uppercase;
       pointer-events: none;
       transition: opacity 0.4s;
@@ -626,7 +523,6 @@
 
     .hint.hide { opacity: 0; }
 
-    /* PDF / print: one slide per landscape page */
     @page {
       size: 13.333in 7.5in;
       margin: 0;
@@ -636,7 +532,7 @@
       html, body {
         height: auto !important;
         overflow: visible !important;
-        background: #050508 !important;
+        background: #050608 !important;
         -webkit-print-color-adjust: exact;
         print-color-adjust: exact;
       }
@@ -645,10 +541,7 @@
         display: none !important;
       }
 
-      .deck {
-        height: auto !important;
-        position: static !important;
-      }
+      .deck { height: auto !important; position: static !important; }
 
       .slide {
         position: relative !important;
@@ -669,14 +562,7 @@
         break-after: auto;
       }
 
-      .shot, .hero-art {
-        animation: none !important;
-        box-shadow: none !important;
-      }
-
-      .wheel-core, .wheel-core span, .level-bar .bar i, .node-dot {
-        animation: none !important;
-      }
+      .shot, .hero-art { animation: none !important; }
     }
 
     body.print-mode {
@@ -710,239 +596,325 @@
   </style>
 </head>
 <body>
-  <div class="brand-chip"><a href="https://buildingcultureid.space" target="_blank" rel="noopener">Building Culture</a></div>
-  <div class="slide-num"><span id="cur">01</span> / 10</div>
+  <div class="brand-chip"><a href="https://mining.buildingcultureid.space/" target="_blank" rel="noopener">Building Culture</a></div>
+  <div class="slide-num"><span id="cur">01</span> / <span id="total">12</span></div>
   <div class="hint" id="hint">← → to navigate</div>
 
   <div class="deck" id="deck">
     <!-- 1 HERO -->
-    <section class="slide hero-slide active" data-i="0">
-      <p class="eyebrow">Pitch Deck</p>
-      <h1>BUILDING CULTURE</h1>
-      <p class="tagline">It's about time to mine some culture.</p>
-      <img class="hero-art" src="assets/hero-bc.png" alt="Building Culture — Connecting Mining" />
-      <p class="hero-copy">
-        Cards, pudgys, apes — communities already collect culture. Culture Node mines attention that sticks: Proof of Attention, education that moves with science, and a Solana-native loop for builders who want more than empty hashes.
+    <section class="slide hero active" data-i="0">
+      <p class="eyebrow">Angel pitch · Pre-seed</p>
+      <h1>Building Culture</h1>
+      <p class="tagline">Human value was never measured correctly.</p>
+      <img class="hero-art" src="assets/mine-culture.png" alt="Building Culture — Human Economy" />
+      <p class="lede">
+        <strong>Human Reputation Engine</strong> — Human Passport.
+        Measure contribution. Share it. Attention &amp; settlement are layers.
+        Settlement is infrastructure — never the brand.
       </p>
-      <a class="site-link" href="https://buildingcultureid.space" target="_blank" rel="noopener">buildingcultureid.space →</a>
+      <a class="site-link" href="https://mining.buildingcultureid.space/" target="_blank" rel="noopener">mining.buildingcultureid.space →</a>
     </section>
 
     <!-- 2 PROBLEM -->
     <section class="slide" data-i="1">
-      <div class="layout-split">
+      <div class="split">
         <div>
-          <p class="eyebrow">The Problem</p>
-          <h2>Web3 is fragmented.</h2>
-          <p class="lede">Builders struggle with the basics of growth — while most ecosystems reward speculation instead of participation.</p>
-          <ul class="problem-list">
-            <li>Getting discovered</li>
-            <li>Growing communities</li>
-            <li>Educating users</li>
-            <li>Sustainable funding</li>
-            <li>Building trust</li>
-            <li>Retaining contributors</li>
+          <p class="eyebrow">The problem</p>
+          <h2>Hours no longer measure worth.</h2>
+          <p class="lede">
+            Time = Money was industrial. AI now floods content, code, and “knowledge.”
+            Screens extract attention. <strong>Contribution still isn’t owned.</strong>
+          </p>
+          <ul class="list">
+            <li><strong>Eyes-only products</strong> — commute, care work, a11y left out</li>
+            <li><strong>Learn-to-earn stigma</strong> — empty farms dressed as education</li>
+            <li><strong>No reputation layer</strong> — humans can’t prove attention that stuck</li>
           </ul>
         </div>
-        <div class="glass islands">
-          <div class="island"><strong>Builders</strong>Isolated discovery<div class="bridge"></div></div>
-          <div class="island"><strong>Communities</strong>Weak retention</div>
-          <div class="island"><strong>Education</strong>No shared loop</div>
-          <div class="island"><strong>Capital</strong>Speculation first</div>
-          <p style="grid-column:1/-1;text-align:center;color:var(--muted);font-size:0.85rem;margin-top:0.5rem;">Broken islands. Weak bridges.</p>
+        <div>
+          <img class="shot" src="assets/failure-curve.png" alt="Their failure curve is optional" />
         </div>
       </div>
     </section>
 
-    <!-- 3 SOLUTION -->
+    <!-- 3 OPPORTUNITY -->
     <section class="slide" data-i="2">
-      <div class="layout-split">
+      <div class="split">
         <div>
-          <p class="eyebrow">Our Solution</p>
-          <h2>One connected ecosystem.</h2>
-          <p class="lede">Building Culture creates a place where builders can discover, build, learn, collaborate, earn, and grow — everything is connected.</p>
-          <div class="pill-grid">
-            <span class="pill">Discover</span>
-            <span class="pill">Build</span>
-            <span class="pill">Learn</span>
-            <span class="pill">Collaborate</span>
-            <span class="pill">Earn</span>
-            <span class="pill">Grow</span>
+          <p class="eyebrow">The wedge</p>
+          <h2>Reputation for the AI economy.</h2>
+          <p class="lede">
+            We measure what machines can’t fake cheaply:
+            <strong>focused learning, conscious decision, and knowledge shared.</strong>
+          </p>
+          <div class="pills">
+            <span class="pill ember">Human Passport</span>
+            <span class="pill">Proof of Attention</span>
+            <span class="pill">Culture Node</span>
+            <span class="pill ember">Hearing Mode</span>
           </div>
-          <div class="shot-wrap" style="margin-top:1.75rem;">
-            <img class="shot" src="assets/shot-facility.png" alt="Culture Node facility schematic" />
+          <div class="callout">
+            Fund the studio that owns <strong>ears-first Proof of Attention</strong> —
+            not a token raise.
           </div>
         </div>
-        <div class="wheel" aria-hidden="true">
-          <div class="spoke" style="transform: rotate(0deg) translateY(-165px) rotate(0deg);">Builder DEX</div>
-          <div class="spoke" style="transform: rotate(40deg) translateY(-165px) rotate(-40deg);">Attention Academy</div>
-          <div class="spoke" style="transform: rotate(80deg) translateY(-165px) rotate(-80deg);">Culture Nodes</div>
-          <div class="spoke" style="transform: rotate(120deg) translateY(-165px) rotate(-120deg);">AI Assistant</div>
-          <div class="spoke" style="transform: rotate(160deg) translateY(-165px) rotate(-160deg);">Quest System</div>
-          <div class="spoke" style="transform: rotate(200deg) translateY(-165px) rotate(-200deg);">Reputation</div>
-          <div class="spoke" style="transform: rotate(240deg) translateY(-165px) rotate(-240deg);">Guilds</div>
-          <div class="spoke" style="transform: rotate(280deg) translateY(-165px) rotate(-280deg);">Marketplace</div>
-          <div class="spoke" style="transform: rotate(320deg) translateY(-165px) rotate(-320deg);">Governance</div>
-          <div class="wheel-core"><span>Building<br/>Culture</span></div>
+        <div>
+          <img class="shot" src="assets/culture-club.png" alt="Culture Club — membership ritual" />
         </div>
       </div>
     </section>
 
-    <!-- 4 CULTURE NODES -->
+    <!-- 4 PRODUCT -->
     <section class="slide" data-i="3">
-      <div class="layout-split">
+      <div class="split">
         <div>
-          <p class="eyebrow">Culture Nodes</p>
-          <h2>Your knowledge powers your node.</h2>
-          <p class="lede">Mining is no longer only hardware. Members fuel their node through learning, missions, community, and AI automation.</p>
-          <div class="pill-grid">
-            <span class="pill">Learning</span>
-            <span class="pill">Missions</span>
-            <span class="pill">Participation</span>
-            <span class="pill">Builder support</span>
-            <span class="pill">Node upgrades</span>
-            <span class="pill">AI automation</span>
-          </div>
+          <p class="eyebrow">Product</p>
+          <h2>Human Passport. Then the Node.</h2>
+          <p class="lede">
+            <strong>Building Culture</strong> is the company.
+            <strong>Human Economy</strong> is the category.
+            <strong>Culture Node</strong> is the workspace after you claim identity.
+          </p>
+          <ul class="loop">
+            <li><strong>Discover</strong> — why attention has value</li>
+            <li><strong>Prove</strong> — Attention Academy + Neural Snap</li>
+            <li><strong>Passport</strong> — claim Human Passport</li>
+            <li><strong>Grow</strong> — daily Learn / Build / Contribute</li>
+            <li><strong>Spread</strong> — invite the next soul; reputation compounds</li>
+          </ul>
         </div>
-        <div class="shot-wrap">
-          <img class="shot" src="assets/shot-reactor.png" alt="Mining reactor and living NFT miner console" />
+        <div>
+          <img class="shot" src="assets/shot-academy.png" alt="Attention Academy — Proof of Attention" />
         </div>
       </div>
     </section>
 
-    <!-- 5 ATTENTION ACADEMY -->
+    <!-- 5 HEARING -->
     <section class="slide" data-i="4">
-      <div class="layout-split">
+      <div class="split">
         <div>
-          <p class="eyebrow">Attention Academy</p>
-          <h2>Learn. Complete missions. Fuel your Node.</h2>
-          <p class="lede">Users complete micro courses, AI learning, builder challenges, and community quests. Every lesson generates progress inside the ecosystem.</p>
-          <ul class="steps">
-            <li>Micro courses &amp; study briefs</li>
-            <li>Agent-verified attention sessions</li>
-            <li>Builder challenges &amp; community quests</li>
-            <li>Progress maps directly into node energy</li>
+          <p class="eyebrow signal">Hearing Mode</p>
+          <h2>Mine culture without looking.</h2>
+          <p class="lede">
+            Ears-first Proof of Attention. Voice status, Academy by ear,
+            commands like <strong>Help · Academy · Zen · Spread</strong>.
+            The screen is optional.
+          </p>
+          <ul class="list good">
+            <li><strong>Real-life surface</strong> — commute, parents, accessibility</li>
+            <li><strong>Differentiated demo</strong> — open <code>?hear=1</code>, earbuds on</li>
+            <li><strong>Same loop</strong> — attention → decision → fuel → node</li>
           </ul>
+          <a class="site-link" href="https://mining.buildingcultureid.space/?hear=1" target="_blank" rel="noopener">Try Hearing Mode →</a>
         </div>
-        <div class="shot-wrap">
-          <img class="shot" src="assets/shot-academy.png" alt="Attention Academy verification terminal" />
+        <div>
+          <img class="shot" src="assets/shot-facility.png" alt="Culture Node facility — Hearing Mode ready" />
         </div>
       </div>
     </section>
 
-    <!-- 6 BUILD DEX -->
+    <!-- 6 ZEN + HOOK -->
     <section class="slide" data-i="5">
-      <div class="layout-split">
+      <div class="split">
         <div>
-          <p class="eyebrow">BUILD DEX</p>
-          <h2>Trade with conviction.</h2>
-          <p class="lede">Instead of hype — discover builders, understand projects, complete quests, read AI analysis, then trade.</p>
-          <ul class="steps">
-            <li>Discover builders &amp; project context</li>
-            <li>Complete quests before you swap</li>
-            <li>AI analysis beside the trade surface</li>
-            <li>Utility loop: credits → CGT → upgrades</li>
-          </ul>
+          <p class="eyebrow">Zen · Hook Mirror</p>
+          <h2>Knowledge first. Then decide.</h2>
+          <p class="lede">
+            When learning lands, the loop <strong>stops</strong> —
+            so it never becomes another infinite feed.
+          </p>
+          <div class="dual">
+            <div class="panel mind">
+              <h3>Mind</h3>
+              <p><strong>Hold the knowledge.</strong> Never paywalled. Dignity over extraction.</p>
+            </div>
+            <div class="panel machine">
+              <h3>Machine</h3>
+              <p><strong>Convert attention → fuel.</strong> Settlement follows the decision.</p>
+            </div>
+          </div>
+          <div class="callout">
+            <strong>Hook Mirror</strong> — after First Spark, name the bait, the notice,
+            and why you stay. Doomscroll made measurable — then Zen.
+          </div>
         </div>
-        <div class="shot-wrap">
-          <img class="shot" src="assets/shot-dex.png" alt="CGT swap and vault trading interface" />
+        <div>
+          <img class="shot" src="assets/spread-love.png" alt="Spread love and knowledge" />
         </div>
       </div>
     </section>
 
-    <!-- 7 GAMIFICATION -->
+    <!-- 7 GROWTH -->
     <section class="slide" data-i="6">
-      <div class="layout-split">
+      <div class="split">
         <div>
-          <p class="eyebrow">Gamification</p>
-          <h2>Everything earns progress.</h2>
-          <div class="xp-grid">
-            <div class="xp-card"><span>Progress</span>XP &amp; Reputation</div>
-            <div class="xp-card"><span>Collectible</span>NFT Miner evolution</div>
-            <div class="xp-card"><span>Social</span>Guild rewards</div>
-            <div class="xp-card"><span>Compete</span>Leaderboards</div>
-            <div class="xp-card"><span>Season</span>Season Pass</div>
-            <div class="xp-card"><span>Daily</span>Check-ins &amp; achievements</div>
-          </div>
-          <div class="level-bar">
-            <span>Lv 1</span>
-            <div class="bar"><i></i></div>
-            <span>Lv 100</span>
+          <p class="eyebrow">Distribution</p>
+          <h2>Club Spread beats ads.</h2>
+          <p class="lede">
+            Product main loop on Home:
+            <strong>Hear → Spark → Zen → Spread → Return.</strong>
+            Growth ledger nests under it:
+            <strong>Land → Claim → Spark → Spread.</strong>
+            Members pull the next passport in. We count connections on a server ledger.
+          </p>
+          <div class="stats">
+            <div class="stat"><span>Product</span><strong>Hear → Spark → Zen → Spread → Return</strong></div>
+            <div class="stat"><span>Network</span><strong>Land → Claim → Spark → Spread</strong></div>
+            <div class="stat"><span>Door</span><strong>First Spark stays free</strong></div>
           </div>
         </div>
-        <div class="shot-wrap">
-          <img class="shot" src="assets/shot-wheel.png" alt="Lucky wheel and daily missions gamification" />
+        <div>
+          <img class="shot" src="assets/shot-header.png" alt="Culture Node live product" />
         </div>
       </div>
     </section>
 
-    <!-- 8 AI LAYER -->
+    <!-- 8 BUSINESS -->
     <section class="slide" data-i="7">
-      <div class="layout-split">
+      <div class="split">
         <div>
-          <p class="eyebrow">AI Layer</p>
-          <h2>Every member has an AI companion.</h2>
-          <p class="lede">Helps discover projects, suggests learning paths, summarizes builders, creates strategies, answers questions, and automates participation.</p>
-          <div class="pill-grid">
-            <span class="pill">Discover</span>
-            <span class="pill">Learning paths</span>
-            <span class="pill">Builder summaries</span>
-            <span class="pill">Strategies</span>
-            <span class="pill">Q&amp;A</span>
-            <span class="pill">Automation</span>
+          <p class="eyebrow">Business model</p>
+          <h2>Cash before mainnet heroics.</h2>
+          <p class="lede">
+            Free core is sacred. Revenue starts with partners who want
+            <strong>measurable attention</strong> — not impressions.
+          </p>
+          <table class="table">
+            <thead>
+              <tr><th>Layer</th><th>Offer</th><th>Path</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>Partners</td><td>Attention Session pilot</td><td>$0–$1.5k / trade → retainer</td></tr>
+              <tr><td>Individuals</td><td>Human Passport Pro</td><td>$9.99/mo</td></tr>
+              <tr><td>Companies</td><td>Human Intelligence Platform</td><td>$999–$5k/mo</td></tr>
+              <tr><td>Consumer</td><td>1¢ Attention Tolls</td><td>When traffic exists</td></tr>
+            </tbody>
+          </table>
+          <div class="callout">
+            We never sell First Spark, Mind/Zen hold, or empty impressions.
           </div>
-          <div class="callout">Cognitive personalities (Scholar, Rogue, Zen, Industrial) buff how your node learns and mines.</div>
         </div>
-        <div class="shot-wrap">
-          <img class="shot" src="assets/shot-reactor.png" alt="AI cognitive personality layer on Culture Node" style="object-fit:cover;object-position:center 70%;" />
+        <div>
+          <img class="shot" src="assets/shot-reactor.png" alt="Culture Node — knowledge fuel" />
         </div>
       </div>
     </section>
 
-    <!-- 9 VISION -->
+    <!-- 9 WHY NOW -->
     <section class="slide" data-i="8">
-      <div class="layout-split">
+      <div class="split">
         <div>
-          <p class="eyebrow">Vision</p>
-          <h2>The operating system for Web3 communities.</h2>
-          <p class="lede">Connecting builders, creators, investors, learners, partners, DAOs, developers, and communities through one unified ecosystem.</p>
-          <div class="vision-chips">
-            <span>Builders</span>
-            <span>Creators</span>
-            <span>Investors</span>
-            <span>Learners</span>
-            <span>Partners</span>
-            <span>DAOs</span>
-            <span>Developers</span>
-            <span>Communities</span>
+          <p class="eyebrow">Why this works</p>
+          <h2>Honest Devnet. Real wedge.</h2>
+          <ul class="list good">
+            <li><strong>Hearing Mode</strong> — ears-first in an eyes-only market</li>
+            <li><strong>Zen break</strong> — philosophy as product, not feed addiction</li>
+            <li><strong>B2B cash without mainnet</strong> — Partner Sessions settle today</li>
+            <li><strong>Brand rules written</strong> — settlement layer, never the story</li>
+            <li><strong>Low capital intensity</strong> — curriculum + software studio</li>
+          </ul>
+        </div>
+        <div>
+          <p class="eyebrow signal" style="margin-bottom:0.75rem;">What we are not</p>
+          <ul class="list">
+            <li>A mining platform or token farm</li>
+            <li>An NFT club flex</li>
+            <li>Banner ads dressed as learning</li>
+            <li>Gold-digger grades &amp; empty hashes</li>
+          </ul>
+          <div class="callout">
+            Live on <strong>Solana Devnet</strong> for ledger practice.
+            Brand stays Culture Node / Human Economy.
           </div>
         </div>
-        <div class="network" id="network"></div>
       </div>
     </section>
 
-    <!-- 10 JOIN -->
+    <!-- 10 TRACTION PATH -->
     <section class="slide" data-i="9">
-      <div class="layout-split">
+      <div class="split">
         <div>
-          <p class="eyebrow">Join Building Culture</p>
-          <h2>Let's build the future together.</h2>
-          <p class="lede">We're looking for people and programs ready to shape the next layer of Web3 culture.</p>
-          <ul class="join-list">
-            <li>Builders</li>
-            <li>Partners</li>
-            <li>Communities</li>
-            <li>Grant programs</li>
-            <li>Investors</li>
-            <li>Early adopters</li>
-          </ul>
-          <p class="closing-tag">Fuel Knowledge. Build Communities. Shape the Future.</p>
-          <a class="site-link" href="https://buildingcultureid.space" target="_blank" rel="noopener">buildingcultureid.space →</a>
-        </div>
-        <div class="shot-wrap">
-          <img class="hero-art" src="assets/hero-bc.png" alt="Building Culture closing hero" style="width:100%;margin:0;" />
-          <div class="shot-wrap" style="margin-top:1rem;">
-            <img class="shot" src="assets/shot-header.png" alt="Culture Node live product header" />
+          <p class="eyebrow">Path</p>
+          <h2>Scenario B is the working bet.</h2>
+          <table class="table">
+            <thead>
+              <tr><th>Scenario</th><th>Feel</th><th>Signal</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>A · Honest grind</td><td>Small, real</td><td>Hundreds MAU · 2–4 partner tests</td></tr>
+              <tr><td>B · Club compounds</td><td>Studio funds itself</td><td>Thousands MAU · recurring partner</td></tr>
+              <tr><td>C · Ears-first category</td><td>Story travels</td><td>Partners queue · distribution attaches</td></tr>
+            </tbody>
+          </table>
+          <div class="callout">
+            Persistence + Spread + weekly Hearing demos moves <strong>A → B</strong>.
+            C needs partners with audiences.
           </div>
+        </div>
+        <div>
+          <p class="eyebrow signal" style="margin-bottom:0.75rem;">90-day gates</p>
+          <div class="gates">
+            <div class="gate">
+              <span class="n">1</span>
+              <p><strong>Production economy honest</strong> — live vs UX-only never faked</p>
+            </div>
+            <div class="gate">
+              <span class="n">2</span>
+              <p><strong>One partner pilot closed</strong> — cash or trade + case study</p>
+            </div>
+            <div class="gate">
+              <span class="n">3</span>
+              <p><strong>Four weeks of metrics</strong> — Hearing demos + Spreads counted</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 11 ASK -->
+    <section class="slide" data-i="10">
+      <div class="split">
+        <div>
+          <p class="eyebrow">The ask</p>
+          <h2>Fund the studio. Gate the milestones.</h2>
+          <p class="lede">
+            Small angel check against Scenario B —
+            <strong>ears-first Proof of Attention</strong> with B2B cash before token theater.
+          </p>
+          <ul class="list ember">
+            <li><strong>Ship focus</strong> — Hear → Spark → Zen → Spread → Return (Loop Stage Home; facility after open)</li>
+            <li><strong>One public pilot</strong> — Partner Attention Session case study</li>
+            <li><strong>Weekly Hearing demos</strong> — retention + Spread in the data room</li>
+          </ul>
+          <div class="callout">
+            Good for members (free door), partners (brand-safe pilots), and angels (honest settlement).
+          </div>
+        </div>
+        <div>
+          <img class="shot" src="assets/hero-bc.png" alt="Building Culture" />
+        </div>
+      </div>
+    </section>
+
+    <!-- 12 CLOSE -->
+    <section class="slide" data-i="11">
+      <div class="split">
+        <div>
+          <p class="eyebrow">Next step</p>
+          <h2>Hear it. Then decide.</h2>
+          <p class="lede">
+            90-second demo: open Hearing → say Academy → Zen (Mind or Machine) → Spread.
+            No gallery tour.
+          </p>
+          <div class="links">
+            <a class="site-link" href="https://mining.buildingcultureid.space/?hear=1" target="_blank" rel="noopener">Hearing Mode →</a>
+            <a class="site-link" href="https://mining.buildingcultureid.space/" target="_blank" rel="noopener">Live product →</a>
+            <a class="site-link" href="./partner-one-pager.html">Partner one-pager →</a>
+          </div>
+          <p class="closing">Mine some culture. Knowledge first. Then decide. Settlement second.</p>
+        </div>
+        <div>
+          <img class="shot" src="assets/mine-culture.png" alt="Mine some culture" />
         </div>
       </div>
     </section>
@@ -958,8 +930,11 @@
     const slides = [...document.querySelectorAll(".slide")];
     const dots = document.getElementById("dots");
     const cur = document.getElementById("cur");
+    const total = document.getElementById("total");
     const hint = document.getElementById("hint");
     let i = 0;
+
+    total.textContent = String(slides.length).padStart(2, "0");
 
     slides.forEach((_, idx) => {
       const b = document.createElement("button");
@@ -999,40 +974,6 @@
       if (Math.abs(dx) > 50) go(dx < 0 ? i + 1 : i - 1);
       touchX = null;
     }, { passive: true });
-
-    const net = document.getElementById("network");
-    const positions = [
-      [50, 50], [18, 28], [78, 22], [22, 72], [80, 68],
-      [35, 18], [65, 82], [12, 50], [88, 48], [42, 62],
-      [58, 30], [30, 42], [70, 55], [45, 78], [55, 15]
-    ];
-    positions.forEach(([x, y], idx) => {
-      const d = document.createElement("div");
-      d.className = "node-dot";
-      d.style.left = x + "%";
-      d.style.top = y + "%";
-      d.style.animationDelay = (idx * 0.18) + "s";
-      if (idx % 3 === 0) d.style.background = "var(--violet)";
-      if (idx % 3 === 0) d.style.boxShadow = "0 0 16px var(--violet)";
-      if (idx % 5 === 0) d.style.background = "var(--cyan)";
-      if (idx % 5 === 0) d.style.boxShadow = "0 0 16px var(--cyan)";
-      net.appendChild(d);
-    });
-
-    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-    svg.setAttribute("viewBox", "0 0 100 100");
-    svg.style.cssText = "position:absolute;inset:0;width:100%;height:100%;opacity:0.35;";
-    positions.slice(1).forEach(([x, y]) => {
-      const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
-      line.setAttribute("x1", "50");
-      line.setAttribute("y1", "50");
-      line.setAttribute("x2", String(x));
-      line.setAttribute("y2", String(y));
-      line.setAttribute("stroke", "rgba(16,245,160,0.45)");
-      line.setAttribute("stroke-width", "0.3");
-      svg.appendChild(line);
-    });
-    net.appendChild(svg);
 
     if (new URLSearchParams(location.search).has("print")) {
       document.body.classList.add("print-mode");

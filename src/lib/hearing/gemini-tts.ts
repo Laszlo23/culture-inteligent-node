@@ -8,6 +8,7 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { GoogleGenAI } from '@google/genai';
 import { getGeminiApiKey, hasGeminiApiKey } from '../gemini-key';
+import { classifyThrown, type UserErrorCode } from '../user-errors';
 
 export type HearingVoiceStyle = 'guide' | 'soft' | 'clear';
 
@@ -111,7 +112,9 @@ export async function synthesizeHearingSpeech(
 ): Promise<NeuralSpeakResult> {
   const apiKey = getGeminiApiKey();
   if (!apiKey) {
-    throw new Error('gemini_key_missing');
+    const err = new Error('gemini_key_missing') as Error & { code: UserErrorCode };
+    err.code = 'gemini_key_missing';
+    throw err;
   }
 
   const cleaned = text.replace(/\s+/g, ' ').trim();
@@ -186,6 +189,10 @@ export async function synthesizeHearingSpeech(
     }
   }
 
-  const msg = lastErr instanceof Error ? lastErr.message : 'tts_failed';
-  throw new Error(msg);
+  const code: UserErrorCode = classifyThrown(lastErr, 'hearing');
+  const detail = lastErr instanceof Error ? lastErr.message : 'tts_failed';
+  const err = new Error(code) as Error & { code: UserErrorCode; detail: string };
+  err.code = code;
+  err.detail = detail;
+  throw err;
 }

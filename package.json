@@ -10,10 +10,18 @@
     "preview": "vite preview",
     "clean": "rm -rf dist server.js",
     "lint": "tsc --noEmit",
+    "test": "tsx --test src/lib/arcium-poa.test.ts src/lib/solana-economy.test.ts src/lib/zk-id/nullifier.test.ts src/lib/main-loop.test.ts src/lib/winning-flows.test.ts src/lib/rain-checklist.test.ts src/lib/first-contribution.test.ts src/lib/bots/attention-miner-core.test.ts",
     "test:arcium-mirror": "tsx --test src/lib/arcium-poa.test.ts",
     "test:economy": "tsx --test src/lib/solana-economy.test.ts",
     "test:zk": "tsx --test src/lib/zk-id/nullifier.test.ts",
-    "economy:bootstrap": "tsx scripts/devnet-bootstrap.ts"
+    "test:loop": "tsx --test src/lib/main-loop.test.ts src/lib/winning-flows.test.ts src/lib/rain-checklist.test.ts",
+    "test:bots": "tsx --test src/lib/bots/attention-miner-core.test.ts",
+    "economy:bootstrap": "tsx scripts/devnet-bootstrap.ts",
+    "bots:discord-commands": "tsx scripts/register-discord-commands.ts",
+    "bots:telegram-webhook": "tsx scripts/set-telegram-webhook.ts",
+    "farcaster:validate": "node scripts/validate-farcaster-manifest.mjs",
+    "farcaster:validate:signed": "node scripts/validate-farcaster-manifest.mjs --require-association",
+    "farcaster:apply-association": "node scripts/apply-farcaster-association.mjs"
   },
   "dependencies": {
     "@farcaster/miniapp-sdk": "^0.3.0",

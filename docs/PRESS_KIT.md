@@ -95,7 +95,8 @@ https://mining.buildingcultureid.space/?hear=1
 
 **Mini App:** `https://mining.buildingcultureid.space/?fc=1`  
 **Manifest:** `https://mining.buildingcultureid.space/.well-known/farcaster.json`  
-**Playbook:** `docs/FARCASTER_GROWTH.md`
+**Store assets:** `https://mining.buildingcultureid.space/miniapp/`  
+**Playbook:** `docs/FARCASTER_GROWTH.md` · sign ownership in the [Manifest Tool](https://farcaster.xyz/~/developers/mini-apps/manifest?domain=mining.buildingcultureid.space)
 
 ```
 Human value was never measured correctly.
@@ -192,6 +193,7 @@ Personalize one line per pitch. Attach campaign still from `/public/campaign/min
 | Investor & partner brief | `docs/INVESTOR_PARTNER_BRIEF.md` |
 | Angel diligence (cons / not-so-cons) | `docs/ANGEL_DILIGENCE.md` |
 | Partner Attention Session | `docs/PARTNER_ATTENTION_SESSION.md` |
+| Angel pitch deck (HTML) | `pitch/index.html` |
 | Partner one-pager (HTML) | `pitch/partner-one-pager.html` |
 | Share copy (code) | `src/lib/culture-broadcast.ts` |
 | Campaign PNGs | `public/campaign/` |

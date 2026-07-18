@@ -187,6 +187,11 @@ export interface PartnerNode {
   bccRequired: number;
   active: boolean;
   description: string;
+  /** Official project URL */
+  url?: string;
+  /** One surprising / high-signal fact */
+  wow?: string;
+  role?: string;
 }
 
 export interface GameState {

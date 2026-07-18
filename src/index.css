@@ -427,3 +427,19 @@ h2.italic,
   animation: nft-scan-y 2.4s linear infinite;
   mix-blend-mode: screen;
 }
+
+/* Ecosystem ally logo rail */
+@keyframes ecoMarquee {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+
+.eco-marquee-track {
+  animation: ecoMarquee 38s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .eco-marquee-track {
+    animation: none;
+  }
+}

@@ -225,23 +225,34 @@ export async function mintMinerOnChain(opts: {
   const ctx = resolveEconomyWallet();
   if (!ctx) throw new Error('No wallet');
   const owner = new PublicKey(ctx.walletAddress);
+
+  const attempt = async (assetId: number) => {
+    const mintIxs = await buildMintMinerIx(owner, assetId, opts.skin, opts.hashrate, opts.rarity);
+    mintIxs.push(
+      buildMemoIx(
+        owner,
+        formatAttentionMemo('mint_miner', {
+          asset: assetId,
+          skin: opts.skin,
+          rarity: opts.rarity,
+          t: Date.now(),
+        })
+      )
+    );
+    const signature = await sendIxs(mintIxs);
+    return { signature, assetId, mintAddress: minerPda(assetId).toBase58() };
+  };
+
   const config = await fetchConfig();
   if (!config) throw new Error('Config PDA missing — run bootstrap');
-  const assetId = config.minerCount;
-  const mintIxs = await buildMintMinerIx(owner, assetId, opts.skin, opts.hashrate, opts.rarity);
-  mintIxs.push(
-    buildMemoIx(
-      owner,
-      formatAttentionMemo('mint_miner', {
-        asset: assetId,
-        skin: opts.skin,
-        rarity: opts.rarity,
-        t: Date.now(),
-      })
-    )
-  );
-  const signature = await sendIxs(mintIxs);
-  return { signature, assetId, mintAddress: minerPda(assetId).toBase58() };
+  try {
+    return await attempt(config.minerCount);
+  } catch (firstErr: unknown) {
+    // Race: re-fetch minerCount and retry once
+    const refreshed = await fetchConfig();
+    if (!refreshed || refreshed.minerCount === config.minerCount) throw firstErr;
+    return await attempt(refreshed.minerCount);
+  }
 }
 
 export async function listMinerOnChain(assetId: number, priceCgt: number): Promise<string> {
@@ -304,8 +315,10 @@ export async function queueEnergyDrainPercent(decayPercent: number): Promise<str
     pendingDrainPercent = 0;
     lastDrainFlushAt = Date.now();
     return sig;
-  } catch {
+  } catch (err: unknown) {
     // Keep pending for next tick; do not invent local fuel.
+    const msg = err instanceof Error ? err.message : String(err);
+    console.warn(`[economy] drain_energy flush failed (${bps} bps pending): ${msg}`);
     return null;
   } finally {
     drainFlushInFlight = false;

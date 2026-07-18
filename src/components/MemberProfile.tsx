@@ -12,6 +12,9 @@ import {
 } from 'lucide-react';
 import { GameState, MinerNFT } from '../types';
 import NftCard from './nft/NftCard';
+import { friendlyFailureDetail } from '../lib/user-errors';
+import { DISCORD_INVITE_URL } from '../lib/discord-community';
+import DiscordCommunityHub from './DiscordCommunityHub';
 
 interface MemberProfileProps {
   state: GameState;
@@ -225,96 +228,109 @@ export default function MemberProfile({
     }, 120);
   };
 
-  // Reward triggers
-  const claimProfileReward = () => {
-    setState(prev => {
+  /** Social/profile rewards: on-chain when settlement ready, else practice BCC. */
+  const settleProfileReward = async (opts: {
+    bcc: number;
+    energyPercent?: number;
+    reason: string;
+    mark: (profile: NonNullable<GameState['profile']>) => NonNullable<GameState['profile']>;
+    successLog: string;
+  }) => {
+    setState((prev) => {
       const currentProfile = prev.profile || profileState;
-      if (currentProfile.profileCompletedRewardClaimed) return prev;
-
-      return {
-        ...prev,
-        credits: prev.credits + 200,
-        energy: Math.min(100, prev.energy + 20),
-        profile: {
-          ...currentProfile,
-          avatarUrl,
-          aboutMe,
-          xUsername,
-          telegramUsername,
-          discordUsername,
-          profileCompletedRewardClaimed: true
-        }
-      };
+      return { ...prev, profile: opts.mark(currentProfile) };
     });
-    addLog("LEDGER UNLOCKED: Profile filling reward approved. +200 CP, +20% Core Energy.", "success");
+
+    if (economyReady) {
+      try {
+        const { rewardOnChain, syncLedgerToState } = await import('../lib/economy-actions');
+        const result = await rewardOnChain({
+          bcc: opts.bcc,
+          energyPercent: opts.energyPercent,
+          reason: opts.reason,
+        });
+        if ('skipped' in result) {
+          addLog(`PROFILE LOGGED: ${opts.reason} — ${result.reason}. No local BCC.`, 'warn');
+          return;
+        }
+        await syncLedgerToState(setState);
+        addLog(`${opts.successLog} ${result.solscan}`, 'success');
+        return;
+      } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message : String(e);
+        addLog(`PROFILE LOGGED (no local BCC): ${opts.reason} — ${msg}`, 'warn');
+        return;
+      }
+    }
+
+    setState((prev) => ({
+      ...prev,
+      credits: prev.credits + opts.bcc,
+      energy:
+        opts.energyPercent != null
+          ? Math.min(100, prev.energy + opts.energyPercent)
+          : prev.energy,
+    }));
+    addLog(`${opts.successLog} (practice — not on-chain)`, 'warn');
+  };
+
+  const claimProfileReward = () => {
+    if ((state.profile || profileState).profileCompletedRewardClaimed) return;
+    void settleProfileReward({
+      bcc: 200,
+      energyPercent: 20,
+      reason: 'profile_completed',
+      mark: (p) => ({
+        ...p,
+        avatarUrl,
+        aboutMe,
+        xUsername,
+        telegramUsername,
+        discordUsername,
+        profileCompletedRewardClaimed: true,
+      }),
+      successLog: 'LEDGER UNLOCKED: Profile reward — +200 BCC / +20% energy.',
+    });
   };
 
   const claimXFollowReward = () => {
-    setState(prev => {
-      const currentProfile = prev.profile || profileState;
-      if (currentProfile.xFollowClaimed) return prev;
-
-      return {
-        ...prev,
-        credits: prev.credits + 100,
-        profile: {
-          ...currentProfile,
-          xFollowClaimed: true
-        }
-      };
+    if ((state.profile || profileState).xFollowClaimed) return;
+    void settleProfileReward({
+      bcc: 100,
+      reason: 'x_follow',
+      mark: (p) => ({ ...p, xFollowClaimed: true }),
+      successLog: 'LEDGER UNLOCKED: X follow — +100 BCC.',
     });
-    addLog("LEDGER UNLOCKED: Official X account follow reward approved. +100 CP added.", "success");
   };
 
   const claimTelegramJoinReward = () => {
-    setState(prev => {
-      const currentProfile = prev.profile || profileState;
-      if (currentProfile.telegramJoinClaimed) return prev;
-
-      return {
-        ...prev,
-        credits: prev.credits + 100,
-        profile: {
-          ...currentProfile,
-          telegramJoinClaimed: true
-        }
-      };
+    if ((state.profile || profileState).telegramJoinClaimed) return;
+    void settleProfileReward({
+      bcc: 100,
+      reason: 'tg_join',
+      mark: (p) => ({ ...p, telegramJoinClaimed: true }),
+      successLog: 'LEDGER UNLOCKED: Telegram join — +100 BCC.',
     });
-    addLog("LEDGER UNLOCKED: Telegram group join reward approved. +100 CP added.", "success");
   };
 
   const claimDiscordJoinReward = () => {
-    setState(prev => {
-      const currentProfile = prev.profile || profileState;
-      if (currentProfile.discordJoinClaimed) return prev;
-
-      return {
-        ...prev,
-        credits: prev.credits + 100,
-        profile: {
-          ...currentProfile,
-          discordJoinClaimed: true
-        }
-      };
+    if ((state.profile || profileState).discordJoinClaimed) return;
+    void settleProfileReward({
+      bcc: 100,
+      reason: 'discord_join',
+      mark: (p) => ({ ...p, discordJoinClaimed: true }),
+      successLog: 'LEDGER UNLOCKED: Discord join — +100 BCC.',
     });
-    addLog("LEDGER UNLOCKED: Discord server join reward approved. +100 CP added.", "success");
   };
 
   const claimXInteractionReward = () => {
-    setState(prev => {
-      const currentProfile = prev.profile || profileState;
-      if (currentProfile.xPostInteractionClaimed) return prev;
-
-      return {
-        ...prev,
-        credits: prev.credits + 250,
-        profile: {
-          ...currentProfile,
-          xPostInteractionClaimed: true
-        }
-      };
+    if ((state.profile || profileState).xPostInteractionClaimed) return;
+    void settleProfileReward({
+      bcc: 250,
+      reason: 'x_interaction',
+      mark: (p) => ({ ...p, xPostInteractionClaimed: true }),
+      successLog: 'LEDGER UNLOCKED: X interaction — +250 BCC.',
     });
-    addLog("LEDGER UNLOCKED: X Post interaction (Like, Repost, Comment) reward approved. +250 CP added.", "success");
   };
 
   const selectPresetAvatar = (url: string) => {
@@ -365,7 +381,7 @@ export default function MemberProfile({
         'success'
       );
     } catch (e: any) {
-      addLog(`BUY FAILED: ${e?.message || e}`, 'warn');
+      addLog(`BUY FAILED: ${friendlyFailureDetail(e)}`, 'warn');
     }
   };
 
@@ -386,7 +402,16 @@ export default function MemberProfile({
     }
 
     addLog(`BROADCASTING list_miner for #${assetId} at ${priceVal} CGT…`, 'info');
+    let spentKind: 'retake' | 'list' | 'spark' | null = null;
     try {
+      const { fetchEconomyStatus } = await import('../lib/api');
+      const { listMinerOnChain, syncMinersToState } = await import('../lib/economy-actions');
+      const status = await fetchEconomyStatus();
+      if (!status.ready) {
+        addLog('LISTING BLOCKED: Economy not configured — no fake on-chain listing.', 'warn');
+        return;
+      }
+
       const { spendSparkCredit } = await import('./AttentionTollShop');
       const toll = spendSparkCredit('list');
       if (!toll.ok) {
@@ -397,6 +422,7 @@ export default function MemberProfile({
         onOpenTreasury?.('list_slot');
         return;
       }
+      spentKind = toll.spent;
       setState((prev) => ({
         ...prev,
         sparkCredits: toll.inv.sparkCredits,
@@ -404,13 +430,6 @@ export default function MemberProfile({
         listSlotCredits: toll.inv.listSlotCredits,
       }));
 
-      const { fetchEconomyStatus } = await import('../lib/api');
-      const { listMinerOnChain, syncMinersToState } = await import('../lib/economy-actions');
-      const status = await fetchEconomyStatus();
-      if (!status.ready) {
-        addLog('LISTING BLOCKED: Economy not configured — no fake on-chain listing.', 'warn');
-        return;
-      }
       const sig = await listMinerOnChain(assetId, priceVal);
       await syncMinersToState(setState);
       setListingNftId(null);
@@ -419,7 +438,17 @@ export default function MemberProfile({
         'success'
       );
     } catch (e: any) {
-      addLog(`LIST FAILED: ${e?.message || e}`, 'warn');
+      if (spentKind) {
+        const { refundSparkCredit } = await import('./AttentionTollShop');
+        const inv = refundSparkCredit(spentKind);
+        setState((prev) => ({
+          ...prev,
+          sparkCredits: inv.sparkCredits,
+          academyRetakeCredits: inv.academyRetakeCredits,
+          listSlotCredits: inv.listSlotCredits,
+        }));
+      }
+      addLog(`LIST FAILED: ${friendlyFailureDetail(e)}`, 'warn');
     }
   };
 
@@ -446,7 +475,7 @@ export default function MemberProfile({
         'success'
       );
     } catch (e: any) {
-      addLog(`CANCEL FAILED: ${e?.message || e}`, 'warn');
+      addLog(`CANCEL FAILED: ${friendlyFailureDetail(e)}`, 'warn');
     }
   };
 
@@ -583,7 +612,7 @@ export default function MemberProfile({
         addLog(`MINT BLOCKED: ${msg}`, 'warn');
       }
     } catch (e: any) {
-      const msg = e?.message || String(e);
+      const msg = friendlyFailureDetail(e);
       setMintInlineError(msg);
       addLog(`MINT FAILED: ${msg}`, 'warn');
     } finally {
@@ -943,7 +972,13 @@ export default function MemberProfile({
 
               {/* Quests Lists */}
               <div className="space-y-4">
-                
+                <DiscordCommunityHub
+                  variant="strip"
+                  onJoinLogged={() =>
+                    addLog('DISCORD: Opening community HQ — houses & Hearing live here.', 'info')
+                  }
+                />
+
                 {/* Task 1: Follow on X */}
                 <div className={`p-4 rounded-xl border flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 transition-all ${
                   profileState.xFollowClaimed 
@@ -1045,21 +1080,21 @@ export default function MemberProfile({
                       <span className="text-[9px] bg-indigo-500/10 text-indigo-400 border border-indigo-500/30 px-1.5 py-0.2 rounded uppercase font-black tracking-widest">DISCORD HQ</span>
                       <span className="text-[10px] text-slate-500">• 100 CP</span>
                     </div>
-                    <h4 className="text-xs font-bold text-slate-200">STRIKE DISCORD CITADEL CONVERSATION</h4>
+                    <h4 className="text-xs font-bold text-slate-200">Join Discord HQ</h4>
                     <p className="text-[11px] text-slate-400 font-sans leading-relaxed">
-                      Establish secure links in our community Discord guild for team incentives.
+                      One server for faction houses, Hearing ritual, and builders — community home.
                     </p>
                   </div>
 
                   <div className="flex gap-2 w-full sm:w-auto font-mono text-xs">
                     <a
-                      href="https://discord.gg/geUpHt3eSb"
+                      href={DISCORD_INVITE_URL}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="flex-1 sm:flex-initial px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 rounded-lg flex items-center justify-center gap-1.5 transition-all"
                     >
                       <ExternalLink className="w-3.5 h-3.5 text-indigo-400" />
-                      CONNECT
+                      JOIN
                     </a>
                     
                     <button

@@ -23,6 +23,9 @@ import {
 } from '../lib/hearing/scripts';
 import { track } from '../lib/attention-metrics';
 import { soundEngine } from '../lib/sound/engine';
+import { toUserError, userErrorClassKey } from '../lib/user-errors';
+
+const HEARING_ERROR_THROTTLE_MS = 45_000;
 
 export const HEARING_STORAGE_KEY = 'culture_hearing_v1';
 export const HEARING_BANNER_KEY = 'culture_hearing_banner_v1';
@@ -84,6 +87,19 @@ export function useHearingMode(onCommand: HearingCommandHandler): HearingModeApi
   const loopGenRef = useRef(0);
   const onCommandRef = useRef(onCommand);
   const bootedRef = useRef(false);
+  const lastErrorClassAtRef = useRef<Map<string, number>>(new Map());
+
+  const showSpeakError = useCallback((code?: string, message?: string) => {
+    const msg =
+      message ||
+      toUserError({ code: code || 'tts_failed', context: 'hearing' });
+    const classKey = userErrorClassKey({ code, detail: msg, context: 'hearing' });
+    const lastAt = lastErrorClassAtRef.current.get(classKey) || 0;
+    if (Date.now() - lastAt < HEARING_ERROR_THROTTLE_MS) return;
+    lastErrorClassAtRef.current.set(classKey, Date.now());
+    lastLineRef.current = msg;
+    setLastLine(msg);
+  }, []);
 
   useEffect(() => {
     onCommandRef.current = onCommand;
@@ -111,7 +127,8 @@ export function useHearingMode(onCommand: HearingCommandHandler): HearingModeApi
     stopListening();
     soundEngine.setNarrationActive(true);
     try {
-      await speak(line, { style: 'guide' });
+      const result = await speak(line, { style: 'guide' });
+      if (!result.ok) showSpeakError(result.code, result.message);
       // Contemplative beat before the mic opens — enlightened pause
       if (activeRef.current) await pause(480);
     } finally {
@@ -119,7 +136,7 @@ export function useHearingMode(onCommand: HearingCommandHandler): HearingModeApi
       if (activeRef.current) setPhase('idle');
       else setPhase('idle');
     }
-  }, []);
+  }, [showSpeakError]);
 
   const handleCommand = useCallback(
     async (cmd: HearingCommand) => {
@@ -143,7 +160,8 @@ export function useHearingMode(onCommand: HearingCommandHandler): HearingModeApi
         stopListening();
         soundEngine.setNarrationActive(true);
         try {
-          await speak(line, { style: 'clear' });
+          const result = await speak(line, { style: 'clear' });
+          if (!result.ok) showSpeakError(result.code, result.message);
           if (activeRef.current) await pause(400);
         } finally {
           soundEngine.setNarrationActive(false);
@@ -177,7 +195,7 @@ export function useHearingMode(onCommand: HearingCommandHandler): HearingModeApi
         await speakLine(unknownCommandScript());
       }
     },
-    [speakLine]
+    [speakLine, showSpeakError]
   );
 
   const listenLoop = useCallback(
@@ -226,8 +244,7 @@ export function useHearingMode(onCommand: HearingCommandHandler): HearingModeApi
       track('hearing_open', { tts: s.tts, stt: s.stt, neural: s.neural });
       await pause(280);
       if (!s.neural) {
-        const miss =
-          'Warm neural guide needs a Gemini key on the server. Mic still works — say Help after the key is live, or use on-screen controls.';
+        const miss = toUserError({ code: 'neural_voice_unavailable', context: 'hearing' });
         lastLineRef.current = miss;
         setLastLine(miss);
         setPhase('idle');

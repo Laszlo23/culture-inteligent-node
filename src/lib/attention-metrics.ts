@@ -33,6 +33,10 @@ export type AttentionEventName =
   | 'hook_loop_share'
   | 'hook_loop_copy'
   | 'farcaster_cast'
+  | 'rain_cast'
+  | 'rain_pin'
+  | 'first_contribution_complete'
+  | 'passport_share'
   | 'invite_land'
   | 'invite_claim'
   | 'invite_spread';

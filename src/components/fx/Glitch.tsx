@@ -117,7 +117,7 @@ export function AttentionIconTile({
       {icon}
       {showBadge && (
         <AttentionBadge
-          value={badge === true ? undefined : badge}
+          value={typeof badge === 'number' || typeof badge === 'string' ? badge : undefined}
           tone={tone}
           pulse={badgePulse}
         />

@@ -11,11 +11,14 @@ import { BRAND, SLOGANS } from './brand-slogans';
 
 export const HUMAN_ECONOMY_WAITLIST_KEY = 'building_culture_he_waitlist_v1';
 
-export type HumanScoreKey = 'knowledge' | 'builder' | 'contribution';
+export type HumanScoreKey = 'knowledge' | 'builder' | 'creativity' | 'contribution';
 
 export type HumanScores = {
   knowledge: number;
+  /** @deprecated Prefer creativity — kept for persistence compat */
   builder: number;
+  /** Public passport axis (alias of builder) */
+  creativity: number;
   contribution: number;
   /** 0–100 composite */
   humanValue: number;
@@ -107,13 +110,15 @@ function clampScore(n: number): number {
   return Math.max(0, Math.min(100, Math.round(n)));
 }
 
-/** Derive Human Passport scores from existing local activity. */
+/** Derive Human Passport scores from existing local activity (+ optional first-contribution seed). */
 export function computeHumanScores(opts: {
   academyCompletedCount: number;
   coreSessionTotal: number;
   missionsCompleted: number;
   missionsTotal: number;
   snapshot?: AttentionSnapshot;
+  /** Seed from First Contribution ritual — floors early scores */
+  seed?: Partial<HumanScores> | null;
 }): HumanScores {
   const snap = opts.snapshot ?? buildAttentionSnapshot(30);
   const sessionRatio =
@@ -121,7 +126,7 @@ export function computeHumanScores(opts: {
       ? opts.academyCompletedCount / opts.coreSessionTotal
       : 0;
 
-  const knowledge = clampScore(
+  let knowledge = clampScore(
     sessionRatio * 55 +
       snap.firstSparkCompletes * 12 +
       snap.sessionCompletes * 6 +
@@ -129,7 +134,7 @@ export function computeHumanScores(opts: {
       snap.hookMirrors * 8
   );
 
-  const builder = clampScore(
+  let builder = clampScore(
     (opts.missionsCompleted / Math.max(1, opts.missionsTotal)) * 40 +
       snap.zenMachine * 8 +
       snap.focusMinutesApprox * 1.2 +
@@ -137,7 +142,7 @@ export function computeHumanScores(opts: {
       (opts.academyCompletedCount >= 2 ? 15 : 0)
   );
 
-  const contribution = clampScore(
+  let contribution = clampScore(
     snap.spreads * 14 +
       snap.broadcastShares * 10 +
       snap.hookLoopShares * 8 +
@@ -145,11 +150,25 @@ export function computeHumanScores(opts: {
       snap.uniqueDaysActive * 4
   );
 
+  const seed = opts.seed;
+  if (seed) {
+    const seedCreativity = seed.creativity ?? seed.builder ?? 0;
+    knowledge = clampScore(Math.max(knowledge, seed.knowledge ?? 0));
+    builder = clampScore(Math.max(builder, seedCreativity));
+    contribution = clampScore(Math.max(contribution, seed.contribution ?? 0));
+  }
+
   const humanValue = clampScore(
     knowledge * 0.4 + builder * 0.3 + contribution * 0.3
   );
 
-  return { knowledge, builder, contribution, humanValue };
+  return {
+    knowledge,
+    builder,
+    creativity: builder,
+    contribution,
+    humanValue,
+  };
 }
 
 export type ReputationDay = {
@@ -217,10 +236,11 @@ export function joinWaitlist(tier: PricingTierId, email?: string): WaitlistEntry
 
 export function skillChipsFromScores(scores: HumanScores): string[] {
   const chips: string[] = [];
+  const creativity = scores.creativity ?? scores.builder;
   if (scores.knowledge >= 20) chips.push('Learning');
   if (scores.knowledge >= 50) chips.push('Focus');
-  if (scores.builder >= 20) chips.push('Building');
-  if (scores.builder >= 50) chips.push('Problem solving');
+  if (creativity >= 20) chips.push('Creativity');
+  if (creativity >= 50) chips.push('Problem solving');
   if (scores.contribution >= 20) chips.push('Sharing');
   if (scores.contribution >= 50) chips.push('Community');
   if (scores.humanValue >= 60) chips.push('Rising contributor');

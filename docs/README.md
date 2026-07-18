@@ -14,12 +14,16 @@ This folder is the source of truth. The root [README](../README.md) is the front
 | What we are building | [HUMAN_ECONOMY.md](./HUMAN_ECONOMY.md) |
 | Voice, colors, banned words | [BRAND_STRATEGY.md](./BRAND_STRATEGY.md) |
 | This week’s community play | [COMMUNITY.md](./COMMUNITY.md) |
+| Discord + Telegram Attention Miner bots | [ATTENTION_MINER_BOTS.md](./ATTENTION_MINER_BOTS.md) |
 | How connections are counted | [GROWTH_LOOP.md](./GROWTH_LOOP.md) |
 | Attention UI (badges + glitch) | [ATTENTION_UX.md](./ATTENTION_UX.md) |
 | Neural Hearing guide | [HEARING_MODE.md](./HEARING_MODE.md) |
 | Farcaster Mini App growth | [FARCASTER_GROWTH.md](./FARCASTER_GROWTH.md) |
+| Google AI / Cloud credits grant pack | [GOOGLE_AI_GRANT.md](./GOOGLE_AI_GRANT.md) |
+| Human Reputation Engine (first 5 min) | [HUMAN_ECONOMY.md](./HUMAN_ECONOMY.md) |
 | Angel / diligence lens | [ANGEL_DILIGENCE.md](./ANGEL_DILIGENCE.md) |
 | Investor one-pager style | [INVESTOR_PARTNER_BRIEF.md](./INVESTOR_PARTNER_BRIEF.md) |
+| Angel pitch deck (live HTML) | [`../pitch/index.html`](../pitch/index.html) |
 | Press blurbs | [PRESS_KIT.md](./PRESS_KIT.md) |
 
 ---

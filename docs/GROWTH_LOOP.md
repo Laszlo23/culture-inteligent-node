@@ -1,10 +1,22 @@
 # Growth Loop — Connections that count
 
 **Live:** https://mining.buildingcultureid.space/  
-**UI:** Home map + Passport → **Growth Loop** panel  
+**UI:** Home **Loop Stage** (ritual/guided) + Passport → **Growth Loop** panel  
 **Playbook:** [COMMUNITY.md](./COMMUNITY.md)
 
-The product loop is not vibes-only. Events hit a **server ledger** so the network keeps growing across browsers.
+## Product main loop (Home)
+
+What members feel on Home while `ritual` / `guided`:
+
+```
+Hear → Spark → Zen → Spread → Return
+```
+
+Implemented as [`MainLoopStage.tsx`](../src/components/MainLoopStage.tsx) + [`main-loop.ts`](../src/lib/main-loop.ts). Full facility map opens only in `open` phase (or quiet “Open facility” in guided).
+
+## Network growth loop (ledger)
+
+The product loop is not vibes-only. Events hit a **server ledger** so the network keeps growing across browsers. Growth nests under the product loop:
 
 ```
 Discover → Claim → Spark → Spread → Return

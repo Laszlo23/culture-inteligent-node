@@ -35,7 +35,12 @@ export type CastTemplateId =
   | 'hearing'
   | 'pricing'
   | 'thread_2'
-  | 'thread_3';
+  | 'thread_3'
+  | 'rain'
+  | 'weekly_hearing'
+  | 'partner_pilot'
+  | 'spread_club'
+  | 'passport_card';
 
 export type CastTemplate = {
   id: CastTemplateId;
@@ -74,10 +79,25 @@ export const CAST_TEMPLATES: CastTemplate[] = [
       'Your Human Passport is reputation you own.',
       '',
       SLOGANS.equation,
-      'Prove attention. Grow Knowledge · Builder · Contribution.',
+      'Prove attention. Grow Knowledge · Creativity · Contribution.',
       '',
       SLOGANS.ctaPassport,
       FARCASTER_HOME,
+    ].join('\n'),
+  },
+  {
+    id: 'passport_card',
+    title: 'See my Human Passport',
+    channelHint: '/builders /creators',
+    embedUrl: FARCASTER_PASSPORT,
+    text: [
+      'See my Human Passport.',
+      '',
+      'Human Value — Knowledge · Creativity · Contribution.',
+      'Verified on Building Culture.',
+      '',
+      SLOGANS.ctaPassport,
+      FARCASTER_PASSPORT,
     ].join('\n'),
   },
   {
@@ -167,6 +187,84 @@ export const CAST_TEMPLATES: CastTemplate[] = [
       FARCASTER_HOME,
     ].join('\n'),
   },
+  {
+    id: 'rain',
+    title: 'Make it rain',
+    channelHint: '/builders /base /onchain',
+    embedUrl: FARCASTER_HOME,
+    text: [
+      'Make it rain.',
+      '',
+      'Hear → Spark → Zen → Spread → Return.',
+      'Not empty hashes. Proof of Attention.',
+      '',
+      'Claim a Human Passport. Invite one builder.',
+      'Discord houses + Telegram pulse. Same loop.',
+      '',
+      FARCASTER_HOME,
+      FARCASTER_HEARING,
+    ].join('\n'),
+  },
+  {
+    id: 'weekly_hearing',
+    title: 'Weekly Hearing demo',
+    channelHint: '/a11y /builders /attention',
+    embedUrl: FARCASTER_HEARING,
+    text: [
+      'Community Hearing — 30 min live.',
+      '',
+      '1. Open Hearing Mode (ears first)',
+      '2. Say Academy → First Spark (~2 min)',
+      '3. Zen: Mind or Machine',
+      '4. Spread your invite',
+      '',
+      'Join us. Bring one friend.',
+      FARCASTER_HEARING,
+    ].join('\n'),
+  },
+  {
+    id: 'partner_pilot',
+    title: 'Partner Attention Session',
+    channelHint: '/founders /protocols',
+    embedUrl: FARCASTER_HOME,
+    text: [
+      'Protocols / edtech / wallets:',
+      '',
+      'We ship your insight as an Attention Session inside Culture Node.',
+      'Members learn → Zen decide → Proof of Attention → Spread.',
+      '',
+      'Pilot week: $0–$1.5k or trade. Free core stays free.',
+      'DM for a pilot. Case study > vanity impressions.',
+      '',
+      `${FARCASTER_HOME.replace('?fc=1', '?room=partners&fc=1')}`,
+    ].join('\n'),
+  },
+  {
+    id: 'spread_club',
+    title: 'Spread the club',
+    channelHint: '/builders',
+    embedUrl: FARCASTER_PASSPORT,
+    text: [
+      SLOGANS.spread,
+      '',
+      'Your invite = a connection when they claim a Human Passport.',
+      'Growth loop: Land → Claim → Spark → Spread → Return.',
+      '',
+      'Copy your invite in-app. Cast it. Make it rain.',
+      FARCASTER_PASSPORT,
+    ].join('\n'),
+  },
+];
+
+/** Ordered rain sequence for MakeItRainDeck */
+export const RAIN_CAST_SEQUENCE: CastTemplateId[] = [
+  'rain',
+  'launch',
+  'hearing',
+  'weekly_hearing',
+  'hook_loop',
+  'spread_club',
+  'partner_pilot',
 ];
 
 export function getCastTemplate(id: CastTemplateId): CastTemplate {

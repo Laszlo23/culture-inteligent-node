@@ -42,6 +42,9 @@ export const attentionVerifications = pgTable('attention_verifications', {
   reason: text('reason').notNull(),
   model: text('model'),
   attestSignature: text('attest_signature'),
+  /** True after grant-energy partial-tx was issued for this proof (retry window still allowed). */
+  energyGranted: boolean('energy_granted').default(false).notNull(),
+  energyGrantedAt: timestamp('energy_granted_at'),
   createdAt: timestamp('created_at').defaultNow(),
 });
 

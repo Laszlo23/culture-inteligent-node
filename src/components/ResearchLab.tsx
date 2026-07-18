@@ -30,6 +30,7 @@ interface ResearchLabProps {
   onOpenTollShop?: (sku?: 'academy_retake' | 'spark_refill') => void;
   onOpenVoid?: (draft?: string) => void;
   onRequestFocus?: (on: boolean) => void;
+  onZenDecision?: (decision: 'hold_knowledge' | 'convert_fuel') => void;
 }
 
 interface SavedSession {
@@ -50,6 +51,7 @@ export default function ResearchLab({
   onOpenTollShop,
   onOpenVoid,
   onRequestFocus,
+  onZenDecision,
 }: ResearchLabProps) {
   const [topic, setTopic] = useState('');
   const [summary, setSummary] = useState('');
@@ -228,6 +230,7 @@ export default function ResearchLab({
               onFirstRitualComplete={onFirstRitualComplete}
               onOpenTollShop={onOpenTollShop}
               onRequestFocus={onRequestFocus}
+              onZenDecision={onZenDecision}
             />
           </motion.div>
         ) : (

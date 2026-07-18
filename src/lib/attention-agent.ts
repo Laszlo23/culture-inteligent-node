@@ -1,5 +1,6 @@
 import { GoogleGenAI } from '@google/genai';
 import { getGeminiApiKey } from './gemini-key';
+import { toUserError, thrownToUserError } from './user-errors';
 
 export interface AttentionVerifyInput {
   sessionId: string;
@@ -34,7 +35,7 @@ function fallbackHeuristic(input: AttentionVerifyInput): AttentionVerifyResult {
   return {
     passed: hasSubstance && score >= 60,
     score,
-    verification: `Heuristic agent (no GEMINI_API_KEY): score ${score}`,
+    verification: `${toUserError({ code: 'gemini_key_missing', context: 'coach' })} (score ${score})`,
     reason: hasSubstance
       ? 'Session artifacts / quiz meet minimum attention threshold.'
       : 'Insufficient session artifacts or quiz score for verification.',
@@ -94,7 +95,7 @@ Respond ONLY with JSON:
     console.error('Gemini attention verify failed:', err);
     return {
       ...fallbackHeuristic(input),
-      verification: `Gemini error → heuristic: ${err?.message || 'unknown'}`,
+      verification: thrownToUserError(err, 'coach'),
       model: 'heuristic-after-gemini-error',
     };
   }

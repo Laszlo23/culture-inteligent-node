@@ -23,10 +23,12 @@ Everything else (Guild Hall, NFT, lab rooms) is optional after that loop runs we
 
 ## This week — founder checklist
 
+**In-app:** open the landing or Passport → **Make it rain** deck (casts, Discord/Telegram pin copy, Hearing + Partner CTAs). Progress saves in the browser (`culture_rain_checklist_v1`).
+
 ### Day 0 (today) — open the doors
 - [ ] Sign Farcaster Mini App ownership: [Manifest Tool](https://farcaster.xyz/~/developers/mini-apps/manifest?domain=mining.buildingcultureid.space)
-- [ ] Post Farcaster launch thread (copy in FARCASTER_GROWTH Day 0)
-- [ ] Pin in Telegram + Discord: Hearing link + “Say Help”
+- [ ] Hit **Make it rain** → cast the sequence (rain → launch → hearing → weekly → hook → spread → partner)
+- [ ] Pin Discord `#welcome` + Telegram pulse (copy buttons in the rain deck)
 - [ ] DM 10 people who already trust you (script below)
 
 ### Day 1–2 — Hook Loop rain
@@ -87,8 +89,30 @@ Replace `YOUR6` with the first 6 chars of your wallet (or use the in-app **Invit
 | --- | --- |
 | **Farcaster** | Discovery + Mini App embeds + Hook Loop viral |
 | **Telegram** | Warm daily pulse, Hearing ritual reminders |
-| **Discord** | Deeper builders, office hours, feedback |
+| **Discord** | **Community home** — welcome, Hearing ritual, faction houses (Apex), partners, builders |
 | **Product Spread** | Personal invites with `?invite=` attribution |
+
+### Discord as community home (in-app)
+
+One config drives Onboarding Hub → **Discord Community**, Guild Hall (faction houses), and profile join CTA:
+
+- Invite: https://discord.gg/geUpHt3eSb  
+- Code: [`src/lib/discord-community.ts`](../src/lib/discord-community.ts) · UI: [`DiscordCommunityHub.tsx`](../src/components/DiscordCommunityHub.tsx)  
+- Channels: `#welcome` · `#hearing-ritual` · `#builders` · `#apex-summit` · `#partners`  
+- Houses: `#house-builders` · `#house-rust` · `#house-quant` (enlist in-app → meet in Discord)
+
+### Attention Miner bots (Discord + Telegram)
+
+Everyone can mine **knowledge** in chat — same loop as the product:
+
+| Command | What it does |
+| --- | --- |
+| `/spark` or `/mine` | Knowledge snap (A/B/C) → knowledge points |
+| `/claim` | Daily drip + Vault deep link |
+| `/hear` | Hearing Mode |
+| `/passport` · `/invite` | Passport + Spread |
+
+Setup: [ATTENTION_MINER_BOTS.md](./ATTENTION_MINER_BOTS.md) · endpoints `/api/bots/discord` · `/api/bots/telegram`
 
 ---
 

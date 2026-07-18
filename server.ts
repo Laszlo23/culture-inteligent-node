@@ -42,6 +42,17 @@ import {
   getZkBindingByWallet,
   upsertZkBinding,
   markZkMinted,
+  saveAttentionVerification,
+  updateAttentionAttest,
+  markAttentionEnergyGranted,
+  listAttentionForUid,
+  getAttentionById,
+  saveKpiProof,
+  getKpiBySignature,
+  getKpiByWallet,
+  saveTollPayment,
+  getTollBySignature,
+  getTollStats,
 } from "./src/db/queries.ts";
 import {
   verifyZkPassportPayload,
@@ -60,19 +71,13 @@ import { verifyKpiTransaction, verifyMemoAttestation } from "./src/lib/solana-ve
 import { researchWeeklySession } from "./src/lib/session-research-agent.ts";
 import { CORE_ATTENTION_SESSIONS, isoWeekKey } from "./src/content/attention-intelligence.ts";
 import {
-  saveAttentionVerification,
-  updateAttentionAttest,
-  saveKpiProof,
-  getKpiBySignature,
   saveCurriculumDraft,
   listCurriculumDrafts,
   getCurriculumDraft,
   publishCurriculumDraft,
   rejectCurriculumDraft,
   listPublishedCurriculum,
-  saveTollPayment,
-  getTollBySignature,
-  getTollStats,
+  canReuseAttentionGrant,
 } from "./src/db/memory-store.ts";
 import { getMarketPulse } from "./src/lib/market-pulse.ts";
 import {
@@ -80,7 +85,6 @@ import {
   buildRewardTransaction,
   economyReady,
 } from "./src/lib/economy-server.ts";
-import { listAttentionForUid, getKpiByWallet } from "./src/db/memory-store.ts";
 import { KPI_BCC_REWARD, KPI_ENERGY_BPS } from "./src/lib/economy-rewards.ts";
 import {
   TOLL_SKUS,
@@ -116,7 +120,15 @@ async function startServer() {
   const app = express();
   const PORT = Number(process.env.PORT) || 3000;
 
-  app.use(express.json({ limit: "1mb" }));
+  app.use(
+    express.json({
+      limit: "1mb",
+      verify: (req, _res, buf) => {
+        // Discord Ed25519 verify needs the exact raw body bytes
+        (req as express.Request & { rawBody?: string }).rawBody = buf.toString("utf8");
+      },
+    })
+  );
 
   const isAdminUser = (email?: string) => {
     return email === "laszlo.bihary@gmail.com" || email === "admin@buildingculture.space";
@@ -499,7 +511,7 @@ async function startServer() {
       });
 
       const id = `att_${crypto.randomBytes(8).toString("hex")}`;
-      const stored = saveAttentionVerification({
+      const stored = await saveAttentionVerification({
         id,
         uid: req.walletUser!.uid,
         walletAddress: wallet,
@@ -548,10 +560,14 @@ async function startServer() {
 
       const check = await verifyMemoAttestation(signature, wallet, "poa:");
       if (!check.ok) {
-        console.warn("Attest soft-check:", check.error);
+        return res.status(400).json({
+          ok: false,
+          error: check.error || "Memo attestation failed on-chain verification",
+          rpcCheck: check,
+        });
       }
 
-      updateAttentionAttest(verificationId, signature);
+      await updateAttentionAttest(verificationId, signature);
       res.json({
         ok: true,
         signature,
@@ -571,7 +587,7 @@ async function startServer() {
       const signature = String(req.body?.signature || "").trim();
       if (!signature) return res.status(400).json({ error: "signature required" });
 
-      const existing = getKpiBySignature(signature);
+      const existing = await getKpiBySignature(signature);
       if (existing?.verified) {
         return res.json({
           ok: true,
@@ -586,7 +602,7 @@ async function startServer() {
         return res.status(400).json({ ok: false, error: check.error });
       }
 
-      const proof = saveKpiProof({
+      const proof = await saveKpiProof({
         id: `kpi_${crypto.randomBytes(6).toString("hex")}`,
         uid: req.walletUser!.uid,
         walletAddress: wallet,
@@ -632,8 +648,8 @@ async function startServer() {
     });
   });
 
-  app.get("/api/toll/stats", (_req, res) => {
-    res.json({ ok: true, ...getTollStats(), marketplaceFeeBps: 250 });
+  app.get("/api/toll/stats", async (_req, res) => {
+    res.json({ ok: true, ...(await getTollStats()), marketplaceFeeBps: 250 });
   });
 
   app.post("/api/toll/verify", requireWalletAuth, async (req: AuthRequest, res) => {
@@ -661,7 +677,7 @@ async function startServer() {
           });
         }
         const practiceSig = signature || `practice_${sku.id}_${wallet}_${Date.now()}`;
-        const existingPractice = getTollBySignature(practiceSig);
+        const existingPractice = await getTollBySignature(practiceSig);
         if (existingPractice?.verified) {
           return res.json({
             ok: true,
@@ -671,7 +687,7 @@ async function startServer() {
             practice: true,
           });
         }
-        const payment = saveTollPayment({
+        const payment = await saveTollPayment({
           id: `toll_${crypto.randomBytes(6).toString("hex")}`,
           uid: req.walletUser!.uid,
           walletAddress: wallet,
@@ -699,7 +715,7 @@ async function startServer() {
         });
       }
 
-      const existing = getTollBySignature(signature);
+      const existing = await getTollBySignature(signature);
       if (existing?.verified) {
         return res.json({
           ok: true,
@@ -719,7 +735,7 @@ async function startServer() {
         return res.status(400).json({ ok: false, error: check.error });
       }
 
-      const payment = saveTollPayment({
+      const payment = await saveTollPayment({
         id: `toll_${crypto.randomBytes(6).toString("hex")}`,
         uid: req.walletUser!.uid,
         walletAddress: wallet,
@@ -774,6 +790,71 @@ async function startServer() {
       keys: req.body && typeof req.body === "object" ? Object.keys(req.body) : [],
     });
     res.status(200).json({ ok: true, received: event });
+  });
+
+  /**
+   * Attention Miner — Discord Interactions (slash commands + answer buttons).
+   * Portal → Interactions Endpoint URL: https://<host>/api/bots/discord
+   * See docs/ATTENTION_MINER_BOTS.md
+   */
+  app.post("/api/bots/discord", async (req, res) => {
+    try {
+      const publicKey = String(process.env.DISCORD_PUBLIC_KEY || "").trim();
+      if (!publicKey) {
+        return res.status(503).json({ error: "discord_bot_not_configured" });
+      }
+      const signature = String(req.get("X-Signature-Ed25519") || "");
+      const timestamp = String(req.get("X-Signature-Timestamp") || "");
+      const rawBody =
+        (req as express.Request & { rawBody?: string }).rawBody ||
+        JSON.stringify(req.body || {});
+      const { verifyDiscordSignature, handleDiscordInteraction } = await import(
+        "./src/lib/bots/discord-webhook.ts"
+      );
+      if (!verifyDiscordSignature({ publicKey, signature, timestamp, rawBody })) {
+        return res.status(401).json({ error: "invalid_signature" });
+      }
+      const payload = await handleDiscordInteraction(req.body || {});
+      return res.json(payload);
+    } catch (error: any) {
+      console.error("[bots.discord]", error?.message || error);
+      return res.status(500).json({ error: "discord_handler_failed" });
+    }
+  });
+
+  /**
+   * Attention Miner — Telegram Bot webhook.
+   * setWebhook → https://<host>/api/bots/telegram
+   * Header: X-Telegram-Bot-Api-Secret-Token
+   */
+  app.post("/api/bots/telegram", async (req, res) => {
+    try {
+      const token = String(process.env.TELEGRAM_BOT_TOKEN || "").trim();
+      const secret = String(process.env.TELEGRAM_WEBHOOK_SECRET || "").trim();
+      if (!token) {
+        return res.status(503).json({ error: "telegram_bot_not_configured" });
+      }
+      if (secret) {
+        const got = String(req.get("X-Telegram-Bot-Api-Secret-Token") || "");
+        if (got !== secret) {
+          return res.status(401).json({ error: "invalid_telegram_secret" });
+        }
+      }
+      const { handleTelegramUpdate } = await import("./src/lib/bots/telegram-webhook.ts");
+      await handleTelegramUpdate(req.body || {}, token);
+      return res.json({ ok: true });
+    } catch (error: any) {
+      console.error("[bots.telegram]", error?.message || error);
+      return res.status(500).json({ error: "telegram_handler_failed" });
+    }
+  });
+
+  app.get("/api/bots/status", (_req, res) => {
+    res.json({
+      discord: Boolean(String(process.env.DISCORD_PUBLIC_KEY || "").trim()),
+      telegram: Boolean(String(process.env.TELEGRAM_BOT_TOKEN || "").trim()),
+      appUrl: process.env.APP_URL || null,
+    });
   });
 
   /**
@@ -855,9 +936,10 @@ async function startServer() {
         "./src/lib/hearing/gemini-tts.ts"
       );
       if (!neuralTtsReady()) {
+        const { toUserError } = await import("./src/lib/user-errors.ts");
         return res.status(503).json({
           error: "neural_voice_unavailable",
-          hint: "Set GEMINI_API_KEY or GENERATIVE_AI_API_KEY on the server.",
+          message: toUserError({ code: "neural_voice_unavailable", context: "hearing" }),
         });
       }
 
@@ -869,10 +951,16 @@ async function startServer() {
       res.setHeader("X-Hearing-Cached", result.cached ? "1" : "0");
       return res.send(result.wav);
     } catch (error: any) {
-      console.error("[hearing.speak]", error?.message || error);
-      return res.status(500).json({
-        error: "tts_failed",
-        detail: error?.message || "unknown",
+      const { classifyThrown, toUserError, httpStatusForUserError } = await import(
+        "./src/lib/user-errors.ts"
+      );
+      const code = (error?.code as string) || classifyThrown(error, "hearing");
+      const status = httpStatusForUserError(code as any);
+      const message = toUserError({ code, detail: error?.detail || error?.message, context: "hearing" });
+      console.error("[hearing.speak]", code, error?.detail || error?.message || error);
+      return res.status(status).json({
+        error: code,
+        message,
       });
     }
   });
@@ -1170,19 +1258,40 @@ async function startServer() {
       const energyBps = Math.min(5000, Math.max(1, Number(req.body?.energyBps) || 2000));
       // Cap BCC per grant — sessions never need uncapped client-chosen mints
       const bccReward = Math.min(500, Math.max(0, Number(req.body?.bccReward) || 0));
-      const verificationId = req.body?.verificationId as string | undefined;
+      const verificationId = typeof req.body?.verificationId === "string"
+        ? req.body.verificationId.trim()
+        : "";
 
-      const recent = listAttentionForUid(uid).filter((r) => r.passed);
-      const kpiOk = getKpiByWallet(wallet).length > 0;
-      const hasProof =
-        Boolean(verificationId && recent.some((r) => r.id === verificationId)) ||
-        recent.length > 0 ||
-        kpiOk;
+      const kpiOk = (await getKpiByWallet(wallet)).length > 0;
+      let proofOk = false;
 
-      if (!hasProof) {
+      if (verificationId) {
+        const proof =
+          (await getAttentionById(verificationId)) ||
+          (await listAttentionForUid(uid)).find((r) => r.id === verificationId) ||
+          null;
+        if (!proof || proof.uid !== uid || !proof.passed) {
+          return res.status(400).json({
+            ok: false,
+            error: "verificationId does not match a passed Academy proof for this wallet",
+          });
+        }
+        if (!canReuseAttentionGrant(proof)) {
+          return res.status(400).json({
+            ok: false,
+            error: "This Academy proof already granted energy — complete a new session for more fuel",
+          });
+        }
+        proofOk = true;
+      } else if (kpiOk) {
+        // KPI path may omit verificationId
+        proofOk = true;
+      }
+
+      if (!proofOk) {
         return res.status(400).json({
           ok: false,
-          error: "No verified Academy/KPI proof for this wallet — complete a session first",
+          error: "Pass verificationId from Academy verify (or complete KPI) before grant-energy",
         });
       }
 
@@ -1195,6 +1304,10 @@ async function startServer() {
 
       if (!result.ok) {
         return res.status(503).json(result);
+      }
+
+      if (verificationId) {
+        await markAttentionEnergyGranted(verificationId);
       }
 
       res.json({
@@ -1220,8 +1333,8 @@ async function startServer() {
       const energyBps = Math.max(0, Number(req.body?.energyBps) || 0);
       const reason = String(req.body?.reason || "reward");
 
-      const recent = listAttentionForUid(uid).filter((r) => r.passed);
-      const kpiOk = getKpiByWallet(wallet).length > 0;
+      const recent = (await listAttentionForUid(uid)).filter((r) => r.passed);
+      const kpiOk = (await getKpiByWallet(wallet)).length > 0;
       if (reason === "bootstrap" && process.env.NODE_ENV === "production") {
         return res.status(400).json({
           ok: false,
@@ -1381,6 +1494,9 @@ async function startServer() {
     const distPath = path.join(process.cwd(), "dist");
     app.use(express.static(distPath));
     app.get("*", (req, res) => {
+      if (req.path.startsWith("/api/")) {
+        return res.status(404).json({ error: "API route not found" });
+      }
       res.sendFile(path.join(distPath, "index.html"));
     });
   }

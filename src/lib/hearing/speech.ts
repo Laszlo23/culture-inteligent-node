@@ -3,6 +3,8 @@
  * Browser speechSynthesis is disabled by default (sounds like cheap TTS).
  */
 
+import { classifyUserError, toUserError, type UserErrorCode } from '../user-errors';
+
 export type SpeechSupport = {
   tts: boolean;
   stt: boolean;
@@ -19,6 +21,12 @@ export type SpeakOptions = {
   style?: SpeakStyle;
   /** Force browser TTS (off unless HEARING_ALLOW_BROWSER_TTS). */
   allowBrowser?: boolean;
+};
+
+export type SpeakResult = {
+  ok: boolean;
+  code?: UserErrorCode;
+  message?: string;
 };
 
 type SpeechRecognitionLike = {
@@ -145,7 +153,12 @@ function playBlob(blob: Blob, volume: number, gen: number): Promise<void> {
   });
 }
 
-async function speakNeural(text: string, style: SpeakStyle, volume: number, gen: number): Promise<boolean> {
+async function speakNeural(
+  text: string,
+  style: SpeakStyle,
+  volume: number,
+  gen: number
+): Promise<SpeakResult> {
   try {
     const res = await fetch('/api/hearing/speak', {
       method: 'POST',
@@ -154,26 +167,56 @@ async function speakNeural(text: string, style: SpeakStyle, volume: number, gen:
       body: JSON.stringify({ text, style }),
     });
     if (!res.ok) {
-      if (res.status === 503) neuralAvailable = false;
-      return false;
+      if (res.status === 503 || res.status === 429) neuralAvailable = false;
+      let code: string | undefined;
+      let serverMessage: string | undefined;
+      try {
+        const body = (await res.json()) as { error?: string; message?: string };
+        code = body.error;
+        serverMessage = body.message;
+      } catch {
+        // non-JSON error body
+      }
+      const classified = classifyUserError({
+        code,
+        status: res.status,
+        detail: serverMessage,
+        context: 'hearing',
+      });
+      return {
+        ok: false,
+        code: classified,
+        message:
+          serverMessage ||
+          toUserError({ code: classified, status: res.status, context: 'hearing' }),
+      };
     }
     neuralAvailable = true;
     const blob = await res.blob();
-    if (gen !== speakGeneration) return true;
+    if (gen !== speakGeneration) return { ok: true };
     await playBlob(blob, volume, gen);
-    return true;
-  } catch {
-    return false;
+    return { ok: true };
+  } catch (err) {
+    return {
+      ok: false,
+      message: toUserError({
+        code: 'network_unavailable',
+        detail: err instanceof Error ? err.message : String(err),
+        context: 'hearing',
+      }),
+      code: 'network_unavailable',
+    };
   }
 }
 
 /**
  * Speak with neural Gemini voice (warm Sulafat).
  * Browser TTS only if ?browserTts=1 — otherwise stay quiet if neural fails.
+ * Returns ok/message so Hearing UI can explain silent failures.
  */
-export async function speak(text: string, opts?: SpeakOptions): Promise<void> {
+export async function speak(text: string, opts?: SpeakOptions): Promise<SpeakResult> {
   const line = text.trim();
-  if (!line) return;
+  if (!line) return { ok: true };
 
   cancelSpeak();
   const gen = speakGeneration;
@@ -184,13 +227,14 @@ export async function speak(text: string, opts?: SpeakOptions): Promise<void> {
     await probeNeuralVoice();
   }
 
-  const ok = await speakNeural(line, style, volume, gen);
-  if (ok || gen !== speakGeneration) return;
+  const result = await speakNeural(line, style, volume, gen);
+  if (result.ok || gen !== speakGeneration) return result.ok ? { ok: true } : result;
 
   if (opts?.allowBrowser || browserTtsAllowed()) {
     await speakBrowserFallback(line, gen);
+    return { ok: true };
   }
-  // else: silent — UI still shows the transcript line
+  return result;
 }
 
 function speakBrowserFallback(text: string, gen: number): Promise<void> {

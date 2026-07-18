@@ -58,8 +58,12 @@ await page.addStyleTag({
   `,
 });
 
+const slideCount = await page.evaluate(
+  () => document.querySelectorAll(".slide").length
+);
+
 const paths = [];
-for (let i = 0; i < 10; i++) {
+for (let i = 0; i < slideCount; i++) {
   await page.evaluate((n) => {
     const slides = [...document.querySelectorAll(".slide")];
     const dots = [...document.querySelectorAll("#dots button")];
@@ -72,7 +76,7 @@ for (let i = 0; i < 10; i++) {
   const file = path.join(slidesDir, `${String(i + 1).padStart(2, "0")}.png`);
   await page.screenshot({ path: file, type: "png", fullPage: false });
   paths.push(file);
-  console.log(`Captured slide ${i + 1}/10 → ${file}`);
+  console.log(`Captured slide ${i + 1}/${slideCount} → ${file}`);
 }
 
 await browser.close();
