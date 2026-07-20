@@ -18,6 +18,7 @@
     "test:loop": "tsx --test src/lib/main-loop.test.ts src/lib/winning-flows.test.ts src/lib/rain-checklist.test.ts",
     "test:bots": "tsx --test src/lib/bots/attention-miner-core.test.ts",
     "economy:bootstrap": "tsx scripts/devnet-bootstrap.ts",
+    "economy:smoke": "tsx scripts/smoke-devnet-probe.ts",
     "bots:discord-commands": "tsx scripts/register-discord-commands.ts",
     "bots:telegram-webhook": "tsx scripts/set-telegram-webhook.ts",
     "farcaster:validate": "node scripts/validate-farcaster-manifest.mjs",

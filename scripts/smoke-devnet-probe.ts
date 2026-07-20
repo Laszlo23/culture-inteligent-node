@@ -24,8 +24,9 @@ async function main() {
   await ensureDiscriminators();
 
   const auth = loadEconomyAuthorityFromEnv();
+  const programId = getEconomyProgramId();
   console.log('RPC', rpc);
-  console.log('program', getEconomyProgramId().toBase58());
+  console.log('program', programId.toBase58());
   console.log('bcc', getBccMint()?.toBase58() || '(missing)');
   console.log('cgt', getCgtMint()?.toBase58() || '(missing)');
   console.log('authority', auth?.publicKey.toBase58() || 'MISSING');
@@ -35,7 +36,7 @@ async function main() {
     console.log('authority SOL', (bal / LAMPORTS_PER_SOL).toFixed(4));
   }
 
-  const prog = await c.getAccountInfo(getEconomyProgramId());
+  const prog = await c.getAccountInfo(programId);
   console.log(
     'program account',
     prog ? `executable=${prog.executable} len=${prog.data.length}` : 'MISSING'
@@ -48,12 +49,12 @@ async function main() {
     console.error('FAIL: config PDA missing — run npx tsx scripts/devnet-bootstrap.ts');
     process.exit(1);
   }
-  console.log('config.authority', cfg.authority.toBase58());
-  console.log('config.bccMint', cfg.bccMint.toBase58());
-  console.log('config.cgtMint', cfg.cgtMint.toBase58());
-  console.log('config.minerCounter', cfg.minerCounter.toString());
+  console.log('config.authority', cfg.authority);
+  console.log('config.bccMint', cfg.bccMint);
+  console.log('config.cgtMint', cfg.cgtMint);
+  console.log('config.minerCount', cfg.minerCount);
 
-  if (auth && !cfg.authority.equals(auth.publicKey)) {
+  if (auth && cfg.authority !== auth.publicKey.toBase58()) {
     console.error('FAIL: ECONOMY_AUTHORITY_SECRET pubkey != on-chain config.authority');
     process.exit(1);
   }
@@ -67,16 +68,24 @@ async function main() {
   const wallet = Keypair.generate();
   console.log('smoke wallet', wallet.publicKey.toBase58());
 
-  // Fund wallet from authority (0.05 SOL)
-  const need = 0.05 * LAMPORTS_PER_SOL;
-  const wBal = await c.getBalance(wallet.publicKey);
+  // Fund smoke wallet from authority (rent + fees). Prefer authority transfer; faucet is often rate-limited.
+  const need = Math.round(0.02 * LAMPORTS_PER_SOL);
+  let wBal = await c.getBalance(wallet.publicKey);
   if (wBal < need) {
+    const authBal = await c.getBalance(auth.publicKey);
+    const send = Math.min(need, Math.max(0, authBal - 10_000));
+    if (send < Math.round(0.005 * LAMPORTS_PER_SOL)) {
+      console.error(
+        `FAIL: need SOL for smoke wallet; authority has ${(authBal / LAMPORTS_PER_SOL).toFixed(4)} SOL. Mine with: devnet-pow mine -d 3 --reward 0.02 --no-infer -t 100000000 -u dev`
+      );
+      process.exit(1);
+    }
     const { SystemProgram } = await import('@solana/web3.js');
     const fund = new Transaction().add(
       SystemProgram.transfer({
         fromPubkey: auth.publicKey,
         toPubkey: wallet.publicKey,
-        lamports: need,
+        lamports: send,
       })
     );
     const { blockhash, lastValidBlockHeight } = await c.getLatestBlockhash();
@@ -86,7 +95,8 @@ async function main() {
     fund.sign(auth);
     const sig = await c.sendRawTransaction(fund.serialize());
     await c.confirmTransaction({ signature: sig, blockhash, lastValidBlockHeight }, 'confirmed');
-    console.log('funded smoke wallet', sig);
+    wBal = await c.getBalance(wallet.publicKey);
+    console.log('funded smoke wallet from authority', sig, 'bal', (wBal / LAMPORTS_PER_SOL).toFixed(4));
   }
 
   const ixs = [
