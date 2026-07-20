@@ -25,6 +25,8 @@ export type { AtmosphereVariant } from './CinematicBackdrop';
 export { default as CinematicPanel } from './CinematicPanel';
 export type { FacilityMood } from './CinematicPanel';
 export { default as InteractiveDeck } from './InteractiveDeck';
+export { default as SpectacleBurst } from './SpectacleBurst';
+export { default as LivingAmbient } from './LivingAmbient';
 export {
   AttentionBadge,
   AttentionIconTile,

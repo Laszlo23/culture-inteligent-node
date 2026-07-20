@@ -16,6 +16,7 @@ import {
 import { useSound } from '../lib/sound/SoundContext';
 import type { UiSound } from '../lib/sound/engine';
 import LevelUpFanfare from './LevelUpFanfare';
+import SpectacleBurst from './fx/SpectacleBurst';
 
 type Toast = RewardEvent & { expiresAt: number };
 
@@ -152,16 +153,26 @@ export default function RewardToastHost() {
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={reduceMotion ? { opacity: 0 } : { opacity: 0, y: -12, scale: 1.04 }}
               transition={{ type: 'spring', stiffness: 320, damping: 24 }}
-              className={`pointer-events-auto w-full max-w-sm cursor-pointer rounded-2xl border bg-[#0c0c12]/92 backdrop-blur-md px-4 py-3 text-left ${rarityGlow(t.rarity)}`}
+              className={`pointer-events-auto relative w-full max-w-sm cursor-pointer overflow-hidden rounded-2xl border bg-gradient-to-br from-[#16120a]/95 via-[#0c0c12]/94 to-[#061018]/95 backdrop-blur-md px-4 py-3 text-left toast-xp-glow ${rarityGlow(t.rarity)}`}
             >
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-xl border border-white/15 bg-black/40 flex items-center justify-center shrink-0">
+              <div className="pointer-events-none absolute inset-0 holo-sheen opacity-50" />
+              {t.kind === 'xp' && (
+                <SpectacleBurst active={!reduceMotion} tone="amber" density="lite" className="opacity-80" />
+              )}
+              {(t.kind === 'badge' || t.kind === 'discovery') && (
+                <SpectacleBurst active={!reduceMotion} tone="cyan" density="lite" className="opacity-70" />
+              )}
+              {t.kind === 'streak' && (
+                <SpectacleBurst active={!reduceMotion} tone="rose" density="lite" className="opacity-70" />
+              )}
+              <div className="relative flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl border border-amber-400/30 bg-black/50 flex items-center justify-center shrink-0 shadow-[0_0_16px_rgba(251,191,36,0.25)]">
                   <ToastIcon kind={t.kind} />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="font-mono text-[9px] font-black uppercase tracking-[0.2em] text-slate-400">
+                  <p className="font-mono text-[9px] font-black uppercase tracking-[0.2em] text-amber-200/70">
                     {t.kind === 'xp'
-                      ? 'XP'
+                      ? 'XP gain'
                       : t.kind === 'badge'
                         ? 'Achievement'
                         : t.kind === 'streak'
@@ -216,7 +227,7 @@ function CountUp({ value }: { value: number }) {
     return () => cancelAnimationFrame(raf);
   }, [value, reduceMotion]);
   return (
-    <span className="font-display text-xl font-extrabold italic text-amber-300 shrink-0">
+    <span className="font-display text-xl font-extrabold italic text-transparent bg-clip-text bg-gradient-to-b from-amber-100 via-amber-300 to-amber-500 shrink-0 drop-shadow-[0_0_12px_rgba(251,191,36,0.5)]">
       +{n}
     </span>
   );

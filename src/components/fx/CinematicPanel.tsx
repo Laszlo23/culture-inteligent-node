@@ -50,7 +50,7 @@ export default function CinematicPanel({
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
-      className={`relative overflow-hidden rounded-2xl border border-white/12 bg-[#07080c] shadow-[0_24px_80px_rgba(0,0,0,0.55)] ${className}`}
+      className={`aurora-edge relative overflow-hidden rounded-2xl border border-white/12 bg-[#07080c] shadow-[0_24px_80px_rgba(0,0,0,0.55)] ${className}`}
     >
       <MoodArt
         wash={visual.wash}
@@ -60,6 +60,8 @@ export default function CinematicPanel({
         plate="signal"
       />
       <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-[#050608]/70 via-[#050608]/25 to-transparent" />
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-cyan-300/50 to-transparent" />
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-amber-300/35 to-transparent" />
       <div className="relative z-10">{children}</div>
     </motion.section>
   );

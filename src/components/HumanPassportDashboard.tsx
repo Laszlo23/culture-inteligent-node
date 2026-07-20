@@ -21,6 +21,7 @@ import CinematicPanel from './fx/CinematicPanel';
 import PlayerLevelChip from './PlayerLevelChip';
 import AchievementGallery from './AchievementGallery';
 import LivingAmbient from './fx/LivingAmbient';
+import FarcasterSocialPulse from './FarcasterSocialPulse';
 import {
   readLevelSnapshot,
   subscribePlayerProgress,
@@ -54,6 +55,8 @@ type Props = {
   onOpenSpark?: () => void;
   onOpenReturn?: () => void;
   onSpread?: () => void;
+  farcasterUsername?: string | null;
+  onLinkFarcaster?: (username: string) => void;
 };
 
 function ScoreCard({
@@ -107,6 +110,8 @@ export default function HumanPassportDashboard({
   onOpenSpark,
   onOpenReturn,
   onSpread,
+  farcasterUsername,
+  onLinkFarcaster,
 }: Props) {
   const missionsCompleted = state.dailyMissions.filter((m) => m.completed).length;
   const scores = useMemo(() => {
@@ -183,11 +188,12 @@ export default function HumanPassportDashboard({
           </div>
           <div className="flex flex-col items-end gap-2">
             <PlayerLevelChip />
-            <div className="rounded-2xl border border-white/12 bg-black/45 px-4 py-3 text-right backdrop-blur-md">
-              <p className="font-mono text-[9px] uppercase tracking-widest text-amber-200/80">
+            <div className="relative overflow-hidden rounded-2xl border border-amber-400/30 bg-gradient-to-br from-[#1a1408]/80 via-black/55 to-[#061018]/70 px-4 py-3 text-right backdrop-blur-md shadow-[0_0_28px_rgba(251,191,36,0.18)]">
+              <div className="pointer-events-none absolute inset-0 holo-sheen opacity-35" />
+              <p className="relative font-mono text-[9px] uppercase tracking-widest text-amber-200/80">
                 Your Human Value
               </p>
-              <p className="font-display text-5xl font-bold italic text-white leading-none mt-1">
+              <p className="relative font-display text-5xl font-bold italic text-transparent bg-clip-text bg-gradient-to-b from-white via-amber-100 to-amber-400 leading-none mt-1 value-slam">
                 {scores.humanValue}
               </p>
             </div>
@@ -231,6 +237,15 @@ export default function HumanPassportDashboard({
 
         <div className="relative z-[1] mt-5">
           <AchievementGallery compact={compact} />
+        </div>
+
+        <div className="relative z-[1] mt-5">
+          <FarcasterSocialPulse
+            walletAddress={walletAddress}
+            farcasterUsername={farcasterUsername}
+            compact={compact}
+            onLinkedUsername={onLinkFarcaster}
+          />
         </div>
 
         {!compact && (

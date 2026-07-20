@@ -51,8 +51,9 @@ export default function AchievementGallery({ compact = false }: { compact?: bool
   const show = unlockedDefs.slice(-6);
 
   return (
-    <div className="rounded-2xl border border-white/12 bg-black/40 p-4 backdrop-blur-md">
-      <div className="flex items-center justify-between gap-2 mb-3">
+    <div className="relative overflow-hidden rounded-2xl border border-amber-400/20 bg-gradient-to-br from-[#12100a]/70 via-black/45 to-[#061018]/50 p-4 backdrop-blur-md shadow-[0_0_28px_rgba(251,191,36,0.08)]">
+      <div className="pointer-events-none absolute inset-0 holo-sheen opacity-25" />
+      <div className="relative flex items-center justify-between gap-2 mb-3">
         <p className="font-mono text-[9px] font-black uppercase tracking-[0.28em] text-amber-300/90">
           Achievements
         </p>
@@ -61,14 +62,14 @@ export default function AchievementGallery({ compact = false }: { compact?: bool
         </p>
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+      <div className="relative grid grid-cols-2 sm:grid-cols-3 gap-2">
         {show.map((a, i) => (
           <motion.div
             key={a.id}
             initial={reduceMotion ? false : { opacity: 0, y: 6 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: i * 0.04 }}
-            className={`rounded-xl border px-3 py-2.5 ${rarityClass(a.rarity, false)}`}
+            className={`rounded-xl border px-3 py-2.5 shadow-[0_0_18px_rgba(0,0,0,0.25)] ${rarityClass(a.rarity, false)}`}
           >
             <p className="font-display text-sm font-bold italic truncate">{a.title}</p>
             <p className="text-[10px] text-white/60 mt-0.5 line-clamp-2">{a.blurb}</p>

@@ -213,16 +213,22 @@ Hashtags (sparingly): `#HumanEconomy` `#HumanPassport` `#HookLoop` `#ProofOfAtte
 
 ---
 
-## 5) Optional next (Neynar API)
+## 5) Neynar social pulse (passport)
 
-When you have a Neynar API key:
+Passport / profile can show **Neynar user score** + **most engaging casts**.
 
 1. Add `NEYNAR_API_KEY` to server `.env` (never `VITE_`).
-2. Publish scheduled casts from a small cron (do not spam).
-3. Verify webhook signatures on `/api/farcaster/webhook`.
-4. Enable Mini App notifications after `accountAssociation` is signed.
+2. Redeploy. Endpoint: `GET /api/neynar/social?username=…` (also `fid` / `address`).
+3. In-app: link a Farcaster handle on **Passport** (Social signal) or **Profile → Farcaster**.
+4. Mini App hosts auto-detect viewer FID via `@farcaster/miniapp-sdk` context.
 
-Docs: [Neynar Mini Apps](https://docs.neynar.com/docs/convert-web-app-to-mini-app)
+Still optional next:
+
+- Verify webhook signatures on `/api/farcaster/webhook` (`NEYNAR_WEBHOOK_SECRET`).
+- Scheduled casts from a small cron (do not spam).
+- Mini App notifications after `accountAssociation` is signed.
+
+Docs: [Neynar User Score](https://docs.neynar.com/docs/neynar-user-quality-score) · [Neynar Mini Apps](https://docs.neynar.com/docs/convert-web-app-to-mini-app)
 
 ---
 

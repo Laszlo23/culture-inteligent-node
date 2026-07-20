@@ -140,7 +140,7 @@ export default function MainLoopStage({
         initial={reduceMotion ? false : { opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.45 }}
-        className="relative overflow-hidden rounded-2xl border border-white/15 bg-[#07080c] shadow-[0_24px_80px_rgba(0,0,0,0.55)]"
+        className="aurora-edge relative overflow-hidden rounded-2xl border border-white/15 bg-[#07080c] shadow-[0_24px_80px_rgba(0,0,0,0.55),0_0_60px_rgba(34,211,238,0.08)]"
       >
         <MoodArt
           wash={
@@ -155,6 +155,8 @@ export default function MainLoopStage({
         />
         <LivingAmbient reactive intensity="medium" />
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-[#050608]/75 via-[#050608]/30 to-transparent" />
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-cyan-300/55 to-transparent" />
+        <div className="pointer-events-none absolute inset-0 holo-sheen opacity-25" />
 
         <div className="relative z-10 px-5 pt-6 pb-5 md:px-8 md:pt-8 md:pb-6">
           <div className="flex flex-wrap items-start justify-between gap-3">
@@ -162,14 +164,14 @@ export default function MainLoopStage({
               <p className="font-mono text-[10px] font-black uppercase tracking-[0.28em] text-cyan-300">
                 {phase === 'ritual' ? 'Opening · First Spark' : 'Main loop · live'}
               </p>
-              <p className="mt-2 font-display text-3xl md:text-4xl font-extrabold italic text-white tracking-tight leading-none drop-shadow-[0_4px_28px_rgba(0,0,0,0.75)]">
+              <p className="mt-2 font-display text-3xl md:text-4xl font-extrabold italic text-white tracking-tight leading-none drop-shadow-[0_4px_28px_rgba(0,0,0,0.75)] value-slam">
                 {BRAND.parent}
               </p>
               <p className="mt-1.5 text-[11px] font-mono uppercase tracking-[0.22em] text-amber-200/90">
                 {BRAND.passport} · {SLOGANS.zen}
               </p>
             </div>
-            <PlayerLevelChip />
+            <PlayerLevelChip glow />
           </div>
 
           {/* Loop rail — clickable */}
@@ -219,11 +221,11 @@ export default function MainLoopStage({
                           ? { repeat: Infinity, duration: 2.4, ease: 'easeInOut' }
                           : undefined
                       }
-                      className={`relative w-8 h-8 rounded-full flex items-center justify-center border text-[10px] font-mono font-black transition-shadow ${
+                      className={`relative w-9 h-9 rounded-full flex items-center justify-center border text-[10px] font-mono font-black transition-shadow ${
                         isSelected
-                          ? 'border-amber-300 bg-amber-400 text-black shadow-[0_0_24px_rgba(251,191,36,0.55)]'
+                          ? 'border-amber-300 bg-amber-400 text-black shadow-[0_0_28px_rgba(251,191,36,0.65)]'
                           : isCurrent
-                            ? 'border-cyan-300 bg-cyan-500 text-black shadow-[0_0_20px_rgba(34,211,238,0.45)]'
+                            ? 'border-cyan-300 bg-cyan-500 text-black shadow-[0_0_26px_rgba(34,211,238,0.55)]'
                             : isDone
                               ? 'border-emerald-400/50 bg-emerald-500/20 text-emerald-200 group-hover:shadow-[0_0_16px_rgba(52,211,153,0.35)]'
                               : 'border-white/15 bg-black/40 text-slate-500 group-hover:border-white/30 group-hover:text-slate-300'
@@ -377,10 +379,11 @@ export default function MainLoopStage({
               onClick={cta.onGo}
               whileHover={reduceMotion ? undefined : { scale: 1.02 }}
               whileTap={reduceMotion ? undefined : { scale: 0.98 }}
-              className="cta-breathe inline-flex items-center justify-center gap-2 px-6 py-3.5 bg-amber-400 hover:bg-amber-300 text-black font-black font-mono text-xs rounded-2xl tracking-wider cursor-pointer"
+              className="cta-breathe relative inline-flex items-center justify-center gap-2 px-7 py-3.5 bg-gradient-to-r from-amber-400 via-amber-300 to-amber-400 hover:from-amber-300 hover:via-amber-200 hover:to-amber-300 text-black font-black font-mono text-xs rounded-2xl tracking-wider cursor-pointer shadow-[0_0_32px_rgba(251,191,36,0.35)] overflow-hidden"
             >
-              {cta.label}
-              <ArrowRight className="w-4 h-4" />
+              <span className="pointer-events-none absolute inset-0 holo-sheen opacity-40" />
+              <span className="relative">{cta.label}</span>
+              <ArrowRight className="relative w-4 h-4" />
             </motion.button>
             {onHear && (
               <button

@@ -69,6 +69,7 @@ export default function MemberProfile({
     xUsername: '',
     telegramUsername: '',
     discordUsername: '',
+    farcasterUsername: '',
     profileCompletedRewardClaimed: false,
     xFollowClaimed: false,
     telegramJoinClaimed: false,
@@ -82,6 +83,9 @@ export default function MemberProfile({
   const [xUsername, setXUsername] = useState(profileState.xUsername);
   const [telegramUsername, setTelegramUsername] = useState(profileState.telegramUsername);
   const [discordUsername, setDiscordUsername] = useState(profileState.discordUsername);
+  const [farcasterUsername, setFarcasterUsername] = useState(
+    profileState.farcasterUsername || ''
+  );
   
   // Custom avatar URL input toggle
   const [showCustomAvatarInput, setShowCustomAvatarInput] = useState(false);
@@ -137,10 +141,13 @@ export default function MemberProfile({
   };
 
   // Check if profile fields are complete (Avatar, About, and at least 1 Social)
-  const isProfileComplete = 
-    avatarUrl.trim() !== '' && 
-    aboutMe.trim().length >= 10 && 
-    (xUsername.trim() !== '' || telegramUsername.trim() !== '' || discordUsername.trim() !== '');
+  const isProfileComplete =
+    avatarUrl.trim() !== '' &&
+    aboutMe.trim().length >= 10 &&
+    (xUsername.trim() !== '' ||
+      telegramUsername.trim() !== '' ||
+      discordUsername.trim() !== '' ||
+      farcasterUsername.trim() !== '');
 
   // Calculate global completed quests out of 5 (1 Profile + 4 Socials)
   const totalQuests = 5;
@@ -165,7 +172,8 @@ export default function MemberProfile({
           aboutMe,
           xUsername,
           telegramUsername,
-          discordUsername
+          discordUsername,
+          farcasterUsername: farcasterUsername.trim().replace(/^@/, ''),
         }
       };
     });
@@ -314,6 +322,7 @@ export default function MemberProfile({
         xUsername,
         telegramUsername,
         discordUsername,
+        farcasterUsername: farcasterUsername.trim().replace(/^@/, ''),
         profileCompletedRewardClaimed: true,
       }),
       successLog: 'Card complete — +200 BCC · +20% energy.',
@@ -849,6 +858,11 @@ export default function MemberProfile({
                 {xUsername && <span className="text-cyan-400 bg-cyan-950/20 border border-cyan-800/30 px-1.5 py-0.5 rounded">X: {xUsername}</span>}
                 {telegramUsername && <span className="text-sky-400 bg-sky-950/20 border border-sky-800/30 px-1.5 py-0.5 rounded">TG: {telegramUsername}</span>}
                 {discordUsername && <span className="text-indigo-400 bg-indigo-950/20 border border-indigo-800/30 px-1.5 py-0.5 rounded">DISC: {discordUsername}</span>}
+                {farcasterUsername && (
+                  <span className="text-violet-300 bg-violet-950/20 border border-violet-500/30 px-1.5 py-0.5 rounded">
+                    FC: @{farcasterUsername.replace(/^@/, '')}
+                  </span>
+                )}
               </div>
             </div>
           </div>
@@ -914,7 +928,7 @@ export default function MemberProfile({
               />
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <label className="text-slate-400 block font-bold uppercase tracking-wider">X USERNAME</label>
                 <input
@@ -924,6 +938,18 @@ export default function MemberProfile({
                   onChange={(e) => setXUsername(e.target.value)}
                   className="w-full bg-[#050506] border border-white/10 rounded-xl px-3.5 py-2 text-slate-200 focus:outline-none focus:border-fuchsia-500 text-xs"
                 />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-slate-400 block font-bold uppercase tracking-wider">FARCASTER</label>
+                <input
+                  type="text"
+                  placeholder="@yourhandle"
+                  value={farcasterUsername}
+                  onChange={(e) => setFarcasterUsername(e.target.value)}
+                  className="w-full bg-[#050506] border border-white/10 rounded-xl px-3.5 py-2 text-slate-200 focus:outline-none focus:border-cyan-500 text-xs"
+                />
+                <p className="text-[9px] text-slate-600">Powers Neynar score + hot casts on your passport</p>
               </div>
 
               <div className="space-y-1.5">

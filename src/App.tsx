@@ -377,6 +377,7 @@ export default function App() {
       xUsername: '',
       telegramUsername: '',
       discordUsername: '',
+      farcasterUsername: '',
       profileCompletedRewardClaimed: false,
       xFollowClaimed: false,
       telegramJoinClaimed: false,
@@ -1909,6 +1910,7 @@ export default function App() {
           xUsername: '',
           telegramUsername: '',
           discordUsername: '',
+          farcasterUsername: '',
           profileCompletedRewardClaimed: false,
           xFollowClaimed: false,
           telegramJoinClaimed: false,
@@ -2287,18 +2289,19 @@ export default function App() {
       )}
 
       {/* Top bar — slim on mobile; desktop keeps facility metrics */}
-      <header className="border border-white/8 bg-[#0a0a0c]/75 backdrop-blur-xl sticky top-2 z-40 mx-3 sm:mx-4 mt-2 px-3 sm:px-6 py-3 sm:py-4 rounded-2xl flex items-center justify-between gap-3 shadow-[0_12px_40px_rgba(0,0,0,0.45)]">
+      <header className="chrome-header aurora-edge border border-cyan-400/15 bg-[#0a0a0c]/80 backdrop-blur-xl sticky top-2 z-40 mx-3 sm:mx-4 mt-2 px-3 sm:px-6 py-3 sm:py-4 rounded-2xl flex items-center justify-between gap-3 shadow-[0_12px_40px_rgba(0,0,0,0.45),0_0_40px_rgba(34,211,238,0.08)]">
         {/* Left branding — tap home */}
         <button
           type="button"
           onClick={() => handleNavNavigate('map')}
           title="Home"
           aria-label="Go to home"
-          className="flex items-center gap-2.5 sm:gap-3 min-w-0 text-left cursor-pointer rounded-xl hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/50"
+          className="relative z-[1] flex items-center gap-2.5 sm:gap-3 min-w-0 text-left cursor-pointer rounded-xl hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/50"
         >
-          <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-cyan-500/20 border border-cyan-500/30 flex items-center justify-center relative overflow-hidden shrink-0">
+          <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-cyan-500/20 border border-cyan-500/40 flex items-center justify-center relative overflow-hidden shrink-0 shadow-[0_0_20px_rgba(34,211,238,0.25)]">
             <div className="absolute inset-0 bg-cyan-400/10 animate-pulse" />
-            <Cpu className="w-4 h-4 sm:w-5 sm:h-5 text-cyan-400 relative z-10" />
+            <div className="pointer-events-none absolute inset-0 holo-sheen opacity-60" />
+            <Cpu className="w-4 h-4 sm:w-5 sm:h-5 text-cyan-300 relative z-10" />
           </div>
           <div className="min-w-0">
             <span className="hidden sm:block text-[10px] font-mono tracking-widest uppercase text-amber-500/80">
@@ -2315,7 +2318,7 @@ export default function App() {
 
         <PlayerLevelChip
           compact
-          className="shrink-0"
+          className="relative z-[1] shrink-0"
           onClick={() => changeRoom('passport')}
         />
 
@@ -2364,7 +2367,7 @@ export default function App() {
         )}
 
         {/* Actions — Menu always available; Hear + bell on all viewports */}
-        <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
+        <div className="relative z-[1] flex items-center gap-1.5 sm:gap-3 shrink-0">
           {currentUser && (
             <div className="hidden md:flex items-center gap-2 px-3 py-1.5 bg-cyan-950/20 border border-cyan-500/20 rounded-lg font-mono text-[10px] text-cyan-400 font-bold uppercase" title={`${displayIdentity.atHandle}${currentUser.walletAddress ? ` · ${currentUser.walletAddress}` : ''}`}>
               <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
@@ -2818,6 +2821,28 @@ export default function App() {
                   academyCompletedCount={academyCompletedCount}
                   coreSessionTotal={CORE_ATTENTION_SESSIONS.length}
                   compact
+                  farcasterUsername={state.profile?.farcasterUsername}
+                  onLinkFarcaster={(username) => {
+                    setState((prev) => ({
+                      ...prev,
+                      profile: {
+                        ...(prev.profile || {
+                          avatarUrl: '',
+                          aboutMe: '',
+                          xUsername: '',
+                          telegramUsername: '',
+                          discordUsername: '',
+                          farcasterUsername: '',
+                          profileCompletedRewardClaimed: false,
+                          xFollowClaimed: false,
+                          telegramJoinClaimed: false,
+                          discordJoinClaimed: false,
+                          xPostInteractionClaimed: false,
+                        }),
+                        farcasterUsername: username,
+                      },
+                    }));
+                  }}
                   nextStep={{
                     label: navNextStep.label,
                     reason: navNextStep.reason,
@@ -3834,6 +3859,28 @@ export default function App() {
                   firstRitualPending={firstRitualPending}
                   academyCompletedCount={academyCompletedCount}
                   coreSessionTotal={CORE_ATTENTION_SESSIONS.length}
+                  farcasterUsername={state.profile?.farcasterUsername}
+                  onLinkFarcaster={(username) => {
+                    setState((prev) => ({
+                      ...prev,
+                      profile: {
+                        ...(prev.profile || {
+                          avatarUrl: '',
+                          aboutMe: '',
+                          xUsername: '',
+                          telegramUsername: '',
+                          discordUsername: '',
+                          farcasterUsername: '',
+                          profileCompletedRewardClaimed: false,
+                          xFollowClaimed: false,
+                          telegramJoinClaimed: false,
+                          discordJoinClaimed: false,
+                          xPostInteractionClaimed: false,
+                        }),
+                        farcasterUsername: username,
+                      },
+                    }));
+                  }}
                   nextStep={{
                     label: navNextStep.label,
                     reason: navNextStep.reason,

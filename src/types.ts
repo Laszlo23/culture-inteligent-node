@@ -77,6 +77,8 @@ export interface MemberProfile {
   xUsername: string;
   telegramUsername: string;
   discordUsername: string;
+  /** Farcaster username without @ — powers Neynar social pulse */
+  farcasterUsername?: string;
   profileCompletedRewardClaimed: boolean;
   xFollowClaimed: boolean;
   telegramJoinClaimed: boolean;

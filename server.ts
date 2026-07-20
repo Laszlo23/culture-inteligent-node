@@ -985,6 +985,41 @@ async function startServer() {
   });
 
   /**
+   * Neynar social pulse — score + most engaging casts for passport / profile.
+   * Query: fid | username | address (Sol or ETH). Server-only API key.
+   */
+  app.get("/api/neynar/social", async (req, res) => {
+    try {
+      const fidRaw = typeof req.query.fid === "string" ? req.query.fid.trim() : "";
+      const usernameRaw =
+        typeof req.query.username === "string" ? req.query.username.trim() : "";
+      const addressRaw =
+        typeof req.query.address === "string" ? req.query.address.trim() : "";
+
+      const fid = fidRaw ? Number(fidRaw) : undefined;
+      const username = usernameRaw
+        ? usernameRaw.replace(/^@/, "").toLowerCase()
+        : undefined;
+      const address = addressRaw || undefined;
+
+      if (!fid && !username && !address) {
+        return res.status(400).json({ error: "fid_username_or_address_required" });
+      }
+      if (fid != null && (!Number.isFinite(fid) || fid <= 0)) {
+        return res.status(400).json({ error: "invalid_fid" });
+      }
+
+      const { fetchNeynarSocialPulse } = await import("./src/lib/neynar/server.ts");
+      const pulse = await fetchNeynarSocialPulse({ fid, username, address });
+      res.setHeader("Cache-Control", "private, max-age=60");
+      return res.json(pulse);
+    } catch (error: any) {
+      console.error("[neynar.social]", error?.message || error);
+      return res.status(500).json({ error: "neynar_social_failed" });
+    }
+  });
+
+  /**
    * Attention Miner — Discord Interactions (slash commands + answer buttons).
    * Portal → Interactions Endpoint URL: https://<host>/api/bots/discord
    * See docs/ATTENTION_MINER_BOTS.md
