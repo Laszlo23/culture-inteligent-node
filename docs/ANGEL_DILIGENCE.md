@@ -6,6 +6,15 @@
 
 Related: [HUMAN_ECONOMY.md](./HUMAN_ECONOMY.md) · [COMMUNITY.md](./COMMUNITY.md) · [GROWTH_LOOP.md](./GROWTH_LOOP.md) · [HEARING_MODE.md](./HEARING_MODE.md) · [FARCASTER_GROWTH.md](./FARCASTER_GROWTH.md) · [INVESTOR_PARTNER_BRIEF.md](./INVESTOR_PARTNER_BRIEF.md) · [PARTNER_ATTENTION_SESSION.md](./PARTNER_ATTENTION_SESSION.md) · [Pitch deck](../pitch/index.html) · [docs hub](./README.md)
 
+### TL;DR deck
+
+1. **Thesis** — Human Reputation Engine; passport in the first 5 minutes.  
+2. **Buy signal** — one real company Attention Session pilot.  
+3. **Honest layer** — settlement is Devnet practice; don’t oversell mainnet cash.  
+4. **Risk** — retention unproven; host/API gaps can break live claims.  
+5. **Not next** — talent marketplace waits until passport + pilot land.  
+6. **Ask lens** — conviction checklist, not a banker’s model.
+
 ---
 
 ## Verdict (one line)

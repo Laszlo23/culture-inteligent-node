@@ -17,6 +17,7 @@ This folder is the source of truth. The root [README](../README.md) is the front
 | Discord + Telegram Attention Miner bots | [ATTENTION_MINER_BOTS.md](./ATTENTION_MINER_BOTS.md) |
 | How connections are counted | [GROWTH_LOOP.md](./GROWTH_LOOP.md) |
 | Attention UI (badges + glitch) | [ATTENTION_UX.md](./ATTENTION_UX.md) |
+| Interactive deck pattern (hub / explore / Academy brief) | [INTERACTIVE_DECKS.md](./INTERACTIVE_DECKS.md) |
 | Neural Hearing guide | [HEARING_MODE.md](./HEARING_MODE.md) |
 | Farcaster Mini App growth | [FARCASTER_GROWTH.md](./FARCASTER_GROWTH.md) |
 | Google AI / Cloud credits grant pack | [GOOGLE_AI_GRANT.md](./GOOGLE_AI_GRANT.md) |

@@ -14,13 +14,11 @@ import type { StoryChapterId } from '../../lib/human-economy';
 export type FacilityMood = StoryChapterId | 'facility';
 
 const FACILITY_MOOD: {
-  image: string;
   wash: string;
   accent: 'cyan' | 'amber' | 'rose' | 'emerald';
   form: StoryFormKind;
 } = {
-  image: '/atmosphere/arena-hero.webp',
-  wash: 'from-[#050608]/40 via-[#050608]/75 to-[#050608]/95',
+  wash: 'from-[#050608]/30 via-[#050608]/70 to-[#050608]/95',
   accent: 'cyan',
   form: 'orbit',
 };
@@ -38,7 +36,14 @@ export default function CinematicPanel({
   className = '',
   children,
 }: Props) {
-  const visual = mood === 'facility' ? FACILITY_MOOD : CHAPTER_VISUALS[mood];
+  const visual =
+    mood === 'facility'
+      ? FACILITY_MOOD
+      : {
+          wash: CHAPTER_VISUALS[mood].wash,
+          accent: CHAPTER_VISUALS[mood].accent,
+          form: CHAPTER_VISUALS[mood].form,
+        };
 
   return (
     <motion.section
@@ -48,13 +53,13 @@ export default function CinematicPanel({
       className={`relative overflow-hidden rounded-2xl border border-white/12 bg-[#07080c] shadow-[0_24px_80px_rgba(0,0,0,0.55)] ${className}`}
     >
       <MoodArt
-        image={visual.image}
         wash={visual.wash}
         accent={visual.accent}
         form={visual.form}
         compact={compact}
+        plate="signal"
       />
-      <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-[#050608]/75 via-[#050608]/45 to-transparent" />
+      <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-[#050608]/70 via-[#050608]/25 to-transparent" />
       <div className="relative z-10">{children}</div>
     </motion.section>
   );

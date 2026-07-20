@@ -28,6 +28,7 @@ import { CinematicBackdrop } from './fx';
 import { useSound } from '../lib/sound/SoundContext';
 import FarcasterCastButton from './FarcasterCastButton';
 import type { SessionWalletType } from '../lib/wallet/types';
+import { readFirstContribution } from '../lib/first-contribution';
 
 type Props = {
   walletAddress: string;
@@ -57,6 +58,7 @@ export default function HumanPassportClaim({
   const short = `${walletAddress.slice(0, 4)}…${walletAddress.slice(-4)}`;
   const welcome = inviteWelcomeLine(inviteCode);
   const castPack = buildCommunityInviteCast({ displayName, walletAddress });
+  const seedScores = readFirstContribution()?.scores ?? null;
 
   const claim = async () => {
     setBusy(true);
@@ -144,25 +146,38 @@ export default function HumanPassportClaim({
               {SLOGANS.awakening}
             </h1>
             <p className="mt-2 text-sm text-slate-400 leading-relaxed">
-              Create your Human Passport — reputation you discover as you learn, build, and
-              contribute. {SLOGANS.awakeningZero}
+              {seedScores
+                ? 'Keep the scores from your first reflection — then own them on your passport.'
+                : `Create your Human Passport — reputation you discover as you learn, build, and contribute. ${SLOGANS.awakeningZero}`}
             </p>
 
             <ul className="mt-5 grid grid-cols-3 gap-2">
-              {PASSPORT_DIMENSIONS.map((d) => (
-                <li
-                  key={d.id}
-                  className="rounded-xl border border-cyan-500/20 bg-cyan-500/5 px-2 py-3 text-center"
-                >
-                  <p className="font-mono text-[8px] uppercase tracking-widest text-cyan-400/85">
-                    {d.title}
-                  </p>
-                  <p className="mt-1 font-display text-2xl font-bold italic text-white">0</p>
-                </li>
-              ))}
+              {PASSPORT_DIMENSIONS.map((d) => {
+                const value =
+                  d.id === 'knowledge'
+                    ? seedScores?.knowledge ?? 0
+                    : d.id === 'builder'
+                      ? seedScores?.creativity ?? seedScores?.builder ?? 0
+                      : seedScores?.contribution ?? 0;
+                return (
+                  <li
+                    key={d.id}
+                    className="rounded-xl border border-cyan-500/20 bg-cyan-500/5 px-2 py-3 text-center"
+                  >
+                    <p className="font-mono text-[8px] uppercase tracking-widest text-cyan-400/85">
+                      {d.title}
+                    </p>
+                    <p className="mt-1 font-display text-2xl font-bold italic text-white">
+                      {value}
+                    </p>
+                  </li>
+                );
+              })}
             </ul>
             <p className="mt-2 text-[11px] text-slate-500 text-center leading-relaxed">
-              {SLOGANS.potential}
+              {seedScores
+                ? `Human Value ${seedScores.humanValue} · grows every time you prove attention`
+                : SLOGANS.potential}
             </p>
 
             <ul className="mt-5 space-y-2">

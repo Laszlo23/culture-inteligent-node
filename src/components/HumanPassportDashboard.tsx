@@ -4,7 +4,7 @@
 
 import React, { useMemo } from 'react';
 import { motion } from 'motion/react';
-import { ArrowRight, Award } from 'lucide-react';
+import { ArrowRight, Award, Sparkles } from 'lucide-react';
 import type { GameState } from '../types';
 import { BRAND, SLOGANS } from '../lib/brand-slogans';
 import {
@@ -40,6 +40,11 @@ type Props = {
   onOpenFull?: () => void;
   onOpenPartners?: () => void;
   onOpenHearing?: () => void;
+  /** Replay cinematic Awareness Story */
+  onOpenStory?: () => void;
+  onOpenSpark?: () => void;
+  onOpenReturn?: () => void;
+  onSpread?: () => void;
 };
 
 function ScoreCard({
@@ -54,6 +59,8 @@ function ScoreCard({
   return (
     <motion.div
       whileHover={{ y: -2 }}
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
       className={`flex-1 min-w-[96px] rounded-2xl border px-3 py-3.5 text-center backdrop-blur-md ${accentClass}`}
     >
       <p className="font-mono text-[9px] uppercase tracking-wider text-white/70">{label}</p>
@@ -61,9 +68,11 @@ function ScoreCard({
         {value}
       </p>
       <div className="mt-2 h-1 rounded-full bg-white/10 overflow-hidden">
-        <div
+        <motion.div
           className="h-full rounded-full bg-current opacity-90"
-          style={{ width: `${Math.min(100, value)}%` }}
+          initial={{ width: 0 }}
+          animate={{ width: `${Math.min(100, value)}%` }}
+          transition={{ duration: 0.85, ease: 'easeOut' }}
         />
       </div>
     </motion.div>
@@ -85,6 +94,10 @@ export default function HumanPassportDashboard({
   onOpenFull,
   onOpenPartners,
   onOpenHearing,
+  onOpenStory,
+  onOpenSpark,
+  onOpenReturn,
+  onSpread,
 }: Props) {
   const missionsCompleted = state.dailyMissions.filter((m) => m.completed).length;
   const scores = useMemo(() => {
@@ -189,14 +202,26 @@ export default function HumanPassportDashboard({
         )}
 
         <div className="mt-6 flex flex-col sm:flex-row gap-2.5">
-          <button
+          <motion.button
             type="button"
             onClick={nextStep.onGo}
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
             className="flex-1 inline-flex items-center justify-center gap-2 px-5 py-3.5 rounded-2xl bg-white hover:bg-cyan-100 text-black font-mono text-[11px] font-black uppercase tracking-wider cursor-pointer shadow-[0_0_40px_rgba(255,255,255,0.18)]"
           >
             {firstRitualPending ? 'Start Proof of Attention' : nextStep.label}
             <ArrowRight className="w-3.5 h-3.5" />
-          </button>
+          </motion.button>
+          {onOpenStory && (
+            <button
+              type="button"
+              onClick={onOpenStory}
+              className="inline-flex items-center justify-center gap-2 px-4 py-3.5 rounded-2xl border border-amber-400/30 bg-amber-500/10 hover:bg-amber-500/20 text-amber-100 font-mono text-[10px] font-black uppercase tracking-wider cursor-pointer backdrop-blur-md"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+              Why learn
+            </button>
+          )}
           {onOpenFull && compact && (
             <button
               type="button"
@@ -222,6 +247,9 @@ export default function HumanPassportDashboard({
             compact={compact}
             onOpenPartners={onOpenPartners}
             onOpenHearing={onOpenHearing}
+            onOpenSpark={onOpenSpark}
+            onOpenReturn={onOpenReturn}
+            onSpread={onSpread}
           />
         </div>
       </div>

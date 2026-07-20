@@ -21,7 +21,9 @@ Live: https://mining.buildingcultureid.space/
 
 Milestone: a random person feels a new civilization story, creates a passport, finishes one Spark, shares with a friend — without the facility map.
 
-Cold-start code: `HumanEconomyLanding` · `STORY_CHAPTERS` · then Auth → `HumanPassportClaim` → Loop Stage.
+Cold-start code: `HumanEconomyLanding` · `STORY_CHAPTERS` (cinematic presentation) · explore uses `EXPLORE_DECK` · then Auth → `HumanPassportClaim` → **personal hook** (`curious` / `reflective` / `balanced`) → First Contribution → Loop Stage.  
+Hook ≠ class-select; passport Knowledge / Builder / Contribution stay discovery scores. Path soft-routes Academy order + contribution prompts only.  
+In-app explainers: [INTERACTIVE_DECKS.md](./INTERACTIVE_DECKS.md).
 
 ## Problem
 

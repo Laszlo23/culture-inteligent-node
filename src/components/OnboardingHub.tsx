@@ -605,7 +605,7 @@ export default function OnboardingHub({
                 mood="awakening"
                 onCta={() => {
                   window.location.href =
-                    'mailto:admin@buildingculture.space?subject=Attention%20Session%20pilot';
+                    'mailto:office@buildingculture.capital?subject=Attention%20Session%20pilot';
                   addLog('PARTNER: Pilot inquiry opened — Attention Session path.', 'success');
                 }}
               />

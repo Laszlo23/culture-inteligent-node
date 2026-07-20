@@ -121,7 +121,7 @@ const ALL: Record<string, NavItem> = {
   profile: {
     id: 'profile',
     label: 'You',
-    hint: 'Mint · list · invite',
+    hint: 'Card · quests · miners',
     icon: <User className="w-4 h-4" />,
   },
   missions: {
@@ -305,7 +305,7 @@ export default function NavMenu({
     phase === 'ritual'
       ? ['map', 'lab', 'passport']
       : phase === 'guided'
-        ? ['map', 'lab', 'passport', 'treasury']
+        ? ['map', 'lab', 'passport', 'missions', 'profile', 'treasury']
         : ['map', 'passport', 'lab', 'missions', 'profile'];
 
   const moreFacilityIds: NavDestination[] =

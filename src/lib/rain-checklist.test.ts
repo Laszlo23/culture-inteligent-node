@@ -2,9 +2,12 @@ import { describe, it, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   DISCORD_PIN_COPY,
+  DM_INVITE_COPY,
+  RAIN_CHAPTERS,
   RAIN_CHECKLIST_KEY,
   RAIN_TASKS,
   TELEGRAM_PIN_COPY,
+  firstIncompleteChapter,
   markRainTask,
   rainDoneCount,
   readRainProgress,
@@ -40,6 +43,16 @@ describe('rain checklist', () => {
     assert.match(DISCORD_PIN_COPY, /\/spark/);
     assert.match(TELEGRAM_PIN_COPY, /hear=1/);
     assert.match(TELEGRAM_PIN_COPY, /Passport/i);
+  });
+
+  it('groups tasks into four ritual chapters', () => {
+    assert.equal(RAIN_CHAPTERS.length, 4);
+    assert.deepEqual(
+      RAIN_CHAPTERS.map((c) => c.id),
+      ['cast', 'pin', 'invite', 'host']
+    );
+    assert.match(DM_INVITE_COPY, /First Spark/i);
+    assert.equal(firstIncompleteChapter(readRainProgress()), 'cast');
   });
 });
 

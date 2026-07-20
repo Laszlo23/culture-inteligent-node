@@ -71,8 +71,10 @@ import {
 } from "./src/lib/zk-id/server-verify.ts";
 import {
   mintSoulboundToken2022,
+  buildSoulboundMintForUserFee,
   recordSoulboundPlaceholder,
   getSoulboundBadgePda,
+  SOULBOUND_MINT_MIN_LAMPORTS,
 } from "./src/lib/zk-id/soulbound-mint.ts";
 import { loadEconomyAuthorityFromEnv } from "./src/lib/solana-economy.ts";
 import { Connection, PublicKey } from "@solana/web3.js";
@@ -1198,30 +1200,86 @@ async function startServer() {
         });
       }
 
+      /** Client finished a user-fee mint — record binding */
+      const confirm = req.body?.confirm as
+        | { mintAddress?: string; mintSignature?: string; badgePda?: string }
+        | undefined;
+      if (confirm?.mintAddress && confirm?.mintSignature) {
+        const updated = await markZkMinted(row.nullifierHash, {
+          mintAddress: confirm.mintAddress,
+          mintSignature: confirm.mintSignature,
+          badgePda: confirm.badgePda || row.badgePda,
+        });
+        return res.json({
+          soulboundMinted: true,
+          mintAddress: confirm.mintAddress,
+          mintSignature: confirm.mintSignature,
+          badgePda: updated?.badgePda || confirm.badgePda,
+          mode: "token2022",
+          nonTransferable: true,
+          note: "Soulbound · ZKPassport-bound · Token-2022 NonTransferable",
+          binding: updated,
+        });
+      }
+
       const owner = new PublicKey(wallet);
       const authority = loadEconomyAuthorityFromEnv();
+      const connection = new Connection(
+        process.env.SOLANA_RPC_URL || "https://api.devnet.solana.com",
+        "confirmed"
+      );
+      const preferUserFee = req.body?.preferUserFee === true;
       let mintResult;
       let mode: string;
 
+      const allowRecorded = req.body?.allowRecorded === true;
+
       if (authority) {
-        try {
-          const connection = new Connection(
-            process.env.SOLANA_RPC_URL || "https://api.devnet.solana.com",
-            "confirmed"
-          );
-          mintResult = await mintSoulboundToken2022({
-            connection,
-            payer: authority,
-            owner,
-            nullifierHash: row.nullifierHash,
-          });
-          mode = "token2022";
-        } catch (mintErr: any) {
-          console.warn("Token-2022 mint failed, recording placeholder", mintErr?.message);
-          mintResult = recordSoulboundPlaceholder(row.nullifierHash, wallet);
-          mode = "recorded";
+        const authBal = await connection.getBalance(authority.publicKey);
+        const canAuthorityPay = authBal >= SOULBOUND_MINT_MIN_LAMPORTS;
+
+        if (canAuthorityPay && !preferUserFee) {
+          try {
+            mintResult = await mintSoulboundToken2022({
+              connection,
+              payer: authority,
+              owner,
+              nullifierHash: row.nullifierHash,
+            });
+            mode = "token2022";
+          } catch (mintErr: any) {
+            console.warn("Authority-paid Token-2022 mint failed", mintErr?.message);
+          }
         }
-      } else {
+
+        // Prefer member-paid rent when treasury is dry (or client asked for it)
+        if (!mintResult && !allowRecorded && (preferUserFee || !canAuthorityPay)) {
+          try {
+            const prepared = await buildSoulboundMintForUserFee({
+              connection,
+              mintAuthority: authority,
+              owner,
+              nullifierHash: row.nullifierHash,
+            });
+            return res.json({
+              needsClientSign: true,
+              serialized: prepared.serializedBase64,
+              mintAddress: prepared.mintAddress,
+              badgePda: prepared.badgePda,
+              ownerAta: prepared.ownerAta,
+              mode: "token2022_pending_sign",
+              note:
+                authBal < SOULBOUND_MINT_MIN_LAMPORTS
+                  ? "Treasury low on Devnet SOL — sign once with your wallet to seal the badge (~0.005 SOL rent)."
+                  : "Sign once with your wallet to seal the soulbound badge.",
+            });
+          } catch (prepErr: any) {
+            console.warn("User-fee mint prepare failed", prepErr?.message);
+          }
+        }
+      }
+
+      if (!mintResult) {
         mintResult = recordSoulboundPlaceholder(row.nullifierHash, wallet);
         mode = "recorded";
       }
@@ -1238,12 +1296,12 @@ async function startServer() {
         mintSignature: mintResult.mintSignature,
         badgePda: mintResult.badgePda,
         ownerAta: mintResult.ownerAta,
-        mode,
+        mode: mode!,
         nonTransferable: mode === "token2022",
         note:
           mode === "token2022"
             ? "Soulbound · ZKPassport-bound · Token-2022 NonTransferable"
-            : "Soulbound record gated by ZKPassport — Token-2022 mint pending ECONOMY_AUTHORITY_SECRET / SOL",
+            : "Soulbound claim sealed (ZK-gated). On-chain Token-2022 pending Devnet SOL — your identity is bound.",
         binding: updated,
       });
     } catch (err: any) {

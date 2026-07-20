@@ -3,8 +3,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React from 'react';
-import { Shield, FileText, Scale, ArrowLeft } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { Shield, FileText, Scale, ArrowLeft, ChevronDown } from 'lucide-react';
 
 export type LegalPageId = 'legal-privacy' | 'legal-terms' | 'legal-disclaimer';
 
@@ -13,14 +13,21 @@ interface LegalPagesProps {
   onBack: () => void;
 }
 
-const COPY: Record<
-  LegalPageId,
-  { title: string; icon: React.ReactNode; updated: string; sections: { h: string; p: string }[] }
-> = {
+type LegalDoc = {
+  title: string;
+  icon: React.ReactNode;
+  updated: string;
+  /** One plain-language lead — not a second essay */
+  lead: string;
+  sections: { h: string; p: string }[];
+};
+
+const COPY: Record<LegalPageId, LegalDoc> = {
   'legal-privacy': {
     title: 'Privacy Policy',
     icon: <Shield className="w-5 h-5 text-cyan-400" />,
     updated: 'July 2026',
+    lead: 'We keep facility progress in your browser, use wallet addresses for Devnet proofs, and never ask The Void for your identity.',
     sections: [
       {
         h: 'What we store locally',
@@ -48,6 +55,7 @@ const COPY: Record<
     title: 'Terms of Use',
     icon: <FileText className="w-5 h-5 text-cyan-400" />,
     updated: 'July 2026',
+    lead: 'This is an experimental Solana Devnet demo. Simulated features are game-layer only — not financial products.',
     sections: [
       {
         h: 'Devnet demo product',
@@ -71,6 +79,7 @@ const COPY: Record<
     title: 'Disclaimer',
     icon: <Scale className="w-5 h-5 text-cyan-400" />,
     updated: 'July 2026',
+    lead: 'Some flows hit Solana Devnet for real; cosmetics and practice loops stay client-side. Always verify signatures yourself.',
     sections: [
       {
         h: 'What is real on-chain (Devnet)',
@@ -98,6 +107,11 @@ const COPY: Record<
 
 export default function LegalPages({ page, onBack }: LegalPagesProps) {
   const doc = COPY[page];
+  const [openId, setOpenId] = useState<string | null>(doc.sections[0]?.h ?? null);
+
+  useEffect(() => {
+    setOpenId(COPY[page].sections[0]?.h ?? null);
+  }, [page]);
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
@@ -115,17 +129,41 @@ export default function LegalPages({ page, onBack }: LegalPagesProps) {
           {doc.icon}
           <h2 className="text-lg font-bold text-white tracking-tight">{doc.title}</h2>
         </div>
-        <p className="font-mono text-[9px] tracking-widest uppercase text-slate-600 mb-6">
+        <p className="font-mono text-[9px] tracking-widest uppercase text-slate-600 mb-3">
           Building Culture · Updated {doc.updated} · Devnet
         </p>
+        <p className="text-sm leading-relaxed text-slate-300 mb-6">{doc.lead}</p>
 
-        <div className="space-y-5">
-          {doc.sections.map((s) => (
-            <section key={s.h}>
-              <h3 className="text-xs font-bold text-slate-200 mb-1.5">{s.h}</h3>
-              <p className="text-[12px] text-slate-400 font-sans leading-relaxed">{s.p}</p>
-            </section>
-          ))}
+        <div className="space-y-2" role="list">
+          {doc.sections.map((s) => {
+            const open = openId === s.h;
+            return (
+              <div
+                key={s.h}
+                role="listitem"
+                className="rounded-xl border border-white/8 bg-black/30 overflow-hidden"
+              >
+                <button
+                  type="button"
+                  aria-expanded={open}
+                  onClick={() => setOpenId(open ? null : s.h)}
+                  className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left cursor-pointer hover:bg-white/[0.03]"
+                >
+                  <h3 className="text-xs font-bold text-slate-200">{s.h}</h3>
+                  <ChevronDown
+                    className={`h-4 w-4 shrink-0 text-slate-500 transition-transform ${
+                      open ? 'rotate-180 text-cyan-400/80' : ''
+                    }`}
+                  />
+                </button>
+                {open && (
+                  <p className="border-t border-white/5 px-4 py-3 text-[12px] text-slate-400 font-sans leading-relaxed">
+                    {s.p}
+                  </p>
+                )}
+              </div>
+            );
+          })}
         </div>
       </div>
     </div>

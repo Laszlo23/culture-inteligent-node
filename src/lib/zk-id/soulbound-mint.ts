@@ -44,15 +44,65 @@ export type SoulboundMintResult = {
   mode: 'token2022' | 'recorded';
 };
 
+/** Lamports we want on the fee payer before attempting Token-2022 mint (~mint+ATA+fees). */
+export const SOULBOUND_MINT_MIN_LAMPORTS = 4_500_000;
+
+function buildSoulboundIx(opts: {
+  payer: PublicKey;
+  owner: PublicKey;
+  mint: PublicKey;
+  mintAuthority: PublicKey;
+  mintLen: number;
+  lamports: number;
+  ownerAta: PublicKey;
+}) {
+  return [
+    SystemProgram.createAccount({
+      fromPubkey: opts.payer,
+      newAccountPubkey: opts.mint,
+      space: opts.mintLen,
+      lamports: opts.lamports,
+      programId: TOKEN_2022_PROGRAM_ID,
+    }),
+    createInitializeNonTransferableMintInstruction(opts.mint, TOKEN_2022_PROGRAM_ID),
+    createInitializeMintInstruction(
+      opts.mint,
+      0,
+      opts.mintAuthority,
+      null,
+      TOKEN_2022_PROGRAM_ID
+    ),
+    createAssociatedTokenAccountIdempotentInstruction(
+      opts.payer,
+      opts.ownerAta,
+      opts.owner,
+      opts.mint,
+      TOKEN_2022_PROGRAM_ID,
+      ASSOCIATED_TOKEN_PROGRAM_ID
+    ),
+    createMintToInstruction(
+      opts.mint,
+      opts.ownerAta,
+      opts.mintAuthority,
+      1,
+      [],
+      TOKEN_2022_PROGRAM_ID
+    ),
+  ];
+}
+
 /**
  * Mint a 1-supply Token-2022 NonTransferable reputation badge to `owner`.
  * `payer` signs rent + fees (authority or user).
+ * `mintAuthority` defaults to payer (legacy); pass economy authority when user pays fees.
  */
 export async function mintSoulboundToken2022(opts: {
   connection?: Connection;
   payer: Keypair;
   owner: PublicKey;
   nullifierHash: string;
+  /** When user pays fees, authority still controls the mint */
+  mintAuthority?: Keypair;
 }): Promise<SoulboundMintResult> {
   const connection =
     opts.connection ||
@@ -60,8 +110,8 @@ export async function mintSoulboundToken2022(opts: {
       (typeof process !== 'undefined' && process.env?.SOLANA_RPC_URL) || DEVNET_RPC,
       'confirmed'
     );
+  const mintAuthority = opts.mintAuthority || opts.payer;
   const mintKeypair = Keypair.generate();
-  const decimals = 0;
   const extensions = [ExtensionType.NonTransferable];
   const mintLen = getMintLen(extensions);
   const lamports = await connection.getMinimumBalanceForRentExemption(mintLen);
@@ -76,48 +126,23 @@ export async function mintSoulboundToken2022(opts: {
   );
 
   const tx = new Transaction().add(
-    SystemProgram.createAccount({
-      fromPubkey: opts.payer.publicKey,
-      newAccountPubkey: mintKeypair.publicKey,
-      space: mintLen,
+    ...buildSoulboundIx({
+      payer: opts.payer.publicKey,
+      owner: opts.owner,
+      mint: mintKeypair.publicKey,
+      mintAuthority: mintAuthority.publicKey,
+      mintLen,
       lamports,
-      programId: TOKEN_2022_PROGRAM_ID,
-    }),
-    createInitializeNonTransferableMintInstruction(
-      mintKeypair.publicKey,
-      TOKEN_2022_PROGRAM_ID
-    ),
-    createInitializeMintInstruction(
-      mintKeypair.publicKey,
-      decimals,
-      opts.payer.publicKey,
-      null,
-      TOKEN_2022_PROGRAM_ID
-    ),
-    createAssociatedTokenAccountIdempotentInstruction(
-      opts.payer.publicKey,
       ownerAta,
-      opts.owner,
-      mintKeypair.publicKey,
-      TOKEN_2022_PROGRAM_ID,
-      ASSOCIATED_TOKEN_PROGRAM_ID
-    ),
-    createMintToInstruction(
-      mintKeypair.publicKey,
-      ownerAta,
-      opts.payer.publicKey,
-      1,
-      [],
-      TOKEN_2022_PROGRAM_ID
-    )
+    })
   );
 
-  const signature = await sendAndConfirmTransaction(
-    connection,
-    tx,
-    [opts.payer, mintKeypair],
-    { commitment: 'confirmed' }
-  );
+  const signers = [opts.payer, mintKeypair];
+  if (mintAuthority !== opts.payer) signers.push(mintAuthority);
+
+  const signature = await sendAndConfirmTransaction(connection, tx, signers, {
+    commitment: 'confirmed',
+  });
 
   return {
     mintAddress: mintKeypair.publicKey.toBase58(),
@@ -125,6 +150,66 @@ export async function mintSoulboundToken2022(opts: {
     badgePda: badgePda.toBase58(),
     ownerAta: ownerAta.toBase58(),
     mode: 'token2022',
+  };
+}
+
+/**
+ * Partially-signed mint tx: user is fee payer, economy authority is mint authority.
+ * Client must sign as fee payer then send (or POST confirm after send).
+ */
+export async function buildSoulboundMintForUserFee(opts: {
+  connection?: Connection;
+  mintAuthority: Keypair;
+  owner: PublicKey;
+  nullifierHash: string;
+}): Promise<{
+  serializedBase64: string;
+  mintAddress: string;
+  badgePda: string;
+  ownerAta: string;
+}> {
+  const connection =
+    opts.connection ||
+    new Connection(
+      (typeof process !== 'undefined' && process.env?.SOLANA_RPC_URL) || DEVNET_RPC,
+      'confirmed'
+    );
+  const mintKeypair = Keypair.generate();
+  const extensions = [ExtensionType.NonTransferable];
+  const mintLen = getMintLen(extensions);
+  const lamports = await connection.getMinimumBalanceForRentExemption(mintLen);
+  const [badgePda] = getSoulboundBadgePda(opts.nullifierHash);
+  const ownerAta = getAssociatedTokenAddressSync(
+    mintKeypair.publicKey,
+    opts.owner,
+    false,
+    TOKEN_2022_PROGRAM_ID,
+    ASSOCIATED_TOKEN_PROGRAM_ID
+  );
+
+  const { blockhash } = await connection.getLatestBlockhash('confirmed');
+  const tx = new Transaction().add(
+    ...buildSoulboundIx({
+      payer: opts.owner,
+      owner: opts.owner,
+      mint: mintKeypair.publicKey,
+      mintAuthority: opts.mintAuthority.publicKey,
+      mintLen,
+      lamports,
+      ownerAta,
+    })
+  );
+  tx.feePayer = opts.owner;
+  tx.recentBlockhash = blockhash;
+  tx.partialSign(opts.mintAuthority, mintKeypair);
+
+  return {
+    serializedBase64: tx
+      .serialize({ requireAllSignatures: false, verifySignatures: false })
+      .toString('base64'),
+    mintAddress: mintKeypair.publicKey.toBase58(),
+    badgePda: badgePda.toBase58(),
+    ownerAta: ownerAta.toBase58(),
   };
 }
 

@@ -452,18 +452,74 @@ export async function zkStatus() {
   };
 }
 
-export async function zkMintSoulbound() {
+export async function zkMintSoulbound(opts?: {
+  walletType?: SessionWalletType;
+  localKeypair?: Keypair | null;
+  /** Prefer member-paid rent when treasury is dry */
+  preferUserFee?: boolean;
+  /** Skip client-sign path — seal ZK-gated record only */
+  allowRecorded?: boolean;
+}) {
   const headers = await authHeaders();
   const response = await fetch('/api/zk/mint', {
     method: 'POST',
     headers,
-    body: JSON.stringify({}),
+    body: JSON.stringify({
+      preferUserFee: opts?.preferUserFee === true,
+      allowRecorded: opts?.allowRecorded === true,
+    }),
   });
   const data = await response.json();
   if (!response.ok) throw new Error(data.error || 'Soulbound mint failed');
+
+  if (data.needsClientSign && data.serialized) {
+    if (!opts?.walletType) {
+      throw new Error('Wallet session required to sign soulbound mint');
+    }
+    try {
+      const signature = await sendPartialEconomyTx({
+        serializedBase64: data.serialized,
+        walletType: opts.walletType,
+        localKeypair: opts.localKeypair,
+      });
+      const confirmRes = await fetch('/api/zk/mint', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          confirm: {
+            mintAddress: data.mintAddress,
+            mintSignature: signature,
+            badgePda: data.badgePda,
+          },
+        }),
+      });
+      const confirmed = await confirmRes.json();
+      if (!confirmRes.ok) throw new Error(confirmed.error || 'Soulbound confirm failed');
+      return confirmed as {
+        soulboundMinted?: boolean;
+        alreadyMinted?: boolean;
+        mintAddress: string;
+        mintSignature?: string;
+        badgePda?: string;
+        mode: string;
+        nonTransferable?: boolean;
+        note?: string;
+      };
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (/insufficient|0x1|no record of a prior/i.test(msg)) {
+        throw new Error(
+          'Need a little Devnet SOL in your wallet to seal the on-chain badge (~0.005). Claim faucet SOL, then try again — or retry for a ZK-gated record.'
+        );
+      }
+      throw err instanceof Error ? err : new Error(msg);
+    }
+  }
+
   return data as {
     soulboundMinted?: boolean;
     alreadyMinted?: boolean;
+    needsClientSign?: boolean;
     mintAddress: string;
     mintSignature?: string;
     badgePda?: string;

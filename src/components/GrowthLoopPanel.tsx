@@ -27,18 +27,26 @@ type Props = {
   compact?: boolean;
   onOpenPartners?: () => void;
   onOpenHearing?: () => void;
+  /** Enter Spark / Academy session */
+  onOpenSpark?: () => void;
+  /** Claim / return beat */
+  onOpenReturn?: () => void;
+  /** Copy / trigger spread invite */
+  onSpread?: () => void;
 };
 
 const STEPS: Array<{
   id: keyof LocalLoopProgress;
   label: string;
   hint: string;
+  /** Index into JOURNEY_DECK */
+  deckIndex: number;
 }> = [
-  { id: 'discovered', label: 'Discover', hint: 'I learn something new.' },
-  { id: 'claimed', label: 'Build', hint: 'I create my Human Passport.' },
-  { id: 'sparked', label: 'Spark', hint: 'I prove understanding.' },
-  { id: 'spread', label: 'Share', hint: 'I help others grow.' },
-  { id: 'returned', label: 'Reputation', hint: 'My contribution becomes visible.' },
+  { id: 'discovered', label: 'Hear', hint: 'Open ears-first — or just begin.', deckIndex: 0 },
+  { id: 'claimed', label: 'Passport', hint: 'Own your Human Passport.', deckIndex: 0 },
+  { id: 'sparked', label: 'Spark', hint: 'Prove attention once.', deckIndex: 1 },
+  { id: 'spread', label: 'Spread', hint: 'Pass an invite — love travels.', deckIndex: 3 },
+  { id: 'returned', label: 'Return', hint: 'Claim daily Impact · grow scores.', deckIndex: 4 },
 ];
 
 export default function GrowthLoopPanel({
@@ -47,12 +55,34 @@ export default function GrowthLoopPanel({
   compact = false,
   onOpenPartners,
   onOpenHearing,
+  onOpenSpark,
+  onOpenReturn,
+  onSpread,
 }: Props) {
   const myCode = inviteCodeFromWallet(walletAddress);
   const [local, setLocal] = useState<LocalLoopProgress>(() => buildLocalLoopProgress());
   const [pulse, setPulse] = useState<GrowthPulse | null>(null);
   const [mine, setMine] = useState<GrowthMemberStats | null>(null);
   const [loading, setLoading] = useState(false);
+  const [deckIndex, setDeckIndex] = useState(0);
+  const [activeStepId, setActiveStepId] = useState<keyof LocalLoopProgress | null>(null);
+  const [showDeck, setShowDeck] = useState(!compact);
+  const [sparkTick, setSparkTick] = useState(0);
+
+  useEffect(() => {
+    const id = window.setInterval(() => setSparkTick((n) => n + 1), 4800);
+    return () => window.clearInterval(id);
+  }, []);
+
+  const runStep = (step: (typeof STEPS)[number]) => {
+    setDeckIndex(step.deckIndex);
+    setActiveStepId(step.id);
+    setShowDeck(true);
+    if (step.id === 'discovered') onOpenHearing?.();
+    else if (step.id === 'sparked') onOpenSpark?.();
+    else if (step.id === 'spread') onSpread?.();
+    else if (step.id === 'returned') onOpenReturn?.();
+  };
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -107,10 +137,10 @@ export default function GrowthLoopPanel({
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <p className="font-mono text-[9px] font-black tracking-[0.28em] uppercase text-emerald-400/90">
-            Growth loop
+            Your path
           </p>
           <h3 className="mt-1 font-display text-lg md:text-xl font-bold italic text-white">
-            Connections growing
+            Hear → Spark → Spread → Return
           </h3>
         </div>
         <button
@@ -124,9 +154,30 @@ export default function GrowthLoopPanel({
         </button>
       </div>
 
-      {!compact && (
+      {showDeck && (
         <div className="mt-4">
-          <InteractiveDeck slides={JOURNEY_DECK} mood="evolution" compact />
+          <InteractiveDeck
+            key={`journey-${deckIndex}`}
+            slides={JOURNEY_DECK}
+            mood="evolution"
+            compact
+            initialIndex={deckIndex}
+            onCta={(slideId) => {
+              if (slideId === 'discover') onOpenHearing?.();
+              else if (slideId === 'spark' || slideId === 'build') onOpenSpark?.();
+              else if (slideId === 'share') onSpread?.();
+              else if (slideId === 'reputation') onOpenReturn?.();
+            }}
+          />
+          {compact && (
+            <button
+              type="button"
+              onClick={() => setShowDeck(false)}
+              className="mt-2 w-full text-center text-[10px] font-mono uppercase tracking-wider text-slate-500 hover:text-slate-300 cursor-pointer"
+            >
+              Hide explainer
+            </button>
+          )}
         </div>
       )}
 
@@ -160,30 +211,48 @@ export default function GrowthLoopPanel({
       <ol className="mt-5 flex flex-wrap gap-2">
         {STEPS.map((step, i) => {
           const done = stepDone(step.id);
+          const selected = showDeck && activeStepId === step.id;
+          const glow = done && sparkTick % 5 === i % 5;
           return (
-            <li
-              key={step.id}
-              className={`flex items-center gap-2 rounded-xl border px-3 py-2 min-w-[7.5rem] ${
-                done
-                  ? 'border-emerald-400/40 bg-emerald-500/10 text-emerald-100'
-                  : 'border-white/10 bg-white/[0.03] text-slate-400'
-              }`}
-              title={step.hint}
-            >
-              <span
-                className={`flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-black ${
-                  done ? 'bg-emerald-400 text-black' : 'bg-white/10 text-slate-500'
+            <li key={step.id}>
+              <button
+                type="button"
+                onClick={() => runStep(step)}
+                title={step.hint}
+                className={`relative flex items-center gap-2 rounded-xl border px-3 py-2 min-w-[7.5rem] cursor-pointer transition ${
+                  selected
+                    ? 'border-amber-400/50 bg-amber-500/15 text-amber-50 shadow-[0_0_20px_rgba(251,191,36,0.25)]'
+                    : done
+                      ? 'border-emerald-400/40 bg-emerald-500/10 text-emerald-100 hover:shadow-[0_0_16px_rgba(52,211,153,0.3)]'
+                      : 'border-white/10 bg-white/[0.03] text-slate-400 hover:border-white/25 hover:text-slate-200'
                 }`}
               >
-                {done ? <Check className="w-3 h-3" /> : i + 1}
-              </span>
-              <span className="font-mono text-[10px] font-bold uppercase tracking-wider">
-                {step.label}
-              </span>
+                <span
+                  className={`relative flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-black ${
+                    done ? 'bg-emerald-400 text-black' : 'bg-white/10 text-slate-500'
+                  }`}
+                >
+                  {done ? <Check className="w-3 h-3" /> : i + 1}
+                  {glow && (
+                    <motion.span
+                      className="pointer-events-none absolute -inset-1 rounded-full border border-amber-300/50"
+                      initial={{ opacity: 0.6, scale: 1 }}
+                      animate={{ opacity: 0, scale: 1.6 }}
+                      transition={{ duration: 1.2 }}
+                    />
+                  )}
+                </span>
+                <span className="font-mono text-[10px] font-bold uppercase tracking-wider">
+                  {step.label}
+                </span>
+              </button>
             </li>
           );
         })}
       </ol>
+      <p className="mt-2 text-[10px] font-mono uppercase tracking-wider text-slate-600">
+        Tap a step · explainer + session
+      </p>
 
       {!compact && pulse && pulse.recent.length > 0 && (
         <div className="mt-4 rounded-xl border border-white/8 bg-black/25 px-3 py-2.5">

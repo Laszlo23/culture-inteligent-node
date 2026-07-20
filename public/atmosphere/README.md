@@ -1,14 +1,17 @@
-# Atmosphere video loops
+# Atmosphere
 
-Short muted loops used by `CinematicBackdrop` (`hero` / `auth` / `facility` / `ritual` / `duality`).
+Live UI no longer uses the soft MP4 wash plates.
 
-| File | Used for |
-|------|----------|
-| `hero-field.mp4` | Landing + auth |
-| `facility-grid.mp4` | Facility + duality (single quiet plate) |
-| `ritual-pulse.mp4` | First Spark / ritual |
-| `arena-hero.webp` | Duality poster / Arena still |
+`CinematicBackdrop` / `AmbientField` render a **sparkling signal field**:
+- canvas particles (cyan / amber / white cross-sparks)
+- perspective lattice
+- accent beams (ritual / duality / hero)
 
-Atmosphere stays intentionally quiet: one video plate, soft veil, no grain/grid stack.
+Legacy files below are kept as optional poster / archive assets only:
 
-Generated procedurally with ffmpeg (no stock license). Replace with filmed plates anytime — keep ~960×540, muted, ≤1MB when possible.
+| File | Notes |
+|------|--------|
+| `hero-field.mp4` | unused (archive) |
+| `facility-grid.mp4` | unused (archive) |
+| `ritual-pulse.mp4` | unused (archive) |
+| `arena-hero.webp` | still available for story / posters |

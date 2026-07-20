@@ -10,23 +10,22 @@ import {
   JOURNEY_STEPS,
   PASSPORT_DIMENSIONS,
   PRICING_TIERS,
-  PROOF_TYPES,
   STORY_CHAPTERS,
   joinWaitlist,
   type PricingTierId,
   type StoryChapterId,
 } from '../lib/human-economy';
-import { pickQuote } from '../lib/motivating-quotes';
+import { EXPLORE_DECK } from '../lib/decks';
 import {
   COMMUNITY_LINKS,
   captureInviteFromUrl,
   inviteWelcomeLine,
 } from '../lib/community-invite';
 import { CinematicBackdrop } from './fx';
+import InteractiveDeck from './fx/InteractiveDeck';
 import { FarcasterCastDeck, OgShareDeck } from './FarcasterCastButton';
 import MakeItRainDeck from './MakeItRainDeck';
 import StoryChapterArt, { CHAPTER_VISUALS } from './onboarding/StoryChapterArt';
-
 type Props = {
   onBuildPassport: () => void;
   onContinueSecure?: () => void;
@@ -43,7 +42,7 @@ const ACCENT_DOT: Record<(typeof CHAPTER_VISUALS)[StoryChapterId]['accent'], str
 
 export default function HumanEconomyLanding({ onBuildPassport, onContinueSecure }: Props) {
   const reduceMotion = useReducedMotion();
-  const economyRef = useRef<HTMLElement | null>(null);
+  const exploreRef = useRef<HTMLElement | null>(null);
   const scrollerRef = useRef<HTMLDivElement | null>(null);
   const [mode, setMode] = useState<LandingMode>('story');
   const [activeChapter, setActiveChapter] = useState(0);
@@ -51,8 +50,6 @@ export default function HumanEconomyLanding({ onBuildPassport, onContinueSecure 
   const [inviteLine, setInviteLine] = useState<string | null>(null);
 
   const lastIndex = STORY_CHAPTERS.length - 1;
-  const chapterQuote = pickQuote(`landing:${activeChapter}`);
-
   const { scrollYProgress } = useScroll({ container: scrollerRef });
   const progress = useSpring(scrollYProgress, { stiffness: 120, damping: 28 });
 
@@ -81,11 +78,10 @@ export default function HumanEconomyLanding({ onBuildPassport, onContinueSecure 
   useEffect(() => {
     if (mode !== 'explore') return;
     const id = window.requestAnimationFrame(() => {
-      economyRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      exploreRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     });
     return () => window.cancelAnimationFrame(id);
   }, [mode]);
-
   useEffect(() => {
     if (mode !== 'story' || !scrollerRef.current) return;
     const root = scrollerRef.current;
@@ -195,12 +191,6 @@ export default function HumanEconomyLanding({ onBuildPassport, onContinueSecure 
                   {inviteLine && i === 0 && (
                     <p className="mb-5 max-w-xl rounded-2xl border border-amber-400/30 bg-amber-950/50 px-4 py-3 text-sm leading-relaxed text-amber-50 shadow-[0_12px_40px_rgba(0,0,0,0.45)] backdrop-blur-md">
                       {inviteLine}
-                    </p>
-                  )}
-
-                  {i === activeChapter && (
-                    <p className="mb-4 max-w-xl text-sm italic leading-relaxed text-white/75 drop-shadow-[0_2px_16px_rgba(0,0,0,0.65)]">
-                      {chapterQuote}
                     </p>
                   )}
 
@@ -379,86 +369,20 @@ export default function HumanEconomyLanding({ onBuildPassport, onContinueSecure 
           </div>
         </section>
 
-        <section className="px-5 md:px-10 py-20 border-t border-white/5 max-w-4xl mx-auto">
-          <p className="font-mono text-[9px] font-black tracking-[0.28em] uppercase text-amber-400/80">
-            The problem
-          </p>
-          <h2 className="mt-3 font-display text-2xl sm:text-3xl font-bold italic text-white">
-            Why does my attention have value?
-          </h2>
-          <p className="mt-4 text-slate-400 leading-relaxed max-w-2xl">
-            {SLOGANS.timeMoney} AI can create content, code, and knowledge at scale — so human
-            worth can no longer be measured by hours spent. The future economy measures learning,
-            creativity, problem solving, curiosity, collaboration, and contribution.
-          </p>
-        </section>
-
         <section
-          ref={economyRef}
+          ref={exploreRef}
           id="human-economy"
-          className="px-5 md:px-10 py-20 border-t border-white/5 max-w-5xl mx-auto scroll-mt-8"
+          className="px-5 md:px-10 py-16 border-t border-white/5 max-w-3xl mx-auto scroll-mt-8"
         >
-          <p className="font-mono text-[9px] font-black tracking-[0.28em] uppercase text-cyan-400/80">
-            The Human Economy
-          </p>
-          <h2 className="mt-3 font-display text-2xl sm:text-3xl font-bold italic text-white">
-            How you evolve
-          </h2>
-          <ol className="mt-8 grid sm:grid-cols-5 gap-3">
-            {JOURNEY_STEPS.map((step, i) => (
-              <li
-                key={step.id}
-                className="rounded-2xl border border-white/8 bg-white/[0.03] px-4 py-4"
-              >
-                <span className="font-mono text-[9px] text-cyan-400/70 tracking-widest">
-                  0{i + 1}
-                </span>
-                <p className="mt-2 font-semibold text-white text-sm">{step.title}</p>
-                <p className="mt-1 text-[11px] text-slate-500 leading-snug">{step.line}</p>
-              </li>
-            ))}
-          </ol>
-        </section>
-
-        <section className="px-5 md:px-10 py-16 border-t border-white/5 max-w-4xl mx-auto">
-          <h2 className="font-display text-xl sm:text-2xl font-bold italic text-white">
-            Proof of Attention
-          </h2>
-          <p className="mt-2 text-sm text-slate-400 max-w-xl">
-            Short challenges — not empty scrolling. Knowledge, creativity, problem solving,
-            reflection.
-          </p>
-          <div className="mt-6 grid grid-cols-2 sm:grid-cols-4 gap-3">
-            {PROOF_TYPES.map((t) => (
-              <div
-                key={t.id}
-                className="rounded-xl border border-white/8 bg-[#0a0a0e]/80 px-3 py-3"
-              >
-                <p className="text-sm font-semibold text-white">{t.label}</p>
-                <p className="text-[11px] text-slate-500 mt-1">{t.hint}</p>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        <section className="px-5 md:px-10 py-16 border-t border-white/5 max-w-4xl mx-auto">
-          <h2 className="font-display text-xl sm:text-2xl font-bold italic text-white">
-            Human Passport
-          </h2>
-          <p className="mt-2 text-sm text-slate-400">{SLOGANS.awakeningZero}</p>
-          <div className="mt-6 grid grid-cols-3 gap-3">
-            {PASSPORT_DIMENSIONS.map((s) => (
-              <div
-                key={s.id}
-                className="rounded-2xl border border-cyan-500/20 bg-cyan-500/5 px-4 py-5 text-center"
-              >
-                <p className="font-mono text-[9px] uppercase tracking-widest text-cyan-400/80">
-                  {s.title}
-                </p>
-                <p className="mt-2 font-display text-3xl font-bold italic text-white">0</p>
-              </div>
-            ))}
-          </div>
+          <InteractiveDeck
+            slides={EXPLORE_DECK}
+            mood="facility"
+            onCta={(slideId) => {
+              if (slideId === 'passport') onBuildPassport();
+            }}
+            finishLabel={SLOGANS.ctaPassport}
+            onFinish={onBuildPassport}
+          />
         </section>
 
         <section className="px-5 md:px-10 py-20 border-t border-white/5 max-w-5xl mx-auto">

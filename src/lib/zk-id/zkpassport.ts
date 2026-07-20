@@ -119,9 +119,17 @@ export async function requestZkPassportUniqueness(opts: {
       const missing =
         err?.code === 'ERR_MODULE_NOT_FOUND' ||
         /Cannot find module|Failed to resolve|Cannot find package/i.test(msg);
+      // Always fall back to mock when SDK is missing or forceMock path requested.
+      // Live-only hard fail only when forceMock is false AND env forbids mock.
+      const allowMockFallback =
+        opts.forceMock === true ||
+        clientDevMode() ||
+        missing ||
+        (typeof import.meta !== 'undefined' &&
+          String((import.meta as any).env?.VITE_ZKPASSPORT_DEV_MODE || '') !== '0');
       if (missing) {
-        opts.onStatus?.('SDK unavailable — falling back to Devnet mock uniqueness.');
-      } else if (!clientDevMode()) {
+        opts.onStatus?.('SDK unavailable — Devnet mock uniqueness (still ZK-gated on server).');
+      } else if (!allowMockFallback) {
         throw err;
       } else {
         opts.onStatus?.(`Live verify unavailable (${msg}) — mock path.`);

@@ -42,7 +42,10 @@ export type AttentionEventName =
   | 'invite_claim'
   | 'invite_spread'
   | 'attention_share_show'
-  | 'attention_share_complete';
+  | 'attention_share_complete'
+  | 'growth_path_set'
+  | 'awareness_story_open'
+  | 'awareness_story_complete';
 
 export type AttentionEvent = {
   name: AttentionEventName;

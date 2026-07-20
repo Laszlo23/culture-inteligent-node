@@ -127,3 +127,67 @@ export const TELEGRAM_PIN_COPY = [
   'Invite a builder. Own your Human Passport.',
   'https://mining.buildingcultureid.space/?fc=1',
 ].join('\n');
+
+/** Short DM script for trusted invites */
+export const DM_INVITE_COPY = [
+  'Hey — trying something different: Human Passport + Proof of Attention.',
+  '',
+  'Two minutes: claim your passport, run First Spark (ears-first if you want), then tell me what shifted.',
+  '',
+  'https://mining.buildingcultureid.space/?hear=1',
+  '',
+  'Not a token farm. Just attention that becomes visible.',
+].join('\n');
+
+/** Ritual chapters for MakeItRainDeck UI */
+export type RainChapterId = 'cast' | 'pin' | 'invite' | 'host';
+
+export type RainChapter = {
+  id: RainChapterId;
+  label: string;
+  title: string;
+  line: string;
+  taskIds: RainTaskId[];
+};
+
+export const RAIN_CHAPTERS: RainChapter[] = [
+  {
+    id: 'cast',
+    label: 'Cast',
+    title: 'Send the signal',
+    line: 'One strong cast beats ten quiet posts.',
+    taskIds: ['cast_rain', 'cast_hearing'],
+  },
+  {
+    id: 'pin',
+    label: 'Pin',
+    title: 'Anchor the rooms',
+    line: 'Discord and Telegram should open on the ritual.',
+    taskIds: ['pin_discord', 'pin_telegram'],
+  },
+  {
+    id: 'invite',
+    label: 'Invite',
+    title: 'Pull ten souls in',
+    line: 'Trusted DMs — people who will actually try First Spark.',
+    taskIds: ['dm_ten'],
+  },
+  {
+    id: 'host',
+    label: 'Host',
+    title: 'Hold the room',
+    line: 'Live Hearing or one partner pilot ask.',
+    taskIds: ['hearing_live', 'partner_outreach'],
+  },
+];
+
+export function chapterDoneCount(progress: RainProgress, chapter: RainChapter): number {
+  return chapter.taskIds.filter((id) => progress[id]).length;
+}
+
+export function firstIncompleteChapter(progress: RainProgress): RainChapterId {
+  for (const ch of RAIN_CHAPTERS) {
+    if (chapterDoneCount(progress, ch) < ch.taskIds.length) return ch.id;
+  }
+  return 'cast';
+}

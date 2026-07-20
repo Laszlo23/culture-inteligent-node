@@ -15,14 +15,16 @@ import {
 } from '../lib/first-contribution';
 import { evaluateFirstContributionViaApi } from '../lib/first-contribution-eval';
 import { track } from '../lib/attention-metrics';
+import { readGrowthPath, type GrowthPathId } from '../lib/growth-path';
 import PassportShareCard from './PassportShareCard';
 import ConversationalProof from './ConversationalProof';
+import PersonalHookGate from './PersonalHookGate';
 import type { ProofBeat } from '../hooks/useConversationalProof';
 import { formatFirstContributionJoined } from '../lib/hearing/conversational-proof';
 import { useHearing } from '../lib/hearing/context';
 import { CinematicBackdrop, GlowPulse } from './fx';
 
-type Phase = 'welcome' | 'challenge' | 'reveal';
+type Phase = 'hook' | 'welcome' | 'challenge' | 'reveal';
 
 type Props = {
   displayName?: string;
@@ -42,11 +44,12 @@ export default function FirstContributionRitual({
   onContinueWorkspace,
 }: Props) {
   const hearing = useHearing();
-  const prompt = useMemo(
-    () => pickFirstContributionPrompt(walletAddress || ensureGuestId()),
-    [walletAddress]
+  const seed = walletAddress || ensureGuestId();
+  const [growthPath, setGrowthPath] = useState<GrowthPathId | null>(() => readGrowthPath());
+  const [prompt, setPrompt] = useState(() =>
+    pickFirstContributionPrompt(seed, readGrowthPath())
   );
-  const [phase, setPhase] = useState<Phase>('welcome');
+  const [phase, setPhase] = useState<Phase>(() => (readGrowthPath() ? 'welcome' : 'hook'));
   const [joinedAnswer, setJoinedAnswer] = useState('');
   const [convKey, setConvKey] = useState(0);
   const [busy, setBusy] = useState(false);
@@ -54,6 +57,16 @@ export default function FirstContributionRitual({
   const [record, setRecord] = useState<FirstContributionRecord | null>(null);
 
   const name = (displayName || 'You').replace(/^@/, '');
+
+  const onHookChosen = useCallback(
+    (path: GrowthPathId) => {
+      setGrowthPath(path);
+      setPrompt(pickFirstContributionPrompt(seed, path));
+      setConvKey((k) => k + 1);
+      setPhase('welcome');
+    },
+    [seed]
+  );
 
   const beats: ProofBeat[] = useMemo(
     () => [
@@ -141,6 +154,18 @@ export default function FirstContributionRitual({
       <GlowPulse energy={10} color="cyan" className="absolute -right-16 -top-16 w-56 h-56 z-0" />
       <div className="relative z-10 max-w-3xl mx-auto px-5 py-14 md:py-20">
         <AnimatePresence mode="wait">
+          {phase === 'hook' && (
+            <motion.div
+              key="hook"
+              initial={{ opacity: 0, y: 14 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              className="max-w-3xl"
+            >
+              <PersonalHookGate onChosen={onHookChosen} />
+            </motion.div>
+          )}
+
           {phase === 'welcome' && (
             <motion.div
               key="welcome"
@@ -151,6 +176,7 @@ export default function FirstContributionRitual({
             >
               <p className="font-mono text-[9px] font-black tracking-[0.28em] uppercase text-amber-400/90">
                 {BRAND.parent} · Human Reputation
+                {growthPath ? ` · ${growthPath}` : ''}
               </p>
               <h1 className="font-display text-4xl md:text-5xl font-extrabold italic text-white leading-[1.05]">
                 Welcome.

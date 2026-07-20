@@ -1,18 +1,38 @@
 /**
  * First Contribution — magical first 5 minutes for Human Passport.
- * Welcome → reflection → seeded scores → share.
+ * Personal hook → welcome → reflection → seeded scores → share.
  */
 
 import type { HumanScores } from './human-economy';
+import { readGrowthPath, type GrowthPathId } from './growth-path';
 
 export const FIRST_CONTRIBUTION_KEY = 'culture_first_contribution_v1';
 export const FIRST_CONTRIBUTION_SHARED_KEY = 'culture_first_contribution_shared_v1';
 
+/** Default / balanced mix */
 export const FIRST_CONTRIBUTION_PROMPTS = [
   'What is something you learned recently that changed your perspective?',
   'What problem have you been curious about that most people ignore?',
   'Describe something you made or helped with that felt like a real contribution.',
 ] as const;
+
+const CURIOUS_PROMPTS = [
+  'What is something you learned recently that changed how you see a problem?',
+  'What unanswered question keeps pulling at your curiosity?',
+  'What do you most want to understand about how your mind works?',
+] as const;
+
+const REFLECTIVE_PROMPTS = [
+  'What did you notice about yourself the last time you got pulled into a habit?',
+  'Why do you think you return to something even when you know better?',
+  'Describe something you made or helped with that felt like a real contribution.',
+] as const;
+
+const PROMPTS_BY_PATH: Record<GrowthPathId, readonly string[]> = {
+  curious: CURIOUS_PROMPTS,
+  reflective: REFLECTIVE_PROMPTS,
+  balanced: FIRST_CONTRIBUTION_PROMPTS,
+};
 
 export type ContributionDims = {
   curiosity: number;
@@ -45,11 +65,15 @@ function storage(): Storage | null {
   }
 }
 
-export function pickFirstContributionPrompt(seed?: string): string {
-  if (!seed) return FIRST_CONTRIBUTION_PROMPTS[0];
+export function pickFirstContributionPrompt(
+  seed?: string,
+  path?: GrowthPathId | null
+): string {
+  const bank = PROMPTS_BY_PATH[path ?? readGrowthPath() ?? 'balanced'];
+  if (!seed) return bank[0];
   let h = 0;
   for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) >>> 0;
-  return FIRST_CONTRIBUTION_PROMPTS[h % FIRST_CONTRIBUTION_PROMPTS.length];
+  return bank[h % bank.length];
 }
 
 /**

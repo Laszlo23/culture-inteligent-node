@@ -10,7 +10,7 @@
     "preview": "vite preview",
     "clean": "rm -rf dist server.js",
     "lint": "tsc --noEmit",
-    "test": "tsx --test src/lib/arcium-poa.test.ts src/lib/solana-economy.test.ts src/lib/zk-id/nullifier.test.ts src/lib/main-loop.test.ts src/lib/winning-flows.test.ts src/lib/rain-checklist.test.ts src/lib/first-contribution.test.ts src/lib/progress-title.test.ts src/lib/hearing/conversational-proof.test.ts src/lib/bots/attention-miner-core.test.ts",
+    "test": "tsx --test src/lib/arcium-poa.test.ts src/lib/solana-economy.test.ts src/lib/zk-id/nullifier.test.ts src/lib/main-loop.test.ts src/lib/winning-flows.test.ts src/lib/rain-checklist.test.ts src/lib/first-contribution.test.ts src/lib/progress-title.test.ts src/lib/growth-path.test.ts src/lib/hearing/conversational-proof.test.ts src/lib/bots/attention-miner-core.test.ts",
     "test:hearing": "tsx --test src/lib/hearing/conversational-proof.test.ts",
     "test:arcium-mirror": "tsx --test src/lib/arcium-poa.test.ts",
     "test:economy": "tsx --test src/lib/solana-economy.test.ts",

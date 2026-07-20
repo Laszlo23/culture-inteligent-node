@@ -102,44 +102,44 @@ export const PASSPORT_DIMENSIONS = [
  * Cold-start cinematic chapters — civilization story before any dashboard chrome.
  * Keep in sync with HumanEconomyLanding story mode.
  */
+/** Full-bleed cinematic chapters — keep ≤2 short sentences per slide (presentation, not FAQ). */
 export const STORY_CHAPTERS = [
   {
     id: 'opening',
-    eyebrow: 'Opening',
-    title: SLOGANS.hero,
-    body: SLOGANS.openingLede,
-    accent: SLOGANS.openingInvite,
+    eyebrow: 'Opening · Awareness',
+    title: 'Your attention is the most valuable thing you own.',
+    body: 'Feeds train you to scroll. We train you to notice — then learn something that sticks.',
+    accent: 'Welcome to Building Culture. Awareness first. Learning next.',
   },
   {
     id: 'problem',
-    eyebrow: 'Chapter 0 — The Problem',
-    title: 'The old system measured the wrong thing.',
-    body: 'The current economy says: your value = your time. Building Culture says: your value = your contribution.',
-    accent: SLOGANS.equation,
+    eyebrow: 'Chapter 0 — The Trap',
+    title: 'Hours were never the point.',
+    body: 'The old economy priced your time. The scroll economy prices your distraction. Neither priced what you actually learn.',
+    accent: 'Human Value = Contribution — not minutes burned.',
   },
   {
     id: 'awakening',
     eyebrow: 'Chapter 1 — Awakening',
-    title: 'Your Human Passport',
-    body: 'This is character creation for a new economy — not warrior or mage. You discover Knowledge, Builder, and Contribution. Your first score starts at zero.',
+    title: 'Wake up with a passport.',
+    body: 'Your Human Passport starts at zero on purpose — Knowledge, Creativity, Contribution grow when you prove attention.',
     accent: SLOGANS.awakeningZero,
   },
   {
     id: 'spark',
     eyebrow: 'Chapter 2 — The First Spark',
-    title: 'Potential becomes visible',
-    body: SLOGANS.firstSpark,
+    title: 'Learn once with eyes open.',
+    body: 'One short challenge. You notice. You understand. Your contribution becomes visible.',
     accent: SLOGANS.firstSparkSupport,
   },
   {
     id: 'evolution',
-    eyebrow: 'Chapter 3 — Growth',
-    title: 'How you evolve',
-    body: 'Not a control panel — a journey of becoming.',
-    accent: SLOGANS.potential,
+    eyebrow: 'Chapter 3 — Spread the light',
+    title: 'Awareness compounds when you share it.',
+    body: 'Prove attention. Pass the invite. Help someone else wake up — reputation grows with the loop.',
+    accent: SLOGANS.loop,
   },
 ] as const;
-
 export type StoryChapterId = (typeof STORY_CHAPTERS)[number]['id'];
 
 /** Evolution framing for the Human Economy journey (member-facing). */

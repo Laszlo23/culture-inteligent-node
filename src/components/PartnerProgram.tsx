@@ -67,7 +67,8 @@ export default function PartnerProgram({ state, setState, addLog }: PartnerProgr
 
   const bookPilot = () => {
     addLog('PARTNER: Pilot inquiry opened — Attention Session path.', 'success');
-    window.location.href = 'mailto:admin@buildingculture.space?subject=Attention%20Session%20pilot';
+    window.location.href =
+      'mailto:office@buildingculture.capital?subject=Attention%20Session%20pilot';
   };
 
   return (
@@ -80,7 +81,7 @@ export default function PartnerProgram({ state, setState, addLog }: PartnerProgr
 
       <div className="flex flex-wrap gap-2">
         <a
-          href="mailto:admin@buildingculture.space?subject=Attention%20Session%20pilot"
+          href="mailto:office@buildingculture.capital?subject=Attention%20Session%20pilot"
           className="inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-black font-mono text-[11px] font-black uppercase tracking-wider"
           onClick={() => addLog('PARTNER: Pilot inquiry opened — Attention Session path.', 'success')}
         >

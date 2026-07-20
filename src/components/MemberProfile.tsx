@@ -15,6 +15,7 @@ import NftCard from './nft/NftCard';
 import { friendlyFailureDetail } from '../lib/user-errors';
 import { DISCORD_INVITE_URL } from '../lib/discord-community';
 import DiscordCommunityHub from './DiscordCommunityHub';
+import { useSound } from '../lib/sound/SoundContext';
 
 interface MemberProfileProps {
   state: GameState;
@@ -24,6 +25,8 @@ interface MemberProfileProps {
   onLogout: () => void;
   /** When CGT is short, route members to Vault instead of a dead mint */
   onOpenTreasury?: (sku?: 'list_slot' | 'spark_refill') => void;
+  /** Celebrate successful claims in the parent (ClaimBurst strip) */
+  onRewardBurst?: (message: string) => void;
 }
 
 const PRESET_AVATARS = [
@@ -56,7 +59,9 @@ export default function MemberProfile({
   currentUser,
   onLogout,
   onOpenTreasury,
+  onRewardBurst,
 }: MemberProfileProps) {
+  const { play } = useSound();
   // Safe profile hydration
   const profileState = state.profile || {
     avatarUrl: PRESET_AVATARS[0].url,
@@ -87,8 +92,10 @@ export default function MemberProfile({
   const [verificationProgress, setVerificationProgress] = useState(0);
   const [verificationFeedback, setVerificationFeedback] = useState('');
 
-  // Tab & NFT interaction states
-  const [rightTab, setRightTab] = useState<'social' | 'miners'>('miners');
+  // Section nav & NFT interaction states
+  const [profileSection, setProfileSection] = useState<'identity' | 'quests' | 'miners'>(
+    'identity'
+  );
   const [listingNftId, setListingNftId] = useState<string | null>(null);
   const [nftListingPrice, setNftListingPrice] = useState<string>('75');
   const [isMintingNft, setIsMintingNft] = useState<boolean>(false);
@@ -235,11 +242,17 @@ export default function MemberProfile({
     reason: string;
     mark: (profile: NonNullable<GameState['profile']>) => NonNullable<GameState['profile']>;
     successLog: string;
-  }) => {
-    setState((prev) => {
-      const currentProfile = prev.profile || profileState;
-      return { ...prev, profile: opts.mark(currentProfile) };
-    });
+    burstLabel: string;
+    /** After a real win, nudge the next section */
+    nextSection?: 'quests' | 'miners';
+  }): Promise<boolean> => {
+    const celebrate = () => {
+      play('success');
+      onRewardBurst?.(opts.burstLabel);
+      if (opts.nextSection) {
+        window.setTimeout(() => setProfileSection(opts.nextSection!), 450);
+      }
+    };
 
     if (economyReady) {
       try {
@@ -250,28 +263,42 @@ export default function MemberProfile({
           reason: opts.reason,
         });
         if ('skipped' in result) {
-          addLog(`PROFILE LOGGED: ${opts.reason} — ${result.reason}. No local BCC.`, 'warn');
-          return;
+          addLog(
+            `Reward not settled yet: ${result.reason}. Try again when the vault is ready — nothing claimed.`,
+            'warn'
+          );
+          return false;
         }
         await syncLedgerToState(setState);
+        setState((prev) => {
+          const currentProfile = prev.profile || profileState;
+          return { ...prev, profile: opts.mark(currentProfile) };
+        });
         addLog(`${opts.successLog} ${result.solscan}`, 'success');
-        return;
+        celebrate();
+        return true;
       } catch (e: unknown) {
         const msg = e instanceof Error ? e.message : String(e);
-        addLog(`PROFILE LOGGED (no local BCC): ${opts.reason} — ${msg}`, 'warn');
-        return;
+        addLog(`Reward failed — try again: ${msg}`, 'warn');
+        return false;
       }
     }
 
-    setState((prev) => ({
-      ...prev,
-      credits: prev.credits + opts.bcc,
-      energy:
-        opts.energyPercent != null
-          ? Math.min(100, prev.energy + opts.energyPercent)
-          : prev.energy,
-    }));
-    addLog(`${opts.successLog} (practice — not on-chain)`, 'warn');
+    setState((prev) => {
+      const currentProfile = prev.profile || profileState;
+      return {
+        ...prev,
+        profile: opts.mark(currentProfile),
+        credits: prev.credits + opts.bcc,
+        energy:
+          opts.energyPercent != null
+            ? Math.min(100, prev.energy + opts.energyPercent)
+            : prev.energy,
+      };
+    });
+    addLog(`${opts.successLog} (practice mode — still counts here)`, 'success');
+    celebrate();
+    return true;
   };
 
   const claimProfileReward = () => {
@@ -289,7 +316,9 @@ export default function MemberProfile({
         discordUsername,
         profileCompletedRewardClaimed: true,
       }),
-      successLog: 'LEDGER UNLOCKED: Profile reward — +200 BCC / +20% energy.',
+      successLog: 'Card complete — +200 BCC · +20% energy.',
+      burstLabel: '+200 BCC · CARD COMPLETE',
+      nextSection: 'quests',
     });
   };
 
@@ -299,7 +328,8 @@ export default function MemberProfile({
       bcc: 100,
       reason: 'x_follow',
       mark: (p) => ({ ...p, xFollowClaimed: true }),
-      successLog: 'LEDGER UNLOCKED: X follow — +100 BCC.',
+      successLog: 'Quest done — X follow · +100 BCC.',
+      burstLabel: '+100 BCC · X FOLLOW',
     });
   };
 
@@ -309,7 +339,8 @@ export default function MemberProfile({
       bcc: 100,
       reason: 'tg_join',
       mark: (p) => ({ ...p, telegramJoinClaimed: true }),
-      successLog: 'LEDGER UNLOCKED: Telegram join — +100 BCC.',
+      successLog: 'Quest done — Telegram · +100 BCC.',
+      burstLabel: '+100 BCC · TELEGRAM',
     });
   };
 
@@ -319,7 +350,8 @@ export default function MemberProfile({
       bcc: 100,
       reason: 'discord_join',
       mark: (p) => ({ ...p, discordJoinClaimed: true }),
-      successLog: 'LEDGER UNLOCKED: Discord join — +100 BCC.',
+      successLog: 'Quest done — Discord · +100 BCC.',
+      burstLabel: '+100 BCC · DISCORD',
     });
   };
 
@@ -329,7 +361,8 @@ export default function MemberProfile({
       bcc: 250,
       reason: 'x_interaction',
       mark: (p) => ({ ...p, xPostInteractionClaimed: true }),
-      successLog: 'LEDGER UNLOCKED: X interaction — +250 BCC.',
+      successLog: 'Quest done — X engage · +250 BCC.',
+      burstLabel: '+250 BCC · X ENGAGE',
     });
   };
 
@@ -621,32 +654,61 @@ export default function MemberProfile({
     }
   };
 
+  const cardDone = Boolean(profileState.profileCompletedRewardClaimed);
+  const questsDone = completedCount >= totalQuests;
+  const sectionNav: Array<{
+    id: 'identity' | 'quests' | 'miners';
+    label: string;
+    hint: string;
+    icon: React.ReactNode;
+    done?: boolean;
+  }> = [
+    {
+      id: 'identity',
+      label: '1 · Card',
+      hint: cardDone ? 'Reward claimed' : 'Avatar · bio · socials',
+      icon: <User className="w-4 h-4" />,
+      done: cardDone,
+    },
+    {
+      id: 'quests',
+      label: '2 · Quests',
+      hint: questsDone ? 'All claimed' : `${completedCount}/${totalQuests} claimed`,
+      icon: <Share2 className="w-4 h-4" />,
+      done: questsDone,
+    },
+    {
+      id: 'miners',
+      label: '3 · Miners',
+      hint: 'Mint · list · trade',
+      icon: <Cpu className="w-4 h-4" />,
+    },
+  ];
+
   return (
-    <div id="member-profile-room" className="space-y-6">
-      
-      {/* Banner / Header summary */}
-      <div className="bg-[#0a0a0c] border border-white/5 rounded-2xl p-6 relative overflow-hidden shadow-2xl">
+    <div id="member-profile-room" className="space-y-5 max-w-3xl mx-auto">
+      <div className="bg-[#0a0a0c] border border-white/5 rounded-2xl p-5 md:p-6 relative overflow-hidden shadow-2xl">
         <div className="absolute inset-0 bg-cyber-grid bg-[size:24px_24px] opacity-[0.03]" />
-        <div className="absolute top-0 right-0 w-80 h-80 bg-fuchsia-500/5 rounded-full blur-3xl pointer-events-none" />
-        
-        <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+        <div className="relative z-10 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div>
-            <span className="text-[10px] font-mono text-fuchsia-400 tracking-[0.2em] block uppercase font-bold">IDENTITY & COMMUNITY PROTOCOLS</span>
-            <h2 className="text-2xl lg:text-3xl font-black italic text-white leading-none mt-2 mb-2">
-              MEMBER PROFILE & SOCIAL HUB
+            <span className="text-[10px] font-mono text-fuchsia-400 tracking-[0.2em] block uppercase font-bold">
+              Your hub
+            </span>
+            <h2 className="text-2xl font-black italic text-white leading-none mt-1.5">
+              Profile
             </h2>
-            <p className="text-xs text-slate-400 font-sans leading-relaxed max-w-xl">
-              Fill out your member card, synchronize your active Web3 identities, and support the official **Building Culture** channels to claim exclusive credits and fuel reactor power.
+            <p className="text-xs text-slate-400 font-sans leading-relaxed mt-2 max-w-md">
+              Three easy steps — finish each one to earn BCC and energy. Sounds + burst when you claim.
             </p>
           </div>
 
-          <div className="bg-[#050506]/80 border border-white/5 p-4 rounded-xl font-mono text-xs w-full md:w-auto min-w-[200px]">
+          <div className="bg-[#050506]/80 border border-white/5 p-3.5 rounded-xl font-mono text-xs w-full sm:w-auto min-w-[180px]">
             <div className="flex justify-between text-[10px] text-slate-500 mb-1.5 uppercase font-bold tracking-widest">
-              <span>HUB SYNC STATUS</span>
+              <span>Quests</span>
               <span className="text-fuchsia-400">{globalProgressPercent}%</span>
             </div>
-            <div className="w-full bg-white/5 rounded-full h-2 overflow-hidden mb-3">
-              <motion.div 
+            <div className="w-full bg-white/5 rounded-full h-2 overflow-hidden mb-2">
+              <motion.div
                 className="bg-gradient-to-r from-fuchsia-500 to-indigo-500 h-full"
                 animate={{ width: `${globalProgressPercent}%` }}
                 transition={{ duration: 0.5 }}
@@ -654,22 +716,56 @@ export default function MemberProfile({
             </div>
             <div className="text-[10px] text-slate-400 flex items-center gap-1">
               <Award className="w-3.5 h-3.5 text-amber-400" />
-              <span>{completedCount} / {totalQuests} REWARDS UNLOCKED</span>
+              <span>
+                {completedCount} / {totalQuests} unlocked
+              </span>
             </div>
           </div>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        
-        {/* Profile Editor (Left Panel) */}
-        <div className="lg:col-span-5 bg-[#0a0a0c] border border-white/5 rounded-2xl p-6 shadow-xl space-y-6">
+      <div className="sticky top-14 z-20 flex gap-1 p-1 rounded-xl border border-white/10 bg-[#09090c]/95 backdrop-blur-md shadow-lg">
+        {sectionNav.map((s) => {
+          const active = profileSection === s.id;
+          return (
+            <button
+              key={s.id}
+              type="button"
+              onClick={() => setProfileSection(s.id)}
+              className={`flex-1 min-w-0 rounded-lg px-2 py-2.5 text-left transition-all cursor-pointer ${
+                active
+                  ? 'bg-fuchsia-500/20 border border-fuchsia-400/40 text-white'
+                  : s.done
+                    ? 'border border-emerald-500/25 bg-emerald-500/5 text-emerald-100/90'
+                    : 'border border-transparent text-slate-400 hover:text-slate-200 hover:bg-white/[0.04]'
+              }`}
+            >
+              <span className="flex items-center gap-1.5 font-mono text-[11px] font-black uppercase tracking-wider">
+                {s.done ? <Check className="w-4 h-4 text-emerald-400" /> : s.icon}
+                {s.label}
+              </span>
+              <span className="mt-0.5 block text-[9px] text-slate-500 truncate font-sans">{s.hint}</span>
+            </button>
+          );
+        })}
+      </div>
+
+      {profileSection === 'identity' && (
+        <div className="bg-[#0a0a0c] border border-white/5 rounded-2xl p-6 shadow-xl space-y-6">
           <div className="flex items-center justify-between border-b border-white/5 pb-4">
             <div className="flex items-center gap-2">
               <User className="w-5 h-5 text-fuchsia-400" />
-              <h3 className="font-mono text-sm font-semibold text-slate-100 tracking-wider">MEMBER DIGITAL CARD</h3>
+              <h3 className="font-mono text-sm font-semibold text-slate-100 tracking-wider">
+                Member card
+              </h3>
             </div>
-            <span className="text-[10px] font-mono text-slate-500 uppercase tracking-widest">ID_VERIFIED</span>
+            <button
+              type="button"
+              onClick={() => setProfileSection('quests')}
+              className="text-[10px] font-mono text-cyan-400 hover:text-cyan-300 uppercase tracking-wider cursor-pointer"
+            >
+              Next · Quests →
+            </button>
           </div>
 
           {/* Active Cryptographic Account Session Status */}
@@ -882,7 +978,7 @@ export default function MemberProfile({
                 ) : (
                   <>
                     <Sparkles className="w-4 h-4" />
-                    CLAIM REWARD (+200 CP)
+                    Claim +200 BCC
                   </>
                 )}
               </button>
@@ -897,45 +993,22 @@ export default function MemberProfile({
             )}
           </div>
         </div>
+      )}
 
-        {/* Social & NFT Miner (Right Panel) */}
-        <div className="lg:col-span-7 space-y-6">
-          
-          {/* Tabs Selector */}
-          <div className="flex bg-[#050506] border border-white/5 rounded-xl p-1 font-mono text-xs">
-            <button
-              onClick={() => setRightTab('miners')}
-              className={`flex-1 py-2.5 rounded-lg font-bold tracking-wider transition-all flex items-center justify-center gap-2 cursor-pointer ${
-                rightTab === 'miners'
-                  ? 'bg-gradient-to-r from-fuchsia-500 to-pink-600 text-white shadow-lg font-black'
-                  : 'text-slate-400 hover:text-white hover:bg-white/[0.01]'
-              }`}
-            >
-              <Cpu className="w-4 h-4" />
-              NFT MINER RIGS
-            </button>
-            <button
-              onClick={() => setRightTab('social')}
-              className={`flex-1 py-2.5 rounded-lg font-bold tracking-wider transition-all flex items-center justify-center gap-2 cursor-pointer ${
-                rightTab === 'social'
-                  ? 'bg-gradient-to-r from-fuchsia-500 to-pink-600 text-white shadow-lg font-black'
-                  : 'text-slate-400 hover:text-white hover:bg-white/[0.01]'
-              }`}
-            >
-              <Share2 className="w-4 h-4" />
-              COMMUNITY QUESTS
-            </button>
-          </div>
-
-          {rightTab === 'social' ? (
-            /* Main Social Board */
+      {profileSection === 'quests' && (
             <div className="bg-[#0a0a0c] border border-white/5 rounded-2xl p-6 shadow-xl space-y-6">
               <div className="flex items-center justify-between border-b border-white/5 pb-4 font-mono">
                 <div className="flex items-center gap-2">
                   <Share2 className="w-5 h-5 text-cyan-400" />
-                  <h3 className="text-sm font-semibold text-slate-100 tracking-wider">OFFICIAL COMMUNITY QUESTS</h3>
+                  <h3 className="text-sm font-semibold text-slate-100 tracking-wider">Community quests</h3>
                 </div>
-                <span className="text-[10px] text-slate-500 uppercase tracking-widest">LIVE_POOLS</span>
+                <button
+                  type="button"
+                  onClick={() => setProfileSection('miners')}
+                  className="text-[10px] font-mono text-cyan-400 hover:text-cyan-300 uppercase tracking-wider cursor-pointer"
+                >
+                  Next · Miners →
+                </button>
               </div>
 
               {/* Simulated Live Synchronizer Telemetry */}
@@ -987,8 +1060,8 @@ export default function MemberProfile({
                 }`}>
                   <div className="space-y-1 font-mono">
                     <div className="flex items-center gap-1.5">
-                      <span className="text-[9px] bg-cyan-500/10 text-cyan-400 border border-cyan-500/30 px-1.5 py-0.2 rounded uppercase font-black tracking-widest">X OUTPOST</span>
-                      <span className="text-[10px] text-slate-500">• 100 CP</span>
+                      <span className="text-[9px] bg-cyan-500/10 text-cyan-400 border border-cyan-500/30 px-1.5 py-0.2 rounded uppercase font-black tracking-widest">X follow</span>
+                      <span className="text-[10px] text-slate-500">• +100 BCC</span>
                     </div>
                     <h4 className="text-xs font-bold text-slate-200">FOLLOW OFFICIAL X HANDLE</h4>
                     <p className="text-[11px] text-slate-400 font-sans leading-relaxed">
@@ -1033,11 +1106,11 @@ export default function MemberProfile({
                   <div className="space-y-1 font-mono">
                     <div className="flex items-center gap-1.5">
                       <span className="text-[9px] bg-sky-500/10 text-sky-400 border border-sky-500/30 px-1.5 py-0.2 rounded uppercase font-black tracking-widest">TELEGRAM</span>
-                      <span className="text-[10px] text-slate-500">• 100 CP</span>
+                      <span className="text-[10px] text-slate-500">• +100 BCC</span>
                     </div>
-                    <h4 className="text-xs font-bold text-slate-200">JOIN THE OFFICIAL TELEGRAM UNIT</h4>
+                    <h4 className="text-xs font-bold text-slate-200">Join Telegram</h4>
                     <p className="text-[11px] text-slate-400 font-sans leading-relaxed">
-                      Synchronize communications with builders in our high-density group chat.
+                      Chat with builders — quick updates and support.
                     </p>
                   </div>
 
@@ -1078,7 +1151,7 @@ export default function MemberProfile({
                   <div className="space-y-1 font-mono">
                     <div className="flex items-center gap-1.5">
                       <span className="text-[9px] bg-indigo-500/10 text-indigo-400 border border-indigo-500/30 px-1.5 py-0.2 rounded uppercase font-black tracking-widest">DISCORD HQ</span>
-                      <span className="text-[10px] text-slate-500">• 100 CP</span>
+                      <span className="text-[10px] text-slate-500">• +100 BCC</span>
                     </div>
                     <h4 className="text-xs font-bold text-slate-200">Join Discord HQ</h4>
                     <p className="text-[11px] text-slate-400 font-sans leading-relaxed">
@@ -1122,10 +1195,10 @@ export default function MemberProfile({
                 }`}>
                   <div className="space-y-1 font-mono">
                     <div className="flex items-center gap-1.5">
-                      <span className="text-[9px] bg-amber-500/10 text-amber-400 border border-amber-500/30 px-1.5 py-0.2 rounded uppercase font-black tracking-widest">X SPECIAL PROPAGANDA</span>
-                      <span className="text-[10px] text-slate-500">• 250 CP</span>
+                      <span className="text-[9px] bg-amber-500/10 text-amber-400 border border-amber-500/30 px-1.5 py-0.2 rounded uppercase font-black tracking-widest">X engage</span>
+                      <span className="text-[10px] text-slate-500">• +250 BCC</span>
                     </div>
-                    <h4 className="text-xs font-bold text-slate-200">INTERACT: LIKE, REPOST & COMMENT</h4>
+                    <h4 className="text-xs font-bold text-slate-200">Like, repost & comment</h4>
                     <p className="text-[11px] text-slate-400 font-sans leading-relaxed">
                       Engage with our core status ledger at post link: <span className="text-amber-400 font-semibold break-all text-[10px] font-mono">x.com/status/2077460511478751639</span>.
                     </p>
@@ -1161,10 +1234,24 @@ export default function MemberProfile({
 
               </div>
             </div>
-          ) : (
-            /* SECURE NFT MINER RIGS & DECENTRALIZED MARKETPLACE */
+      )}
+
+      {profileSection === 'miners' && (
             <div className="space-y-6 font-mono text-xs">
-              
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Cpu className="w-5 h-5 text-fuchsia-400" />
+                  <h3 className="text-sm font-semibold text-slate-100 tracking-wider">Miner rigs</h3>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setProfileSection('identity')}
+                  className="text-[10px] font-mono text-cyan-400 hover:text-cyan-300 uppercase tracking-wider cursor-pointer"
+                >
+                  ← Card
+                </button>
+              </div>
+
               {/* Wallet Association Checker */}
               {!currentUser?.walletAddress && (
                 <div className="bg-red-950/10 border border-red-500/30 rounded-2xl p-4 flex gap-3 relative overflow-hidden">
@@ -1433,11 +1520,7 @@ export default function MemberProfile({
               </div>
 
             </div>
-          )}
-
-        </div>    </div>
-
-      </div>
-
+      )}
+    </div>
   );
 }

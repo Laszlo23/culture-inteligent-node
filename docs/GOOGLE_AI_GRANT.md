@@ -7,6 +7,15 @@
 
 **Why this grant:** Culture Node already runs on **Gemini** (Hearing Mode neural TTS, attention verification coach, science signal, session research). Credits cut the #1 burn line for the ears-first product.
 
+### TL;DR deck (6 slides)
+
+1. **Product** — Human Passport + Proof of Attention + Hearing Mode (Gemini TTS), not a mining co.  
+2. **Lane** — Pre-funded / Start (~$2k) unless you have institutional VC proof for Scale.  
+3. **Lead the form with** — education, accessibility, attention coach; hide BCC / wheel / yield.  
+4. **Before Apply** — company email on public domain + GCP billing ID.  
+5. **Proof** — live demo URL + Gemini already in production paths.  
+6. **Ask** — credits to fund Hearing + coach inference burn.
+
 ---
 
 ## Pick your lane (be honest)

@@ -28,7 +28,6 @@ import Leaderboard from './components/Leaderboard';
 import NftGallery from './components/nft/NftGallery';
 import DashboardNftDeck from './components/nft/DashboardNftDeck';
 import { NFT_POSTERS } from './lib/nft-media';
-import OnboardingModal from './components/OnboardingModal';
 import AttentionShareModal from './components/AttentionShareModal';
 import {
   markAttentionShareShown,
@@ -167,7 +166,18 @@ import {
   touchLoopVisit,
 } from './lib/main-loop';
 import { clearLoopWinningNext, type WinRail } from './lib/winning-flows';
+import {
+  mergeRealMissions,
+  questDefsToMissions,
+  getDailyClaimStatus,
+  completedQuestCount,
+  nextIncompleteQuest,
+  wheelUnlocked,
+  REAL_DAILY_QUESTS,
+} from './lib/daily-quests';
 import MainLoopStage from './components/MainLoopStage';
+import StayLoopStrip from './components/StayLoopStrip';
+import AwarenessStoryOverlay from './components/AwarenessStoryOverlay';
 import MakeItRainDeck from './components/MakeItRainDeck';
 import {
   buildAttentionSnapshot,
@@ -320,13 +330,7 @@ const INITIAL_ROOMS: FacilityRoom[] = [
 /** Faction houses — mirrored from Discord HQ (`discord-community.ts`) */
 const INITIAL_GUILDS: Guild[] = guildsFromDiscordHouses();
 
-const INITIAL_MISSIONS: DailyMission[] = [
-  { id: 'm_kpi', label: 'BUILD: Verify a real contribution on-chain (practice network)', completed: false, energyReward: 25, powerReward: 15, category: 'build' },
-  { id: 'm_academy', label: 'LEARN: Complete a Proof of Attention challenge', completed: false, energyReward: 30, powerReward: 20, category: 'build' },
-  { id: 'm1', label: 'LEARN: Review today\'s knowledge checklist (practice)', completed: false, energyReward: 15, powerReward: 8, category: 'video' },
-  { id: 'm2', label: 'BUILD: Skim a problem-solving note and capture one insight', completed: false, energyReward: 15, powerReward: 8, category: 'article' },
-  { id: 'm3', label: 'CONTRIBUTE: Warm-up focus timer — then help someone later', completed: false, energyReward: 20, powerReward: 10, category: 'quest' },
-];
+const INITIAL_MISSIONS: DailyMission[] = questDefsToMissions();
 
 export default function App() {
   // Farcaster Mini App: hide host splash once React is alive
@@ -509,7 +513,15 @@ export default function App() {
   const [firstRitualPending, setFirstRitualPending] = useState<boolean>(() =>
     isFirstRitualPending()
   );
-  const [guideReplay, setGuideReplay] = useState(false);
+  /** In-app Awareness Story (GUIDE / Why learn / ?story=1) */
+  const [showAwarenessStory, setShowAwarenessStory] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    try {
+      return new URLSearchParams(window.location.search).get('story') === '1';
+    } catch {
+      return false;
+    }
+  });
   const [authAutoStart, setAuthAutoStart] = useState<AuthAutoStart>(null);
   const [economyStatus, setEconomyStatus] = useState<EconomyStatus | null>(null);
   const [economyStatusLoading, setEconomyStatusLoading] = useState(true);
@@ -575,9 +587,48 @@ export default function App() {
     dismissStory();
     setStoryDismissed(true);
     setShowStory(false);
-    setGuideReplay(false);
     setAuthAutoStart(auto);
   };
+
+  const openAwarenessStory = () => setShowAwarenessStory(true);
+
+  const finishAwarenessStory = () => {
+    setShowAwarenessStory(false);
+    try {
+      const u = new URL(window.location.href);
+      if (u.searchParams.has('story')) {
+        u.searchParams.delete('story');
+        window.history.replaceState({}, '', u.pathname + u.search + u.hash);
+      }
+    } catch {
+      /* ignore */
+    }
+    setRewardBurst(
+      firstRitualPending
+        ? 'STORY LOCKED IN · START YOUR SPARK'
+        : 'STORY LOCKED IN · PROVE ATTENTION'
+    );
+    changeRoom('lab');
+    addLog(
+      firstRitualPending
+        ? 'STORY: Awareness complete — begin Proof of Attention (First Spark).'
+        : 'STORY: Awareness complete — prove attention again.',
+      'success'
+    );
+  };
+
+  useEffect(() => {
+    if (!showAwarenessStory) return;
+    try {
+      const u = new URL(window.location.href);
+      if (u.searchParams.get('story') === '1') {
+        u.searchParams.delete('story');
+        window.history.replaceState({}, '', u.pathname + u.search + u.hash);
+      }
+    } catch {
+      /* ignore */
+    }
+  }, [showAwarenessStory]);
 
   useEffect(() => {
     if (!currentUser) return;
@@ -843,7 +894,8 @@ export default function App() {
   useEffect(() => {
     if (!currentUser) return;
     if (firstRitualPending || !hasCompletedFirstContribution()) return;
-    if (focusMode || showCultureBroadcast || showStory || passportPending) return;
+    if (focusMode || showCultureBroadcast || showStory || showAwarenessStory || passportPending)
+      return;
     if (showAttentionShare) return;
 
     const delayMs = 12_000;
@@ -864,6 +916,7 @@ export default function App() {
     focusMode,
     showCultureBroadcast,
     showStory,
+    showAwarenessStory,
     passportPending,
     showAttentionShare,
   ]);
@@ -1052,11 +1105,6 @@ export default function App() {
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        const missions: DailyMission[] = parsed.dailyMissions || INITIAL_MISSIONS;
-        const hasKpiMission = missions.some((m) => m.id === 'm_kpi');
-        const labelById = Object.fromEntries(INITIAL_MISSIONS.map((m) => [m.id, m.label]));
-        const withUniverseLabels = (list: DailyMission[]) =>
-          list.map((m) => (labelById[m.id] ? { ...m, label: labelById[m.id] } : m));
         let kpiProof = parsed.kpiProof;
         try {
           const rawProof = localStorage.getItem('building_culture_kpi_proof_v1');
@@ -1067,23 +1115,7 @@ export default function App() {
         setState({
           ...parsed,
           kpiProof,
-          dailyMissions: withUniverseLabels(
-            hasKpiMission
-              ? missions.map((m) =>
-                  m.id === 'm_kpi' && kpiProof?.signature ? { ...m, completed: true } : m
-                )
-              : [
-                  {
-                    id: 'm_kpi',
-                    label: labelById.m_kpi,
-                    completed: !!kpiProof?.signature,
-                    energyReward: 25,
-                    powerReward: 15,
-                    category: 'build' as const,
-                  },
-                  ...missions,
-                ]
-          ),
+          dailyMissions: mergeRealMissions(parsed.dailyMissions),
           rooms: (parsed.rooms || INITIAL_ROOMS).map((r: FacilityRoom) => {
             const seed = INITIAL_ROOMS.find((s) => s.id === r.id);
             let next = seed
@@ -1463,6 +1495,13 @@ export default function App() {
       return 0;
     }
   })();
+  const claimStatus = getDailyClaimStatus();
+  const questsDoneToday = completedQuestCount(
+    state,
+    currentUser?.walletAddress
+  );
+  const nextQuest = nextIncompleteQuest(state, currentUser?.walletAddress);
+  const wheelReadyToday = wheelUnlocked(state, currentUser?.walletAddress);
 
   const navPhase: NavPhase = firstRitualPending
     ? 'ritual'
@@ -1576,9 +1615,9 @@ export default function App() {
     }
     if (spreadPending) {
       return {
-        id: 'profile' as NavDestination,
-        label: 'Pass the invite',
-        reason: `${you}, you saw the hook — now help someone else grow. Love travels.`,
+        id: 'map' as NavDestination,
+        label: 'Share your invite',
+        reason: `${you}, one tap copies your invite — help someone start their passport.`,
       };
     }
     // First loop closed — daily return / grind
@@ -1647,7 +1686,7 @@ export default function App() {
       continueLoopChain();
       return;
     }
-    if (spreadPending && navNextStep.id === 'profile') {
+    if (spreadPending) {
       runLoopSpreadInvite();
       return;
     }
@@ -1682,6 +1721,8 @@ export default function App() {
         'success'
       );
       if (first) {
+        playSound('success');
+        setRewardBurst('SPREAD · INVITE COPIED · LOVE TRAVELS');
         const res = await sendAttentionProofMemo({
           kind: 'spread',
           parts: { channel: 'loop_stage' },
@@ -1689,6 +1730,8 @@ export default function App() {
         if ('signature' in res) {
           addLog(`Spread sealed on Devnet — ${res.solscan}`, 'success');
         }
+      } else {
+        playSound('soft');
       }
     });
   };
@@ -2045,13 +2088,13 @@ export default function App() {
       }`}
     >
 
-      {/* Background Atmosphere — presentation-grade field */}
+      {/* Background Atmosphere — spark field */}
       <div className="absolute inset-0 pointer-events-none z-0 overflow-hidden">
         <AmbientField
           variant={firstRitualPending ? 'ritual' : 'duality'}
           dim={focusMode}
         />
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_50%_at_50%_-10%,rgba(34,211,238,0.08),transparent_55%),radial-gradient(ellipse_60%_40%_at_90%_20%,rgba(245,158,11,0.06),transparent_50%)]" />
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_50%_at_50%_-10%,rgba(34,211,238,0.05),transparent_55%),radial-gradient(ellipse_60%_40%_at_90%_20%,rgba(245,158,11,0.04),transparent_50%)]" />
       </div>
 
       {focusMode && (
@@ -2400,17 +2443,15 @@ export default function App() {
             <span className="hidden sm:inline">More</span>
           </button>
 
-          {!firstRitualPending && navPhase === 'open' && (
+          {navPhase === 'open' && (
             <button
               type="button"
-              onClick={() => {
-                setGuideReplay(true);
-                setShowStory(true);
-              }}
-              title="Replay guide"
-              className="hidden lg:flex items-center gap-1.5 px-2.5 py-1.5 text-slate-500 hover:text-cyan-400 rounded-lg font-mono text-[10px] tracking-wider uppercase font-black transition-all cursor-pointer"
+              onClick={openAwarenessStory}
+              title="Why learn — Awareness Story"
+              className="hidden lg:flex items-center gap-1.5 px-2.5 py-1.5 text-slate-500 hover:text-amber-300 rounded-lg font-mono text-[10px] tracking-wider uppercase font-black transition-all cursor-pointer"
             >
               <HelpCircle className="w-3.5 h-3.5" />
+              <span className="hidden xl:inline">Story</span>
             </button>
           )}
 
@@ -2579,6 +2620,56 @@ export default function App() {
                     navPhase === 'guided' && (spreadDone || state.energy >= 40)
                   }
                   onOpenFacility={() => setLoopFacilityOpen(true)}
+                  onOpenStory={openAwarenessStory}
+                  onStepAction={(step) => {
+                    if (step === 'hear') {
+                      enterHearingFromLoop();
+                      return;
+                    }
+                    if (step === 'spark' || step === 'zen') {
+                      setLoopFacilityOpen(false);
+                      changeRoom('lab');
+                      addLog(
+                        step === 'spark'
+                          ? 'LOOP: Spark — prove attention in Academy.'
+                          : 'LOOP: Zen — Mind or Machine after your proof.',
+                        'info'
+                      );
+                      return;
+                    }
+                    if (step === 'spread') {
+                      runLoopSpreadInvite();
+                      return;
+                    }
+                    advanceLoopBeat();
+                  }}
+                  stay={
+                    firstRitualPending
+                      ? null
+                      : {
+                          claimReady:
+                            claimStatus.ready && Boolean(economyStatus?.ready),
+                          msUntilNext: claimStatus.msUntilNext,
+                          streak: dailyStreak,
+                          questsDone: questsDoneToday,
+                          questsTotal: REAL_DAILY_QUESTS.length,
+                          wheelReady: wheelReadyToday,
+                          nextQuestLabel: nextQuest?.label ?? null,
+                          onClaim: () => changeRoom('treasury'),
+                          onQuests: () => changeRoom('missions'),
+                          onNextQuest: () => {
+                            if (!nextQuest) {
+                              changeRoom('missions');
+                              return;
+                            }
+                            if (nextQuest.openHearing) {
+                              enterHearingFromLoop();
+                              return;
+                            }
+                            changeRoom(nextQuest.room);
+                          },
+                        }
+                  }
                 />
                 {!firstRitualPending && spreadDone && hasSharedPassport() && (
                   <MakeItRainDeck
@@ -2636,6 +2727,38 @@ export default function App() {
                     setHearTouched(true);
                     if (!hearing.active) hearing.toggle();
                   }}
+                  onOpenStory={openAwarenessStory}
+                  onOpenSpark={() => {
+                    setLoopFacilityOpen(false);
+                    changeRoom('lab');
+                  }}
+                  onOpenReturn={() => advanceLoopBeat()}
+                  onSpread={() => runLoopSpreadInvite()}
+                />
+              )}
+              {!firstRitualPending && !showLoopStage && (
+                <StayLoopStrip
+                  claimReady={claimStatus.ready && Boolean(economyStatus?.ready)}
+                  msUntilNext={claimStatus.msUntilNext}
+                  streak={dailyStreak}
+                  questsDone={questsDoneToday}
+                  questsTotal={REAL_DAILY_QUESTS.length}
+                  wheelReady={wheelReadyToday}
+                  nextQuestLabel={nextQuest?.label ?? null}
+                  onClaim={() => changeRoom('treasury')}
+                  onQuests={() => changeRoom('missions')}
+                  onNextQuest={() => {
+                    if (!nextQuest) {
+                      changeRoom('missions');
+                      return;
+                    }
+                    if (nextQuest.openHearing) {
+                      enterHearingFromLoop();
+                      return;
+                    }
+                    changeRoom(nextQuest.room);
+                  }}
+                  compact
                 />
               )}
 
@@ -3361,7 +3484,18 @@ export default function App() {
               )}
               {activeRoom === 'ai' && <AICore state={state} setState={setState} addLog={addLog} />}
               {activeRoom === 'missions' && (
-                <DailyMissions state={state} setState={setState} addLog={addLog} />
+                <DailyMissions
+                  state={state}
+                  setState={setState}
+                  addLog={addLog}
+                  walletAddress={currentUser?.walletAddress}
+                  onNavigate={(room) => changeRoom(room)}
+                  onOpenHearing={() => {
+                    markHearTouched();
+                    setHearTouched(true);
+                    if (!hearing.active) hearing.toggle();
+                  }}
+                />
               )}
               {activeRoom === 'guild' && (
                 <GuildHall
@@ -3390,6 +3524,7 @@ export default function App() {
                   currentUser={currentUser}
                   onLogout={handleLogout}
                   onOpenTreasury={(sku) => (sku ? openTollShop(sku) : changeRoom('treasury'))}
+                  onRewardBurst={(message) => setRewardBurst(message)}
                 />
               )}
               {activeRoom === 'leaderboard' && <Leaderboard state={state} setState={setState} addLog={addLog} />}
@@ -3458,6 +3593,10 @@ export default function App() {
                     setHearTouched(true);
                     if (!hearing.active) hearing.toggle();
                   }}
+                  onOpenStory={openAwarenessStory}
+                  onOpenSpark={() => changeRoom('lab')}
+                  onOpenReturn={() => advanceLoopBeat()}
+                  onSpread={() => runLoopSpreadInvite()}
                 />
               )}
               {activeRoom === 'partners' && <PartnerProgram state={state} setState={setState} addLog={addLog} />}
@@ -3769,18 +3908,17 @@ export default function App() {
         )}
       </AnimatePresence>
 
-      <AnimatePresence>
-        {showStory && (
-          <OnboardingModal
-            replay
-            onClose={() => {
-              setShowStory(false);
-              setGuideReplay(false);
-              addLog("GUIDE: Closed — we're here for attention (Attention → Proof → Fuel).", 'info');
-            }}
-          />
-        )}
-      </AnimatePresence>
+      <AwarenessStoryOverlay
+        open={showAwarenessStory}
+        onClose={() => {
+          setShowAwarenessStory(false);
+          addLog('STORY: Closed — prove attention when ready.', 'info');
+        }}
+        onFinish={finishAwarenessStory}
+        finishLabel={
+          firstRitualPending ? 'Begin your first Spark' : 'Prove attention again'
+        }
+      />
 
       <AttentionShareModal
         open={showAttentionShare}

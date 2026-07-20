@@ -79,13 +79,13 @@ export default function DashboardNftDeck({
       }`}
     >
       <MoodArt
-        image={miningLive ? '/campaign/culture-club.webp' : '/nft/quantum.webp'}
-        wash="from-[#050608]/45 via-[#050608]/75 to-[#050608]/95"
+        wash="from-[#050608]/25 via-[#050608]/70 to-[#050608]/95"
         accent={miningLive ? 'cyan' : 'amber'}
         form={miningLive ? 'spark' : 'orbit'}
         compact
+        plate="signal"
       />
-      <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-[#050608]/85 via-[#050608]/55 to-transparent" />
+      <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-[#050608]/80 via-[#050608]/30 to-transparent" />
 
       <div className="relative z-10 flex flex-col gap-4">
         <div className="flex flex-wrap items-start justify-between gap-3">

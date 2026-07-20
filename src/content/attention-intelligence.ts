@@ -112,6 +112,9 @@ export type SessionExercise =
   | MultiplierAuditExercise
   | HookMirrorExercise;
 
+/** Soft Academy lane — biases order via growth path; never drops a session. */
+export type SessionLane = 'science' | 'reflection' | 'both';
+
 export interface AttentionSession {
   id: string;
   week?: string;
@@ -126,6 +129,8 @@ export interface AttentionSession {
   nextHook: string;
   rewards: SessionRewards;
   status: SessionStatus;
+  /** Science vs reflection bias for personal growth paths */
+  lane?: SessionLane;
   citations?: string[];
   researchNote?: string;
 }
@@ -151,6 +156,7 @@ export const FIRST_SPARK_SESSION: AttentionSession = {
   insight:
     'Proof of Attention is the product: focused questions + a short artifact beat empty hashes. Your score crosses a confidential threshold (Arcium mirror) — then energy lands on your node. Attention first. Everything else is optional depth.',
   durationMin: 2,
+  lane: 'both',
   exerciseType: 'bias_quiz',
   exercise: {
     type: 'bias_quiz',
@@ -218,6 +224,7 @@ export const HOOK_MIRROR_SESSION: AttentionSession = {
   insight:
     'Doomscrolling is not a mystery of willpower. It is a loop: bait → relief → return. The moment you catch yourself ("I\'m doing it again") is where attention becomes yours — or where the curve takes you. Name the bait. Name the notice. Name why you stay. That honesty is Proof of Hook Awareness. Then Zen: hold the knowledge, or convert it to fuel.',
   durationMin: 3,
+  lane: 'reflection',
   exerciseType: 'hook_mirror',
   exercise: {
     type: 'hook_mirror',
@@ -265,6 +272,7 @@ export const CORE_ATTENTION_SESSIONS: AttentionSession[] = [
     insight:
       'Neuroplasticity means repetition builds stronger neural pathways, while unused ones prune. London taxi drivers grew bigger memory-related brain areas from "The Knowledge." Adults learning juggling showed gray matter changes in months. Intelligence isn\'t set — it\'s like a muscle.',
     durationMin: 5,
+    lane: 'science',
     exerciseType: 'reps_track',
     exercise: {
       type: 'reps_track',
@@ -304,6 +312,7 @@ export const CORE_ATTENTION_SESSIONS: AttentionSession[] = [
     insight:
       'Biases like confirmation, anchoring, and optimism are built-in shortcuts. Awareness lets you mine better decisions. Schools skip this; it explains most poor choices.',
     durationMin: 6,
+    lane: 'science',
     exerciseType: 'bias_quiz',
     exercise: {
       type: 'bias_quiz',
@@ -358,6 +367,7 @@ export const CORE_ATTENTION_SESSIONS: AttentionSession[] = [
     insight:
       'Attention isn\'t infinite — it\'s the scarcest resource. Platforms exploit emotional triggers; you can train deliberate focus with batching and cognitive outsourcing (write intrusive thoughts down).',
     durationMin: 5,
+    lane: 'reflection',
     exerciseType: 'grounding_breath',
     exercise: {
       type: 'grounding_breath',
@@ -395,6 +405,7 @@ export const CORE_ATTENTION_SESSIONS: AttentionSession[] = [
     insight:
       'Observer mode separates impulse from choice — gold for attention mining in noisy worlds. Name sensation/emotion, redirect once, repeat.',
     durationMin: 4,
+    lane: 'reflection',
     exerciseType: 'body_scan',
     exercise: {
       type: 'body_scan',
@@ -426,6 +437,7 @@ export const CORE_ATTENTION_SESSIONS: AttentionSession[] = [
     insight:
       'Carol Dweck\'s research: a growth mindset (skills improve with effort) builds resilience and learning. Neuroplasticity makes this literal — effort builds pathways.',
     durationMin: 5,
+    lane: 'science',
     exerciseType: 'growth_scale',
     exercise: {
       type: 'growth_scale',
@@ -463,6 +475,7 @@ export const CORE_ATTENTION_SESSIONS: AttentionSession[] = [
     insight:
       'First principles, inversion, and second-order thinking reduce errors. They\'re brain hacks that compound Attention Intelligence.',
     durationMin: 6,
+    lane: 'science',
     exerciseType: 'mental_models',
     exercise: {
       type: 'mental_models',
@@ -508,6 +521,7 @@ export const CORE_ATTENTION_SESSIONS: AttentionSession[] = [
     insight:
       'Cue → craving/routine → reward. Repetition strengthens basal ganglia chunking. Small consistent actions beat motivation alone. Make good cues obvious, bad ones invisible.',
     durationMin: 5,
+    lane: 'science',
     exerciseType: 'habit_stack',
     exercise: {
       type: 'habit_stack',
@@ -539,6 +553,7 @@ export const CORE_ATTENTION_SESSIONS: AttentionSession[] = [
     insight:
       'Work, place/environment, habits, people, and inner conversations compound. Get these right via plasticity and models — Attention Intelligence at scale.',
     durationMin: 5,
+    lane: 'science',
     exerciseType: 'multiplier_audit',
     exercise: {
       type: 'multiplier_audit',

@@ -11,6 +11,15 @@
 **Live demo:** https://mining.buildingcultureid.space/  
 **Repo:** https://github.com/Laszlo23/culture-inteligent-node  
 
+### TL;DR deck (weekend)
+
+1. **Invalid without Agent ID** — ASP must be live on OKX.AI before form + X count.  
+2. **Register ASP** — copy from `01-asp-identity.md` · session notes in `06-register-session.md`.  
+3. **Demo ≤90s** — shot list in `04-demo-script-90s.md`.  
+4. **X post** — `#OKXAI` + demo · paste from `03-x-post.md`.  
+5. **Form + HackQuest** — answers in `02-form-answers.md`.  
+6. **Tracks** — pick prizes in `05-track-strategy.md` · keep listing live through judging.
+
 ---
 
 ## Critical rule (do not skip)

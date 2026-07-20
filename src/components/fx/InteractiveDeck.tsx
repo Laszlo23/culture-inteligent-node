@@ -14,6 +14,8 @@ type Props = {
   /** Default mood when a slide omits mood */
   mood?: FacilityMood;
   compact?: boolean;
+  /** Jump to a slide (e.g. from clickable loop rail) */
+  initialIndex?: number;
   /** Fired when user taps a slide's ctaLabel */
   onCta?: (slideId: string) => void;
   /** Optional label on final slide when it has no ctaLabel */
@@ -26,11 +28,14 @@ export default function InteractiveDeck({
   className = '',
   mood = 'facility',
   compact = false,
+  initialIndex = 0,
   onCta,
   finishLabel,
   onFinish,
 }: Props) {
-  const [index, setIndex] = useState(0);
+  const [index, setIndex] = useState(() =>
+    Math.max(0, Math.min(slides.length - 1, initialIndex))
+  );
   const touchX = useRef<number | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
 
@@ -46,8 +51,8 @@ export default function InteractiveDeck({
   );
 
   useEffect(() => {
-    setIndex(0);
-  }, [slides]);
+    setIndex(Math.max(0, Math.min(slides.length - 1, initialIndex)));
+  }, [slides, initialIndex]);
 
   useEffect(() => {
     const el = rootRef.current;
@@ -152,34 +157,31 @@ export default function InteractiveDeck({
               {index + 1} / {slides.length}
             </span>
 
-            {showFinish ? (
-              <button
-                type="button"
-                onClick={() => {
-                  if (slide.ctaLabel) onCta?.(slide.id);
-                  else onFinish?.();
-                }}
-                className="inline-flex items-center gap-1.5 rounded-xl bg-cyan-500 px-4 py-2 font-mono text-[10px] font-black uppercase tracking-wider text-black transition hover:bg-cyan-400 cursor-pointer"
-              >
-                {slide.ctaLabel || finishLabel}
-                <ArrowRight className="h-3.5 w-3.5" />
-              </button>
-            ) : (
-              <button
-                type="button"
-                onClick={() => {
-                  if (slide.ctaLabel) {
-                    onCta?.(slide.id);
-                    return;
-                  }
-                  go(1);
-                }}
-                className="inline-flex items-center gap-1.5 rounded-xl bg-white/10 px-4 py-2 font-mono text-[10px] font-black uppercase tracking-wider text-white transition hover:bg-white/15 cursor-pointer"
-              >
-                {slide.ctaLabel || 'Next'}
-                <ArrowRight className="h-3.5 w-3.5" />
-              </button>
-            )}
+            <div className="flex flex-wrap items-center gap-2">
+              {!isLast && (
+                <button
+                  type="button"
+                  onClick={() => go(1)}
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-white/12 bg-black/35 px-3 py-2 font-mono text-[10px] font-bold uppercase tracking-wider text-slate-300 transition hover:border-white/25 hover:text-white cursor-pointer"
+                >
+                  Next
+                  <ArrowRight className="h-3.5 w-3.5" />
+                </button>
+              )}
+              {(slide.ctaLabel || showFinish) && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (slide.ctaLabel) onCta?.(slide.id);
+                    else onFinish?.();
+                  }}
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-cyan-500 px-4 py-2 font-mono text-[10px] font-black uppercase tracking-wider text-black transition hover:bg-cyan-400 cursor-pointer"
+                >
+                  {slide.ctaLabel || finishLabel || 'Go'}
+                  <ArrowRight className="h-3.5 w-3.5" />
+                </button>
+              )}
+            </div>
           </div>
         </div>
       </CinematicPanel>

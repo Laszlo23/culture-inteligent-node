@@ -3,9 +3,9 @@
  * (retention → distribution → cash) without selling the free core.
  *
  * Priority after the product loop is clear:
- * 1) Spread (distribution)
- * 2) Partner Attention Session (first real $)
- * 3) Soft 1¢ toll (when settlement ready)
+ * 1) Keep proving / inviting (member joy)
+ * 2) Soft 1¢ toll (when settlement ready)
+ * 3) Partner Attention Session (first real $) — secondary rail
  */
 
 export type WinRoom =
@@ -14,10 +14,12 @@ export type WinRoom =
   | 'onboarding'
   | 'passport'
   | 'lab'
-  | 'map';
+  | 'map'
+  | 'missions'
+  | 'profile';
 
 export type WinRail = {
-  id: 'partner' | 'toll' | 'discord' | 'hear';
+  id: 'partner' | 'toll' | 'discord' | 'hear' | 'invite';
   label: string;
   reason: string;
   room?: WinRoom;
@@ -34,7 +36,7 @@ export type ClearLoopNext = {
 
 /**
  * When Hear→Spark→Zen→Spread→Return is warm and nothing is due,
- * point at revenue + distribution — not an empty reactor tour.
+ * keep members in a rewarding loop — Partner pilot stays a side rail.
  */
 export function clearLoopWinningNext(input: {
   you: string;
@@ -44,9 +46,15 @@ export function clearLoopWinningNext(input: {
   const you = input.you;
   const rails: WinRail[] = [
     {
+      id: 'invite',
+      label: 'Pass an invite',
+      reason: 'Help someone claim their passport — love travels',
+      room: 'profile',
+    },
+    {
       id: 'partner',
       label: 'Partner pilot',
-      reason: 'Attention Session — first cash or trade case study',
+      reason: 'Attention Session — cash or trade case study',
       room: 'partners',
     },
     {
@@ -60,7 +68,7 @@ export function clearLoopWinningNext(input: {
     rails.unshift({
       id: 'toll',
       label: '1¢ spark refill',
-      reason: 'Optional fuel when the reactor is dry — free core stays free',
+      reason: 'Optional fuel when dry — free core stays free',
       room: 'treasury',
     });
   }
@@ -75,9 +83,9 @@ export function clearLoopWinningNext(input: {
   }
 
   return {
-    id: 'partners',
-    label: 'Book a Partner Session',
-    reason: `${you}, the loop is warm — ship one Attention Session (pilot $0–$1.5k or trade). That’s the first dollar.`,
+    id: 'lab',
+    label: 'Prove attention again',
+    reason: `${you}, another short challenge grows your Human Value — that’s the reward loop.`,
     rails,
   };
 }

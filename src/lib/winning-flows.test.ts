@@ -3,14 +3,14 @@ import assert from 'node:assert/strict';
 import { clearLoopWinningNext, winningDeepLinks } from './winning-flows.ts';
 
 describe('clearLoopWinningNext', () => {
-  it('points clear members at Partner Session (first $)', () => {
+  it('keeps clear members in the prove-attention loop (Partner as rail)', () => {
     const next = clearLoopWinningNext({
       you: 'Ada',
       tollReady: true,
       hasPassport: true,
     });
-    assert.equal(next.id, 'partners');
-    assert.match(next.label, /Partner/i);
+    assert.equal(next.id, 'lab');
+    assert.match(next.label, /Prove|attention/i);
     assert.ok(next.rails.some((r) => r.id === 'toll'));
     assert.ok(next.rails.some((r) => r.id === 'partner'));
   });

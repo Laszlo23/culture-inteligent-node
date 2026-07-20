@@ -6,6 +6,15 @@ Optional later: add A2MCP once you expose a paid HTTPS skill endpoint.
 
 Category fit on OKX.AI agents directory: **Lifestyle** (primary) + story for **Software Services**.
 
+### TL;DR deck
+
+1. **Name** — `Culture Node`  
+2. **One-liner** — Attention Academy + Culture Club + Proof of Attention fuel.  
+3. **Avatar** — 1:1 file from `public/store/app-icon-512.png`  
+4. **Services** — First Spark · Culture Club Spread · Live Science Drop (A2A fees below)  
+5. **Register** — compatible agent + Onchain OS · see `06-register-session.md`  
+6. **Done when** — Agent ID live · paste into form + X post
+
 ---
 
 ## Identity (Step 1)

@@ -6,6 +6,15 @@
 
 Related: [INVESTOR_NUMBERS.md](./INVESTOR_NUMBERS.md) · [GOOGLE_AI_GRANT.md](./GOOGLE_AI_GRANT.md) · [HEARING_MODE.md](./HEARING_MODE.md) · [Pitch](../pitch/index.html)
 
+### TL;DR deck
+
+1. **Raise for voice** — cinematic Hearing journey, not TTS commands.  
+2. **Ask** — $150–350k angel · bridge Google Start (~$2k) this week.  
+3. **Demo** — `?hear=1` live path through story → passport → Spark.  
+4. **Parallel tracks** — Google credits + warm angel intros, same week.  
+5. **Cash before mainnet** — Partner Attention Sessions pay in fiat.  
+6. **Free core stays free** — capital buys depth and scale, not paywalls on First Spark.
+
 ---
 
 ## The raise thesis (say this)

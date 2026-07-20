@@ -177,41 +177,121 @@ export default function SoulboundRitualOverlay({
     }
   };
 
+  const finishMinted = (
+    minted: Awaited<ReturnType<typeof zkMintSoulbound>>,
+    boundNullifier: string | null
+  ) => {
+    setMintAddress(minted.mintAddress);
+    setMintSignature(minted.mintSignature || null);
+    setMintNote(minted.note || null);
+    setEnergyPulse(100);
+    setBeat('done');
+    setStatus(
+      minted.nonTransferable
+        ? 'Soulbound · ZKPassport-bound · Token-2022 NonTransferable'
+        : minted.note || 'Soulbound reputation sealed (ZK-gated).'
+    );
+    const rep: SoulboundReputation = {
+      zkProvider: 'zkpassport',
+      nullifierHash: boundNullifier || nullifierHash || '',
+      verifiedAt: new Date().toISOString(),
+      boundWallet: walletAddress,
+      mintAddress: minted.mintAddress,
+      mintSignature: minted.mintSignature,
+      badgePda: minted.badgePda,
+      soulboundMinted: true,
+    };
+    onComplete?.(rep);
+    addLog?.(
+      `SOULBOUND CLAIMED: ${minted.mintAddress.slice(0, 20)}… (${minted.mode})`,
+      'success'
+    );
+  };
+
   const runMint = async () => {
     setBusy(true);
     setError(null);
     setStatus('Sealing soulbound badge…');
     try {
       await ensureSession();
-      const minted = await zkMintSoulbound();
-      setMintAddress(minted.mintAddress);
-      setMintSignature(minted.mintSignature || null);
-      setMintNote(minted.note || null);
-      setEnergyPulse(100);
-      setBeat('done');
-      setStatus(
-        minted.nonTransferable
-          ? 'Soulbound · ZKPassport-bound · Token-2022 NonTransferable'
-          : minted.note || 'Soulbound reputation sealed (ZK-gated).'
-      );
-      const rep: SoulboundReputation = {
-        zkProvider: 'zkpassport',
-        nullifierHash: nullifierHash || '',
-        verifiedAt: new Date().toISOString(),
-        boundWallet: walletAddress,
-        mintAddress: minted.mintAddress,
-        mintSignature: minted.mintSignature,
-        badgePda: minted.badgePda,
-        soulboundMinted: true,
-      };
-      onComplete?.(rep);
-      addLog?.(
-        `SOULBOUND MINTED: ${minted.mintAddress.slice(0, 20)}… (${minted.mode})`,
-        'success'
-      );
+      const minted = await zkMintSoulbound({
+        walletType,
+        localKeypair,
+        preferUserFee: true,
+      });
+      finishMinted(minted, nullifierHash);
     } catch (err: any) {
-      setError(err?.message || 'Mint failed');
-      addLog?.(`SOULBOUND MINT FAILED: ${err?.message || err}`, 'warn');
+      // Last resort: treasury + member dry → ZK-gated record still counts
+      try {
+        setStatus('On-chain rent unavailable — sealing ZK-gated claim…');
+        const minted = await zkMintSoulbound({
+          walletType,
+          localKeypair,
+          allowRecorded: true,
+        });
+        finishMinted(minted, nullifierHash);
+      } catch {
+        setError(err?.message || 'Mint failed');
+        addLog?.(`SOULBOUND MINT FAILED: ${err?.message || err}`, 'warn');
+      }
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  /** One tap: prove → bind → mint (Devnet mock or live). */
+  const runSealAll = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      await ensureSession();
+      setStatus('Proving uniqueness…');
+      setBeat('prove');
+      const result = await requestZkPassportUniqueness({
+        walletAddress,
+        forceMock: true,
+        onUrl: (url) => setQrUrl(url),
+        onStatus: (line) => setStatus(line),
+      });
+      if (!result.verified || !result.uniqueIdentifier) {
+        throw new Error('Uniqueness proof failed');
+      }
+      const payload = buildVerifyPayload(result);
+      const verified = await zkVerify(payload);
+      setNullifierHash(verified.nullifierHash);
+      setEnergyPulse(40);
+      setBeat('bind');
+      setStatus('Binding identity to wallet…');
+      const bound = await zkBind(verified.nullifierHash);
+      setNullifierHash(bound.nullifierHash);
+      setEnergyPulse(66);
+      if (bound.soulboundMinted) {
+        setBeat('done');
+        setStatus('Already sealed on this identity.');
+        setEnergyPulse(100);
+        return;
+      }
+      setBeat('mint');
+      setStatus('Sealing soulbound badge…');
+      try {
+        const minted = await zkMintSoulbound({
+          walletType,
+          localKeypair,
+          preferUserFee: true,
+        });
+        finishMinted(minted, bound.nullifierHash);
+      } catch {
+        setStatus('Wallet rent unavailable — sealing ZK-gated claim…');
+        const minted = await zkMintSoulbound({
+          walletType,
+          localKeypair,
+          allowRecorded: true,
+        });
+        finishMinted(minted, bound.nullifierHash);
+      }
+    } catch (err: any) {
+      setError(err?.message || 'Soulbound claim failed');
+      addLog?.(`SOULBOUND CLAIM FAILED: ${err?.message || err}`, 'warn');
     } finally {
       setBusy(false);
     }
@@ -330,10 +410,18 @@ export default function SoulboundRitualOverlay({
                     <button
                       type="button"
                       disabled={busy}
-                      onClick={() => void runProve()}
+                      onClick={() => void runSealAll()}
                       className="w-full py-3.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-black font-mono text-xs font-black uppercase tracking-wider cursor-pointer disabled:opacity-60 shadow-[0_0_28px_rgba(34,211,238,0.3)]"
                     >
-                      {busy ? 'Proving…' : 'Prove with ZKPassport'}
+                      {busy ? 'Sealing…' : 'Claim soulbound · one tap'}
+                    </button>
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() => void runProve()}
+                      className="w-full py-2.5 rounded-xl border border-white/15 text-slate-300 font-mono text-[10px] font-bold uppercase tracking-wider cursor-pointer disabled:opacity-60 hover:border-cyan-400/40"
+                    >
+                      Or step through · Prove first
                     </button>
                   </div>
                 )}

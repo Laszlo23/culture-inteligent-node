@@ -32,7 +32,7 @@ export {
   GlitchText,
 } from './Glitch';
 
-/** Facility-wide atmosphere (single video plate + soft CSS field). */
+/** Facility-wide atmosphere (spark field + sharp lattice). */
 export function AmbientField({
   className = '',
   variant = 'facility',

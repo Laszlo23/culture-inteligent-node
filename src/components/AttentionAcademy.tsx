@@ -61,7 +61,14 @@ import { setZenDecisionHandler } from '../lib/hearing/zen-bridge';
 import { useHearing } from '../lib/hearing/context';
 import { track } from '../lib/attention-metrics';
 import { inviteCodeFromWallet, reportGrowthEvent } from '../lib/growth-loop';
+import {
+  orderCoreSessions,
+  PATH_LABELS,
+  readGrowthPath,
+  type GrowthPathId,
+} from '../lib/growth-path';
 import { friendlyFailureDetail, thrownToUserError } from '../lib/user-errors';
+import PersonalHookGate from './PersonalHookGate';
 
 interface AttentionAcademyProps {
   state: GameState;
@@ -146,8 +153,13 @@ export default function AttentionAcademy({
   const [zenModeOn, setZenModeOn] = useState(() => isZenMode());
   const [learningDecision, setLearningDecision] = useState<LearningDecision | null>(null);
   const zenPromptedRef = React.useRef<string | null>(null);
+  const [growthPath, setGrowthPath] = useState<GrowthPathId | null>(() => readGrowthPath());
+  const [showPathGate, setShowPathGate] = useState(false);
 
-  const catalog = useMemo(() => mergeCatalog(published), [published]);
+  const catalog = useMemo(
+    () => orderCoreSessions(mergeCatalog(published), growthPath),
+    [published, growthPath]
+  );
 
   /** Soft gate: Hook Mirror is recommended after First Spark but does not hard-lock the core series. */
   const isSessionLocked = useCallback(
@@ -620,7 +632,7 @@ export default function AttentionAcademy({
         efficiency: nextEfficiency,
         proofOfAttentions: proofs,
         dailyMissions: prev.dailyMissions.map((m) =>
-          m.id === 'm_academy' ? { ...m, completed: true } : m
+          m.id === 'm_spark' || m.id === 'm_academy' ? { ...m, completed: true } : m
         ),
       };
     });
@@ -1053,12 +1065,36 @@ export default function AttentionAcademy({
               {completedSessions.filter((id) => CORE_ATTENTION_SESSIONS.some((s) => s.id === id)).length} /{' '}
               {CORE_ATTENTION_SESSIONS.length} CORE
             </p>
+            <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+              <p className="text-[10px] font-mono uppercase tracking-wider text-cyan-300/90">
+                {PATH_LABELS[growthPath ?? 'balanced']}
+              </p>
+              <button
+                type="button"
+                onClick={() => setShowPathGate((v) => !v)}
+                className="text-[10px] font-mono uppercase tracking-wider text-slate-500 hover:text-cyan-300 cursor-pointer"
+              >
+                {showPathGate ? 'Close' : 'Change path'}
+              </button>
+            </div>
             {isMaster && (
               <p className="mt-2 text-xs text-amber-300 flex items-center gap-1.5">
                 <Award className="w-3.5 h-3.5" /> Core series mastered
               </p>
             )}
           </div>
+
+          {showPathGate && (
+            <PersonalHookGate
+              compact
+              initialPath={growthPath}
+              onChosen={(path) => {
+                setGrowthPath(path);
+                setShowPathGate(false);
+                addLog(`GROWTH PATH: ${PATH_LABELS[path]} — catalog reordered.`, 'info');
+              }}
+            />
+          )}
 
           <div className="space-y-1.5 max-h-[420px] overflow-y-auto pr-1">
             {catalog.map((session, idx) => {

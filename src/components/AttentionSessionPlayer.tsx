@@ -6,7 +6,9 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { motion } from 'motion/react';
 import { Zap, Check, Play, RotateCcw } from 'lucide-react';
 import type { AttentionSession } from '../content/attention-intelligence';
+import type { DeckSlide } from '../lib/decks/types';
 import { CinematicBackdrop } from './fx';
+import InteractiveDeck from './fx/InteractiveDeck';
 import { useHearing } from '../lib/hearing/context';
 import { setHearingSessionHandler } from '../lib/hearing/session-bridge';
 import type { HearingCommand } from '../lib/hearing/commands';
@@ -68,6 +70,29 @@ export default function AttentionSessionPlayer({
   const [hookNotice, setHookNotice] = useState('');
   const [hookWhy, setHookWhy] = useState('');
   const hookReadyAnnouncedRef = useRef(false);
+  const exerciseNarratedRef = useRef<string | null>(null);
+  /** Hook → insight deck before exercise (curriculum essays stay in content files). */
+  const [briefDone, setBriefDone] = useState(completed);
+
+  const briefSlides: DeckSlide[] = useMemo(
+    () => [
+      {
+        id: `${session.id}-hook`,
+        eyebrow: 'Hook · Mind',
+        title: session.title,
+        body: session.hook,
+        mood: 'spark',
+      },
+      {
+        id: `${session.id}-insight`,
+        eyebrow: 'Insight · Machine',
+        title: 'Hold this',
+        body: session.insight,
+        mood: 'facility',
+      },
+    ],
+    [session.id, session.title, session.hook, session.insight]
+  );
 
   const biasAllAnswered =
     ex.type === 'bias_quiz' &&
@@ -150,6 +175,8 @@ export default function AttentionSessionPlayer({
     setHookNotice('');
     setHookWhy('');
     hookReadyAnnouncedRef.current = false;
+    exerciseNarratedRef.current = null;
+    setBriefDone(completed);
     if (ex.type === 'bias_quiz') {
       setBiasAnswers(ex.questions.map(() => null));
     }
@@ -159,7 +186,7 @@ export default function AttentionSessionPlayer({
     if (ex.type === 'body_scan') {
       setScanLeft(ex.seconds);
     }
-  }, [session.id]);
+  }, [session.id, completed, ex]);
 
   // breathing loop
   useEffect(() => {
@@ -211,17 +238,31 @@ export default function AttentionSessionPlayer({
     return () => clearInterval(interval);
   }, [scanActive, ex, addLog]);
 
-  // Hearing Mode: narrate session open once
+  // Hearing Mode: narrate hook while brief deck is open
   useEffect(() => {
     if (!hearingActive || !speakLine || completed) return;
     if (narratedSessionRef.current === session.id) return;
     narratedSessionRef.current = session.id;
+    void speakLine(
+      `${session.title}. ${session.hook} Duration about ${session.durationMin} minutes. Swipe the deck for the insight, then start the exercise.`
+    );
+  }, [
+    hearingActive,
+    speakLine,
+    session.id,
+    session.title,
+    session.hook,
+    session.durationMin,
+    completed,
+  ]);
+
+  // Hearing Mode: narrate exercise prompts only after brief deck finishes
+  useEffect(() => {
+    if (!hearingActive || !speakLine || completed || !briefDone) return;
+    if (exerciseNarratedRef.current === session.id) return;
+    exerciseNarratedRef.current = session.id;
 
     void (async () => {
-      await speakLine(
-        `${session.title}. ${session.hook} Duration about ${session.durationMin} minutes.`
-      );
-
       if (ex.type === 'bias_quiz') {
         const q = ex.questions[0];
         const opts = q.options
@@ -244,8 +285,7 @@ export default function AttentionSessionPlayer({
         await speakLine('Follow the on-screen prompts. Say help anytime.');
       }
     })();
-  }, [hearingActive, speakLine, session.id, session.title, session.hook, session.durationMin, ex, completed]);
-
+  }, [hearingActive, speakLine, session.id, ex, completed, briefDone]);
   // Hearing Mode: breath phase cues
   useEffect(() => {
     if (!hearingActive || !speakLine || ex.type !== 'grounding_breath') return;
@@ -438,7 +478,7 @@ export default function AttentionSessionPlayer({
       }
     }
 
-    onReadyChange(ready && !completed, artifacts);
+    onReadyChange(ready && !completed && briefDone, artifacts);
   }, [
     ex,
     skill,
@@ -464,9 +504,9 @@ export default function AttentionSessionPlayer({
     hookNotice,
     hookWhy,
     completed,
+    briefDone,
     onReadyChange,
   ]);
-
   // Hearing: announce when Hook Mirror is ready for Zen
   useEffect(() => {
     if (!hearingActive || !speakLine || completed || ex.type !== 'hook_mirror') return;
@@ -491,20 +531,20 @@ export default function AttentionSessionPlayer({
         <CinematicBackdrop variant="duality" />
       </div>
       <div className="relative z-[1] space-y-5">
-      <div className="rounded-xl border border-amber-400/25 bg-black/35 backdrop-blur-[2px] p-4">
-        <p className="text-[10px] font-mono text-amber-300 tracking-widest uppercase mb-2">
-          Hook · Mind · Knowledge first
+      {!briefDone ? (
+        <InteractiveDeck
+          slides={briefSlides}
+          mood="spark"
+          finishLabel="Start exercise"
+          onFinish={() => setBriefDone(true)}
+        />
+      ) : (
+        <p className="rounded-xl border border-white/8 bg-black/30 px-4 py-2.5 text-[12px] italic leading-relaxed text-slate-400">
+          &ldquo;{session.hook}&rdquo;
         </p>
-        <p className="text-slate-200 text-sm leading-relaxed italic">&ldquo;{session.hook}&rdquo;</p>
-      </div>
-      <div className="rounded-xl border border-cyan-400/25 bg-black/35 backdrop-blur-[2px] p-4">
-        <p className="text-[10px] font-mono text-cyan-300 tracking-widest uppercase mb-2">
-          Insight · Machine · Duality holds
-        </p>
-        <p className="text-slate-300 text-sm leading-relaxed">{session.insight}</p>
-      </div>
+      )}
 
-      {ex.type === 'reps_track' && (
+      {briefDone && ex.type === 'reps_track' && (
         <div className="space-y-4">
           <div>
             <label className={labelClass}>{ex.skillPrompt}</label>
@@ -541,7 +581,7 @@ export default function AttentionSessionPlayer({
         </div>
       )}
 
-      {ex.type === 'bias_quiz' && (
+      {briefDone && ex.type === 'bias_quiz' && (
         <div className="space-y-4">
           {/* Desktop progress orbs: Q1…Qn → Reflect → Ready */}
           <div className="flex flex-wrap items-center gap-2 rounded-xl border border-white/10 bg-black/30 px-3 py-2.5">
@@ -636,7 +676,7 @@ export default function AttentionSessionPlayer({
         </div>
       )}
 
-      {ex.type === 'grounding_breath' && (
+      {briefDone && ex.type === 'grounding_breath' && (
         <div className="space-y-4">
           <p className="text-[10px] font-mono text-slate-500 uppercase tracking-wider">5-4-3-2-1 Grounding</p>
           {ex.groundingLabels.map((label, i) => (
@@ -688,7 +728,7 @@ export default function AttentionSessionPlayer({
         </div>
       )}
 
-      {ex.type === 'body_scan' && (
+      {briefDone && ex.type === 'body_scan' && (
         <div className="space-y-4">
           <div className="rounded-xl border border-violet-500/20 bg-violet-500/5 p-6 text-center">
             {!scanDone && !scanActive && (
@@ -732,7 +772,7 @@ export default function AttentionSessionPlayer({
         </div>
       )}
 
-      {ex.type === 'growth_scale' && (
+      {briefDone && ex.type === 'growth_scale' && (
         <div className="space-y-4">
           <p className="text-[10px] font-mono text-slate-500">Rate 1–5 (disagree → agree)</p>
           {ex.statements.map((st, i) => (
@@ -777,7 +817,7 @@ export default function AttentionSessionPlayer({
         </div>
       )}
 
-      {ex.type === 'mental_models' && (
+      {briefDone && ex.type === 'mental_models' && (
         <div className="space-y-4">
           <div className="grid gap-2">
             {ex.models.map((m) => (
@@ -799,7 +839,7 @@ export default function AttentionSessionPlayer({
         </div>
       )}
 
-      {ex.type === 'habit_stack' && (
+      {briefDone && ex.type === 'habit_stack' && (
         <div className="space-y-4">
           <div className="rounded-xl border border-white/5 p-3 text-xs text-slate-400 font-mono">
             After [existing habit], I will [new tiny action].
@@ -825,7 +865,7 @@ export default function AttentionSessionPlayer({
         </div>
       )}
 
-      {ex.type === 'multiplier_audit' && (
+      {briefDone && ex.type === 'multiplier_audit' && (
         <div className="space-y-4">
           <div className="flex flex-wrap gap-2">
             {ex.multipliers.map((m, i) => (
@@ -870,7 +910,7 @@ export default function AttentionSessionPlayer({
         </div>
       )}
 
-      {ex.type === 'hook_mirror' && (
+      {briefDone && ex.type === 'hook_mirror' && (
         <div className="space-y-4">
           <p className="font-mono text-[9px] font-black uppercase tracking-[0.22em] text-amber-400/90">
             Proof of Hook Awareness · three honest turns
