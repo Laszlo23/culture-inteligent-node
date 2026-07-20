@@ -170,7 +170,7 @@ Building Culture
 **A11y / inclusive tech:** accessibility newsletters, “eyes-free UI” makers on X  
 **Local / founder:** your city tech newsletter, indie hacker showcases
 
-Personalize one line per pitch. Attach campaign still from `/public/campaign/mine-culture.png` or Hearing Mode demo.
+Personalize one line per pitch. Attach campaign still from `/public/campaign/mine-culture.webp` or Hearing Mode demo.
 
 ---
 

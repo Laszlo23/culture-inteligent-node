@@ -13,7 +13,8 @@ import {
   type MainLoopFlags,
 } from '../lib/main-loop';
 import type { WinRail } from '../lib/winning-flows';
-import { CinematicBackdrop, EnergyFlow, GlowPulse } from './fx';
+import { EnergyFlow, GlowPulse } from './fx';
+import { MoodArt } from './onboarding/StoryChapterArt';
 
 export type LoopBeatCta = {
   label: string;
@@ -31,6 +32,8 @@ type Props = {
   flags: MainLoopFlags;
   phase: 'ritual' | 'guided';
   username?: string | null;
+  /** Progress title — preferred greeting identity */
+  progressTitle?: string | null;
   energy: number;
   streak: number;
   connections?: number | null;
@@ -61,6 +64,7 @@ export default function MainLoopStage({
   flags,
   phase,
   username,
+  progressTitle,
   energy,
   streak,
   connections,
@@ -78,7 +82,8 @@ export default function MainLoopStage({
 }: Props) {
   const reduceMotion = useReducedMotion();
   const rail = buildLoopRail(flags);
-  const you = username?.replace(/^@/, '') || null;
+  const handle = username?.replace(/^@/, '') || null;
+  const you = progressTitle?.trim() || handle;
 
   return (
     <div className="space-y-4">
@@ -96,11 +101,24 @@ export default function MainLoopStage({
         initial={reduceMotion ? false : { opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.45 }}
-        className="relative overflow-hidden rounded-2xl border border-cyan-400/35 bg-[#07080c]/90"
+        className="relative overflow-hidden rounded-2xl border border-white/15 bg-[#07080c] shadow-[0_24px_80px_rgba(0,0,0,0.55)]"
       >
-        <div className="absolute inset-0">
-          <CinematicBackdrop variant={phase === 'ritual' ? 'ritual' : 'duality'} />
-        </div>
+        <MoodArt
+          image={
+            phase === 'ritual'
+              ? '/campaign/culture-club.webp'
+              : '/campaign/mine-culture.webp'
+          }
+          wash={
+            phase === 'ritual'
+              ? 'from-[#060a10]/35 via-[#050608]/70 to-[#050608]/95'
+              : 'from-[#050608]/30 via-[#050608]/70 to-[#050608]/95'
+          }
+          accent={phase === 'ritual' ? 'cyan' : 'amber'}
+          form={phase === 'ritual' ? 'spark' : 'orbit'}
+          compact
+        />
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-[#050608]/80 via-[#050608]/50 to-transparent" />
         <GlowPulse
           energy={Math.max(8, energy)}
           color="cyan"
@@ -113,10 +131,13 @@ export default function MainLoopStage({
         />
 
         <div className="relative z-10 px-5 pt-6 pb-5 md:px-8 md:pt-8 md:pb-6">
-          <p className="font-display text-3xl md:text-4xl font-extrabold italic text-white tracking-tight leading-none">
+          <p className="font-mono text-[10px] font-black uppercase tracking-[0.28em] text-cyan-300">
+            {phase === 'ritual' ? 'Opening · First Spark' : 'Main loop · live'}
+          </p>
+          <p className="mt-2 font-display text-3xl md:text-4xl font-extrabold italic text-white tracking-tight leading-none drop-shadow-[0_4px_28px_rgba(0,0,0,0.75)]">
             {BRAND.parent}
           </p>
-          <p className="mt-1.5 text-[11px] font-mono uppercase tracking-[0.22em] text-cyan-300/90">
+          <p className="mt-1.5 text-[11px] font-mono uppercase tracking-[0.22em] text-amber-200/90">
             {BRAND.passport} · {SLOGANS.zen}
           </p>
 
@@ -224,13 +245,16 @@ export default function MainLoopStage({
           <div className="mt-6 max-w-xl">
             {you && (
               <span className="text-[10px] font-mono uppercase tracking-[0.2em] text-slate-500">
-                For you · @{you}
+                For you · {progressTitle ? you : `@${you}`}
+                {progressTitle && handle ? (
+                  <span className="text-slate-600 normal-case tracking-normal"> · @{handle}</span>
+                ) : null}
               </span>
             )}
-            <h2 className="font-display text-2xl md:text-3xl font-extrabold italic text-white tracking-tight leading-tight mt-1">
+            <h2 className="font-display text-2xl md:text-3xl font-extrabold italic text-white tracking-tight leading-tight mt-1 drop-shadow-[0_4px_24px_rgba(0,0,0,0.7)]">
               {cta.label}
             </h2>
-            <p className="mt-2 text-sm text-slate-400 font-sans leading-relaxed">
+            <p className="mt-2 text-sm text-slate-100/85 font-sans leading-relaxed max-w-lg">
               {cta.reason}
             </p>
           </div>
@@ -241,7 +265,7 @@ export default function MainLoopStage({
               onClick={cta.onGo}
               whileHover={reduceMotion ? undefined : { scale: 1.02 }}
               whileTap={reduceMotion ? undefined : { scale: 0.98 }}
-              className="inline-flex items-center justify-center gap-2 px-6 py-3.5 bg-cyan-500 hover:bg-cyan-400 text-black font-black font-mono text-xs rounded-xl tracking-wider cursor-pointer shadow-[0_0_28px_rgba(34,211,238,0.35)]"
+              className="inline-flex items-center justify-center gap-2 px-6 py-3.5 bg-white hover:bg-cyan-100 text-black font-black font-mono text-xs rounded-2xl tracking-wider cursor-pointer shadow-[0_0_40px_rgba(255,255,255,0.2)]"
             >
               {cta.label}
               <ArrowRight className="w-4 h-4" />
@@ -250,7 +274,7 @@ export default function MainLoopStage({
               <button
                 type="button"
                 onClick={onHear}
-                className="inline-flex items-center justify-center gap-2 px-4 py-3 border border-white/15 bg-white/5 hover:bg-white/10 text-slate-200 font-mono text-[10px] font-bold uppercase tracking-wider rounded-xl cursor-pointer"
+                className="inline-flex items-center justify-center gap-2 px-4 py-3 border border-white/20 bg-black/40 hover:bg-black/55 text-slate-100 font-mono text-[10px] font-bold uppercase tracking-wider rounded-2xl cursor-pointer backdrop-blur-md"
               >
                 <Ear className="w-3.5 h-3.5 text-cyan-300" />
                 Hear first

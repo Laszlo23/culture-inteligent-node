@@ -56,3 +56,25 @@ POST /api/hearing/speak
 4. Spread invite is a first-class Hearing action.
 
 Community ritual: open `?hear=1` on the weekly Community Hearing — see [COMMUNITY.md](./COMMUNITY.md).
+
+---
+
+## Conversational proofs (dictation)
+
+Proofs are conversation-first — short beats, not essay walls:
+
+| Surface | Beats |
+| --- | --- |
+| First Contribution | Spark → Shift → Takeaway |
+| First Spark | MC quiz → one Reflect beat |
+| Hook Mirror | Bait → Notice → Why |
+
+When Hearing is on and a conversational surface is open:
+
+1. Free speech fills the **active beat** (not parsed as nav commands).  
+2. Say **next** / **continue** / **done** / **ready** to advance.  
+3. **stop** / **exit** / **help** / **repeat** still work globally.  
+4. Mic muted → same chat UI; type to edit anytime.
+
+Bridge: `setHearingDictationHandler` in `src/lib/hearing/session-bridge.ts`  
+UI: `ConversationalProof` · `useConversationalProof`

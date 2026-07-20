@@ -17,10 +17,12 @@ import {
 import { resolveEconomyWallet } from '../lib/economy-wallet';
 import { sendAttentionProofMemo } from '../lib/poa-chain';
 import { track } from '../lib/attention-metrics';
+import { withRotatingOg } from '../lib/og-share';
+import type { SessionWalletType } from '../lib/wallet/types';
 
 type Props = {
   walletAddress: string;
-  walletType: 'extension' | 'local';
+  walletType: SessionWalletType;
   displayName?: string;
   /** Called when member enters the floor; `spread` if they copied the invite. */
   onSigned: (result: { spread: boolean }) => void;
@@ -103,7 +105,8 @@ export default function ClubOath({
 
   const copyInvite = async () => {
     try {
-      await navigator.clipboard.writeText(invitePost);
+      const post = withRotatingOg({ text: invitePost, appendImageLink: true }).text;
+      await navigator.clipboard.writeText(post);
       const first = !hasSpreadLove(walletAddress);
       markSpreadLove(walletAddress);
       setSpread(true);

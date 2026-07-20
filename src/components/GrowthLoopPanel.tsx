@@ -17,6 +17,8 @@ import {
 import { buildCommunityInviteCast } from '../lib/community-invite';
 import FarcasterCastButton from './FarcasterCastButton';
 import MakeItRainDeck from './MakeItRainDeck';
+import InteractiveDeck from './fx/InteractiveDeck';
+import { JOURNEY_DECK } from '../lib/decks';
 import { subscribeAttentionMetrics } from '../lib/attention-metrics';
 
 type Props = {
@@ -110,9 +112,6 @@ export default function GrowthLoopPanel({
           <h3 className="mt-1 font-display text-lg md:text-xl font-bold italic text-white">
             Connections growing
           </h3>
-          <p className="mt-1 text-[12px] text-slate-400 max-w-md leading-relaxed">
-            Discover → Spark → Build → Share → Reputation. Watch potential become visible.
-          </p>
         </div>
         <button
           type="button"
@@ -124,6 +123,12 @@ export default function GrowthLoopPanel({
           Sync
         </button>
       </div>
+
+      {!compact && (
+        <div className="mt-4">
+          <InteractiveDeck slides={JOURNEY_DECK} mood="evolution" compact />
+        </div>
+      )}
 
       <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-2">
         <Stat

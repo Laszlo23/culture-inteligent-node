@@ -109,7 +109,7 @@ interface AttentionTollShopProps {
   setState: React.Dispatch<React.SetStateAction<GameState>>;
   addLog: (message: string, type: 'info' | 'success' | 'warn' | 'system') => void;
   walletAddress?: string | null;
-  walletType?: 'extension' | 'local' | null;
+  walletType?: import('../lib/wallet/types').SessionWalletType | null;
   localKeypair?: Keypair | null;
   highlightSku?: TollSkuId | null;
 }

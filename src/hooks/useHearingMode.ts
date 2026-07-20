@@ -6,6 +6,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   cancelSpeak,
   getSpeechSupport,
+  isGuideSpeaking,
   listenOnce,
   probeNeuralVoice,
   speak,
@@ -14,6 +15,11 @@ import {
   type SpeechSupport,
 } from '../lib/hearing/speech';
 import { parseHearingCommand, type HearingCommand } from '../lib/hearing/commands';
+import {
+  dispatchHearingAdvance,
+  dispatchHearingDictation,
+  isHearingDictationActive,
+} from '../lib/hearing/session-bridge';
 import {
   exitScript,
   helpScript,
@@ -83,6 +89,7 @@ export function useHearingMode(onCommand: HearingCommandHandler): HearingModeApi
 
   const activeRef = useRef(false);
   const micRef = useRef(true);
+  const speakingRef = useRef(false);
   const lastLineRef = useRef('');
   const loopGenRef = useRef(0);
   const onCommandRef = useRef(onCommand);
@@ -118,11 +125,25 @@ export function useHearingMode(onCommand: HearingCommandHandler): HearingModeApi
     void probeNeuralVoice().then(() => setSupport(getSpeechSupport()));
   }, []);
 
+  /** Mute/unmute — must abort an in-flight listen so the browser mic indicator clears. */
+  const setMicEnabledSafe = useCallback((on: boolean) => {
+    micRef.current = on;
+    setMicEnabled(on);
+    if (!on) {
+      stopListening();
+      setPhase((p) => (p === 'listening' ? 'idle' : p));
+      track('hearing_mic', { on: false });
+    } else {
+      track('hearing_mic', { on: true });
+    }
+  }, []);
+
   const speakLine = useCallback(async (text: string) => {
     const line = text.trim();
     if (!line) return;
     lastLineRef.current = line;
     setLastLine(line);
+    speakingRef.current = true;
     setPhase('speaking');
     stopListening();
     soundEngine.setNarrationActive(true);
@@ -133,8 +154,8 @@ export function useHearingMode(onCommand: HearingCommandHandler): HearingModeApi
       if (activeRef.current) await pause(480);
     } finally {
       soundEngine.setNarrationActive(false);
-      if (activeRef.current) setPhase('idle');
-      else setPhase('idle');
+      speakingRef.current = false;
+      setPhase('idle');
     }
   }, [showSpeakError]);
 
@@ -156,6 +177,7 @@ export function useHearingMode(onCommand: HearingCommandHandler): HearingModeApi
         const line = helpScript();
         lastLineRef.current = line;
         setLastLine(line);
+        speakingRef.current = true;
         setPhase('speaking');
         stopListening();
         soundEngine.setNarrationActive(true);
@@ -165,6 +187,7 @@ export function useHearingMode(onCommand: HearingCommandHandler): HearingModeApi
           if (activeRef.current) await pause(400);
         } finally {
           soundEngine.setNarrationActive(false);
+          speakingRef.current = false;
           setPhase('idle');
         }
         return;
@@ -205,7 +228,9 @@ export function useHearingMode(onCommand: HearingCommandHandler): HearingModeApi
           await pause(600);
           continue;
         }
-        if (typeof window !== 'undefined' && window.speechSynthesis?.speaking) {
+        // Neural Gemini TTS uses HTMLAudioElement — not speechSynthesis.
+        // Wait until the guide finishes or we'll steal the mic mid-sentence.
+        if (speakingRef.current || isGuideSpeaking()) {
           await pause(220);
           continue;
         }
@@ -213,11 +238,28 @@ export function useHearingMode(onCommand: HearingCommandHandler): HearingModeApi
         try {
           const transcript = await listenOnce({ timeoutMs: 14_000 });
           if (!activeRef.current || gen !== loopGenRef.current) return;
+          if (!micRef.current) continue;
           cancelSpeak(); // barge-in
           const cmd = parseHearingCommand(transcript);
+
+          // Conversational proof owns the mic: free speech → beat, next/done advances.
+          // Only stop/exit/help/repeat escape as global Hearing commands.
+          // Important: always consume `next` so "next" never gets dictated into the answer.
+          if (isHearingDictationActive()) {
+            if (cmd === 'next') {
+              await dispatchHearingAdvance();
+              continue;
+            }
+            if (cmd === 'stop' || cmd === 'exit' || cmd === 'help' || cmd === 'repeat') {
+              await handleCommand(cmd);
+              continue;
+            }
+            if (dispatchHearingDictation(transcript)) continue;
+          }
+
           await handleCommand(cmd);
         } catch {
-          // timeout / abort — continue loop
+          // timeout / abort / mute — continue loop
         } finally {
           if (activeRef.current && gen === loopGenRef.current) {
             setPhase((p) => (p === 'listening' ? 'idle' : p));
@@ -306,7 +348,7 @@ export function useHearingMode(onCommand: HearingCommandHandler): HearingModeApi
     lastLine,
     support,
     micEnabled,
-    setMicEnabled,
+    setMicEnabled: setMicEnabledSafe,
     enable,
     disable,
     toggle,

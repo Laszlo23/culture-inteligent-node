@@ -33,6 +33,8 @@ Facility HUD only after First Spark / `navPhase === 'open'` (loop sanctuary hide
 **Self-executing awareness chain (first loop):**  
 First Spark → fuel celebration → **Continue to Zen** (auto-opens Academy) → Mind/Machine → **Hook Mirror** (auto-stays in Academy) → return Home → **Spread**. Daily claim / partner rails wait until that chain closes.
 
+**Conversational proofs:** First Contribution, First Spark journal, and Hook Mirror use short chat/voice turns (not long textareas). Desktop shows progress orbs + signal strength; Hearing dictates into the active beat. See [HEARING_MODE.md](./HEARING_MODE.md).
+
 Tone guardrail: *discover and grow potential* — never *earn points to prove you are human*.  
 Loop Stage shows Knowledge / Builder / Contribution after First Spark so scores stay visible.
 

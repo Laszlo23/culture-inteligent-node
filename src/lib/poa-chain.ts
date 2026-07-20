@@ -5,6 +5,7 @@
 
 import { Keypair, PublicKey, TransactionInstruction } from '@solana/web3.js';
 import { MEMO_PROGRAM_ID, sendPoaMemoAttestation } from './api';
+import type { SessionWalletType } from './wallet/types';
 
 export type AttentionProofKind =
   | 'academy'
@@ -42,7 +43,7 @@ export function buildMemoIx(payer: PublicKey, memo: string): TransactionInstruct
 
 type WalletSession = {
   walletAddress: string;
-  walletType: 'extension' | 'local';
+  walletType: SessionWalletType;
   localKeypair?: Keypair | null;
 };
 

@@ -24,6 +24,8 @@ import {
   isLikelyMobile,
   phantomInstallUrl,
 } from '../lib/phantom';
+import { pickQuote } from '../lib/motivating-quotes';
+import type { SessionWalletType } from '../lib/wallet/types';
 import { CinematicBackdrop } from './fx';
 
 if (typeof window !== 'undefined' && !window.Buffer) {
@@ -34,7 +36,7 @@ export interface WalletSessionUser {
   username: string;
   email: string;
   walletAddress: string;
-  walletType: 'extension' | 'local';
+  walletType: SessionWalletType;
   isAdmin?: boolean;
 }
 
@@ -66,13 +68,14 @@ export default function AuthPortal({ onLoginSuccess, autoStart = null }: AuthPor
   const [savedLocalAddress, setSavedLocalAddress] = useState<string | null>(null);
   const [sessionDeferred, setSessionDeferred] = useState<{
     address: string;
-    walletType: 'extension' | 'local';
+    walletType: SessionWalletType;
     reason: string;
     user: WalletSessionUser;
   } | null>(null);
   const [retryingSession, setRetryingSession] = useState(false);
   const pendingLocalKeypair = useRef<Keypair | null>(null);
   const autoRan = useRef(false);
+  const authQuote = pickQuote('auth');
 
   useEffect(() => {
     try {
@@ -88,7 +91,7 @@ export default function AuthPortal({ onLoginSuccess, autoStart = null }: AuthPor
 
   const completeLogin = async (
     address: string,
-    walletType: 'extension' | 'local',
+    walletType: SessionWalletType,
     localKeypair?: Keypair | null
   ) => {
     const username = displayName.trim() || operatorNameFromWallet(address);
@@ -266,6 +269,9 @@ export default function AuthPortal({ onLoginSuccess, autoStart = null }: AuthPor
               ? 'Securing your passport…'
               : 'Own your digital reputation'}
           </h2>
+          <p className="text-xs text-cyan-200/85 font-sans mt-2 leading-relaxed italic">
+            {authQuote}
+          </p>
           <p className="text-xs text-slate-400 font-sans mt-2 leading-relaxed">
             Continue with a secure ID, claim your Human Passport, then prove attention. Mobile opens
             inside Phantom for you — ownership stays yours.
@@ -397,6 +403,18 @@ export default function AuthPortal({ onLoginSuccess, autoStart = null }: AuthPor
               </button>
               <p className="text-[10px] text-slate-500 font-sans text-center -mt-1">
                 This device only · practice network · logout clears keys
+              </p>
+
+              <button
+                type="button"
+                disabled
+                title="OKX Agentic Wallet — coming next"
+                className="w-full py-3 rounded-xl bg-white/[0.03] border border-white/8 text-slate-500 font-mono text-xs font-black tracking-wider uppercase flex items-center justify-center gap-2 cursor-not-allowed opacity-70"
+              >
+                OKX Wallet — soon
+              </button>
+              <p className="text-[10px] text-slate-600 font-sans text-center -mt-1">
+                Smart wallet path documented · Phantom stays default
               </p>
 
               {savedLocalAddress && (

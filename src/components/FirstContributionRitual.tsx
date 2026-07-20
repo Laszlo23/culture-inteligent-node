@@ -1,10 +1,10 @@
 /**
- * Magical first 5 minutes: Welcome → reflection → passport scores → share.
+ * Magical first minutes: Welcome → conversational reflection → passport scores → share.
  */
 
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { ArrowRight, Loader2, Sparkles } from 'lucide-react';
+import { ArrowRight, Loader2 } from 'lucide-react';
 import { BRAND, SLOGANS } from '../lib/brand-slogans';
 import {
   ensureGuestId,
@@ -16,6 +16,10 @@ import {
 import { evaluateFirstContributionViaApi } from '../lib/first-contribution-eval';
 import { track } from '../lib/attention-metrics';
 import PassportShareCard from './PassportShareCard';
+import ConversationalProof from './ConversationalProof';
+import type { ProofBeat } from '../hooks/useConversationalProof';
+import { formatFirstContributionJoined } from '../lib/hearing/conversational-proof';
+import { useHearing } from '../lib/hearing/context';
 import { CinematicBackdrop, GlowPulse } from './fx';
 
 type Phase = 'welcome' | 'challenge' | 'reveal';
@@ -28,7 +32,7 @@ type Props = {
   onContinueWorkspace?: () => void;
 };
 
-const MIN_ANSWER = 40;
+const MIN_JOINED = 40;
 
 export default function FirstContributionRitual({
   displayName,
@@ -37,28 +41,61 @@ export default function FirstContributionRitual({
   onKeepPassport,
   onContinueWorkspace,
 }: Props) {
+  const hearing = useHearing();
   const prompt = useMemo(
     () => pickFirstContributionPrompt(walletAddress || ensureGuestId()),
     [walletAddress]
   );
   const [phase, setPhase] = useState<Phase>('welcome');
-  const [answer, setAnswer] = useState('');
+  const [joinedAnswer, setJoinedAnswer] = useState('');
+  const [convKey, setConvKey] = useState(0);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [record, setRecord] = useState<FirstContributionRecord | null>(null);
 
   const name = (displayName || 'You').replace(/^@/, '');
 
-  const submit = async () => {
-    const trimmed = answer.trim();
-    if (trimmed.length < MIN_ANSWER) {
-      setError(`Write at least ${MIN_ANSWER} characters — give us something real.`);
+  const beats: ProofBeat[] = useMemo(
+    () => [
+      {
+        id: 'spark',
+        label: 'Spark',
+        prompt,
+        minLen: 14,
+        placeholder: 'Speak or type a short honest line…',
+      },
+      {
+        id: 'shift',
+        label: 'Shift',
+        prompt: 'What shifted for you in that moment — even a little?',
+        minLen: 14,
+        placeholder: 'What changed in how you see it…',
+      },
+      {
+        id: 'takeaway',
+        label: 'Takeaway',
+        prompt: 'One concrete takeaway you could act on this week?',
+        minLen: 14,
+        placeholder: 'One thing you could try…',
+      },
+    ],
+    [prompt]
+  );
+
+  const onAnswersChange = useCallback((_answers: string[], _ready: boolean, joined: string) => {
+    setJoinedAnswer(joined);
+  }, []);
+
+  const submit = async (answerOverride?: string) => {
+    const trimmed = (answerOverride ?? joinedAnswer).trim();
+    if (trimmed.length < MIN_JOINED) {
+      setError(`Need a bit more signal — keep talking through the turns (${MIN_JOINED}+ chars).`);
+      setConvKey((k) => k + 1);
       return;
     }
     setBusy(true);
     setError(null);
     try {
-      // Server-side Gemini — browser never sees GEMINI_API_KEY
       const evalResult = await evaluateFirstContributionViaApi({
         prompt,
         answer: trimmed,
@@ -90,6 +127,7 @@ export default function FirstContributionRitual({
       onComplete(next);
     } catch {
       setError('Could not measure that — try again.');
+      setConvKey((k) => k + 1);
     } finally {
       setBusy(false);
     }
@@ -101,7 +139,7 @@ export default function FirstContributionRitual({
         <CinematicBackdrop variant="ritual" />
       </div>
       <GlowPulse energy={10} color="cyan" className="absolute -right-16 -top-16 w-56 h-56 z-0" />
-      <div className="relative z-10 max-w-xl mx-auto px-5 py-14 md:py-20">
+      <div className="relative z-10 max-w-3xl mx-auto px-5 py-14 md:py-20">
         <AnimatePresence mode="wait">
           {phase === 'welcome' && (
             <motion.div
@@ -109,7 +147,7 @@ export default function FirstContributionRitual({
               initial={{ opacity: 0, y: 14 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -8 }}
-              className="space-y-8"
+              className="space-y-8 max-w-xl"
             >
               <p className="font-mono text-[9px] font-black tracking-[0.28em] uppercase text-amber-400/90">
                 {BRAND.parent} · Human Reputation
@@ -121,8 +159,8 @@ export default function FirstContributionRitual({
                 Let&apos;s measure your first contribution.
               </p>
               <p className="text-sm text-slate-400 leading-relaxed max-w-md">
-                Not empty scrolling. One short answer — we score curiosity, creativity, and
-                reflection. Your Human Passport starts here.
+                Not a long essay. A short conversation — three turns. We score curiosity,
+                creativity, and reflection. Your Human Passport starts here.
               </p>
               <button
                 type="button"
@@ -143,46 +181,42 @@ export default function FirstContributionRitual({
               exit={{ opacity: 0, y: -8 }}
               className="space-y-6"
             >
-              <p className="font-mono text-[9px] font-black tracking-[0.24em] uppercase text-cyan-400/90">
-                2-minute challenge
-              </p>
-              <h2 className="font-display text-2xl md:text-3xl font-extrabold italic text-white leading-snug">
-                {prompt}
-              </h2>
-              <p className="text-[12px] text-slate-500 font-mono uppercase tracking-wider">
-                AI evaluates · curiosity · creativity · reflection
-              </p>
-              <textarea
-                value={answer}
-                onChange={(e) => setAnswer(e.target.value)}
-                rows={6}
-                placeholder="Write freely — what shifted for you?"
-                className="w-full rounded-xl border border-white/15 bg-black/40 px-4 py-3 text-sm text-slate-100 placeholder:text-slate-600 focus:outline-none focus:border-cyan-400/50 resize-y min-h-[140px]"
-              />
-              <div className="flex items-center justify-between gap-3 text-[11px] font-mono text-slate-500">
-                <span>
-                  {answer.trim().length}/{MIN_ANSWER}+ characters
-                </span>
-                {error && <span className="text-rose-300">{error}</span>}
+              <div className="max-w-xl">
+                <p className="font-mono text-[9px] font-black tracking-[0.24em] uppercase text-cyan-400/90">
+                  2-minute conversation
+                </p>
+                <h2 className="mt-2 font-display text-2xl md:text-3xl font-extrabold italic text-white leading-snug">
+                  Three short turns. Grow the signal.
+                </h2>
+                <p className="mt-2 text-[12px] text-slate-500 font-mono uppercase tracking-wider">
+                  AI evaluates · curiosity · creativity · reflection
+                </p>
               </div>
-              <button
-                type="button"
+
+              <ConversationalProof
+                key={convKey}
+                beats={beats}
+                formatJoined={formatFirstContributionJoined}
+                onAnswersChange={onAnswersChange}
+                onComplete={(joined) => {
+                  void submit(joined);
+                }}
+                hearingActive={Boolean(hearing?.active)}
+                speakLine={hearing?.speakLine}
+                completeLabel="Measure my contribution"
                 disabled={busy}
-                onClick={() => void submit()}
-                className="w-full inline-flex items-center justify-center gap-2 px-6 py-4 rounded-xl bg-cyan-500 hover:bg-cyan-400 disabled:opacity-50 text-black font-mono text-xs font-black uppercase tracking-wider cursor-pointer"
-              >
-                {busy ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    Measuring…
-                  </>
-                ) : (
-                  <>
-                    <Sparkles className="w-4 h-4" />
-                    Measure my contribution
-                  </>
-                )}
-              </button>
+              />
+
+              {error && (
+                <p className="text-[12px] text-rose-300 font-mono">{error}</p>
+              )}
+
+              {busy && (
+                <p className="flex items-center gap-2 text-sm text-slate-400">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Measuring…
+                </p>
+              )}
             </motion.div>
           )}
 
@@ -191,7 +225,7 @@ export default function FirstContributionRitual({
               key="reveal"
               initial={{ opacity: 0, y: 14 }}
               animate={{ opacity: 1, y: 0 }}
-              className="space-y-6"
+              className="space-y-6 max-w-xl"
             >
               <div>
                 <p className="font-mono text-[9px] font-black tracking-[0.24em] uppercase text-amber-400/90">

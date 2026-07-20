@@ -73,12 +73,12 @@ export function FacilitySectorCard({
       }}
       whileHover={room.unlocked ? { y: -6, scale: 1.015 } : undefined}
       transition={{ type: 'spring', stiffness: 380, damping: 26 }}
-      className={`group border rounded-2xl p-5 shadow-xl flex flex-col justify-between overflow-hidden relative min-h-[210px] transition-shadow duration-500 outline-none focus-visible:ring-1 focus-visible:ring-cyan-400/50 ${
+      className={`group border rounded-2xl p-5 shadow-[0_20px_50px_rgba(0,0,0,0.4)] flex flex-col justify-between overflow-hidden relative min-h-[230px] transition-shadow duration-500 outline-none focus-visible:ring-1 focus-visible:ring-cyan-400/50 bg-[#08090e]/80 ${
         room.unlocked
           ? firstRitualPending
-            ? `border-cyan-400/40 shadow-[0_0_28px_rgba(34,211,238,0.12)] ${accent.glow}`
-            : `border-white/5 ${accent.borderHover} ${accent.glow}`
-          : 'border-white/5 opacity-50'
+            ? `border-cyan-400/45 shadow-[0_0_36px_rgba(34,211,238,0.18)] ${accent.glow}`
+            : `border-white/12 ${accent.borderHover} ${accent.glow}`
+          : 'border-white/8 opacity-55'
       }`}
     >
       <div className="absolute inset-0 pointer-events-none overflow-hidden" aria-hidden>

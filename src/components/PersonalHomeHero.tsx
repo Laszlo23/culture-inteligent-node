@@ -24,6 +24,8 @@ export type PersonalNextStep = {
 
 type Props = {
   username: string;
+  /** Progress title greets; handle stays secondary */
+  progressTitle?: string | null;
   avatarUrl?: string;
   aboutMe?: string;
   state: GameState;
@@ -73,6 +75,7 @@ function personalLine(opts: {
 
 export default function PersonalHomeHero({
   username,
+  progressTitle,
   avatarUrl,
   aboutMe,
   state,
@@ -86,12 +89,13 @@ export default function PersonalHomeHero({
   const hour = useMemo(() => new Date().getHours(), []);
   const greet = timeGreeting(hour);
   const handle = username.replace(/^@/, '') || 'operator';
+  const displayName = progressTitle?.trim() || handle;
   const line = personalLine({
     firstRitualPending,
     energy: state.energy,
     academyCompletedCount,
     streak,
-    username: handle,
+    username: displayName,
   });
   const coreDone = Math.min(academyCompletedCount, coreSessionTotal);
   const ownedRigs = (state.minerNFTs || []).length;
@@ -143,8 +147,11 @@ export default function PersonalHomeHero({
                 {greet} · your node
               </p>
               <h2 className="font-display text-2xl md:text-3xl font-extrabold italic text-white tracking-tight mt-0.5 truncate">
-                @{handle}
+                {progressTitle ? displayName : `@${handle}`}
               </h2>
+              {progressTitle ? (
+                <p className="text-[10px] font-mono text-slate-500 mt-0.5">@{handle}</p>
+              ) : null}
               {shortBio ? (
                 <p className="mt-1 text-[11px] text-slate-400 font-sans leading-snug line-clamp-2">
                   {shortBio}

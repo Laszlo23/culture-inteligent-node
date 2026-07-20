@@ -1,6 +1,6 @@
 # X participation post — required
 
-**Campaign art:** use `/public/campaign/mine-culture.png` or `failure-curve.png` as the still if video isn’t ready; prefer video ≤90s when you have it.  
+**Campaign art:** use `/public/campaign/mine-culture.webp` or `failure-curve.webp` as the still if video isn’t ready; prefer video ≤90s when you have it.  
 **Brand lock:** `docs/BRAND_STRATEGY.md`  
 **Full press pack:** `docs/PRESS_KIT.md`
 

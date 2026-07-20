@@ -22,6 +22,9 @@ import { AttentionIconTile } from './Glitch';
 
 export { CinematicBackdrop } from './CinematicBackdrop';
 export type { AtmosphereVariant } from './CinematicBackdrop';
+export { default as CinematicPanel } from './CinematicPanel';
+export type { FacilityMood } from './CinematicPanel';
+export { default as InteractiveDeck } from './InteractiveDeck';
 export {
   AttentionBadge,
   AttentionIconTile,

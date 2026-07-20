@@ -7,7 +7,7 @@ Short muted loops used by `CinematicBackdrop` (`hero` / `auth` / `facility` / `r
 | `hero-field.mp4` | Landing + auth |
 | `facility-grid.mp4` | Facility + duality (single quiet plate) |
 | `ritual-pulse.mp4` | First Spark / ritual |
-| `arena-hero.png` | Duality poster / Arena still |
+| `arena-hero.webp` | Duality poster / Arena still |
 
 Atmosphere stays intentionally quiet: one video plate, soft veil, no grain/grid stack.
 

@@ -179,7 +179,7 @@ export default function Leaderboard({ state, setState, addLog }: LeaderboardProp
     <div id="leaderboard-room" className="space-y-6">
       <div className="relative overflow-hidden rounded-2xl border border-amber-400/20 min-h-[150px] sm:min-h-[180px]">
         <img
-          src="/atmosphere/arena-hero.png"
+          src="/atmosphere/arena-hero.webp"
           alt=""
           className="absolute inset-0 w-full h-full object-cover brightness-[0.42]"
           draggable={false}

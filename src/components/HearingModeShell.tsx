@@ -23,72 +23,69 @@ export default function HearingModeShell() {
 
   const { phase, lastLine, micEnabled, setMicEnabled, disable, support } = hearing;
 
-  const statusLabel =
-    phase === 'speaking'
+  const statusLabel = !micEnabled
+    ? 'Mic muted'
+    : phase === 'speaking'
       ? 'Speaking gently'
       : phase === 'listening'
         ? 'Listening with you'
         : 'Present';
 
-  const hint =
-    phase === 'listening'
+  const hint = !micEnabled
+    ? 'Microphone off — tap the mic to listen again.'
+    : phase === 'listening'
       ? 'I am listening — take your time.'
       : phase === 'speaking'
         ? lastLine || 'Soft words for you…'
         : lastLine || 'Say Help — or Academy when you are ready.';
 
+  const footerHint = !micEnabled
+    ? 'Mic is off. The guide can still speak — unmute when you want to answer.'
+    : 'Soft space. Speak when it feels easy — Help, Academy, or Passport.';
+
   return (
     <div
       className={`fixed left-1/2 z-[60] w-[min(100%-2rem,28rem)] -translate-x-1/2 rounded-2xl border px-4 py-3.5 shadow-[0_16px_48px_rgba(0,0,0,0.55)] backdrop-blur-xl bottom-[calc(6.75rem+env(safe-area-inset-bottom))] md:bottom-4 ${
         zenOn
-          ? 'border-amber-500/35 bg-gradient-to-r from-amber-950/75 via-[#0a0a0c]/94 to-cyan-950/45'
-          : 'border-cyan-500/30 bg-[#0a0a0c]/94'
+          ? 'border-amber-500/40 bg-gradient-to-r from-amber-950/80 via-[#0a0a0c]/96 to-cyan-950/50'
+          : 'border-cyan-400/40 bg-[#0a0a0c]/96'
       }`}
       role="region"
       aria-label="Hearing Mode — listening space"
     >
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-2.5 min-w-0">
+          {/* Steady glow from open — no dim→bright / scale flip when input starts */}
           <motion.div
             className={`relative flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border ${
-              phase === 'listening'
-                ? 'border-cyan-400/55 bg-cyan-500/18 text-cyan-200'
+              !micEnabled
+                ? 'border-rose-400/40 bg-rose-500/12 text-rose-200'
                 : phase === 'speaking'
-                  ? 'border-amber-400/45 bg-amber-500/14 text-amber-200'
-                  : 'border-white/10 bg-white/5 text-slate-400'
+                  ? 'border-amber-400/50 bg-amber-500/16 text-amber-100'
+                  : 'border-cyan-400/55 bg-cyan-500/20 text-cyan-100'
             }`}
-            animate={
-              phase === 'listening'
-                ? { scale: [1, 1.06, 1], opacity: [0.9, 1, 0.9] }
-                : phase === 'speaking'
-                  ? { scale: [1, 1.03, 1] }
-                  : { scale: 1, opacity: 1 }
-            }
-            transition={
-              phase === 'listening' || phase === 'speaking'
-                ? { duration: phase === 'listening' ? 2.8 : 2.2, repeat: Infinity, ease: 'easeInOut' }
-                : { duration: 0.3 }
-            }
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.2 }}
           >
-            {(phase === 'listening' || phase === 'speaking') && (
+            {micEnabled && (
               <motion.span
                 className={`absolute inset-0 rounded-xl ${
-                  phase === 'listening' ? 'bg-cyan-400/15' : 'bg-amber-400/12'
+                  phase === 'speaking' ? 'bg-amber-400/14' : 'bg-cyan-400/16'
                 }`}
-                animate={{ scale: [1, 1.35, 1], opacity: [0.5, 0, 0.5] }}
-                transition={{ duration: 2.6, repeat: Infinity, ease: 'easeInOut' }}
+                animate={{ opacity: [0.45, 0.7, 0.45] }}
+                transition={{ duration: 2.8, repeat: Infinity, ease: 'easeInOut' }}
                 aria-hidden
               />
             )}
             <Ear className="relative h-4 w-4" />
           </motion.div>
-          <div className="min-w-0">
-            <p className="font-mono text-[9px] font-black uppercase tracking-[0.22em] text-cyan-400/95">
+          <div className="min-w-0 flex-1">
+            <p className="font-mono text-[9px] font-black uppercase tracking-[0.22em] text-cyan-300">
               Hearing{zenOn ? ' · Zen' : ''}
               {support.neural ? ' · Neural' : ''} · {statusLabel}
             </p>
             <p
-              className="truncate text-xs text-slate-300/95 leading-snug"
+              className="h-4 truncate text-xs text-slate-200/95 leading-snug"
               aria-live="assertive"
               aria-atomic="true"
             >
@@ -101,8 +98,17 @@ export default function HearingModeShell() {
             <button
               type="button"
               title={micEnabled ? 'Mute mic' : 'Unmute mic'}
-              onClick={() => setMicEnabled(!micEnabled)}
-              className="rounded-lg border border-white/10 p-2 text-slate-400 hover:border-white/25 hover:text-white cursor-pointer"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setMicEnabled(!micEnabled);
+              }}
+              aria-pressed={!micEnabled}
+              className={`rounded-lg border p-2 cursor-pointer transition-colors ${
+                micEnabled
+                  ? 'border-white/10 text-slate-400 hover:border-white/25 hover:text-white'
+                  : 'border-rose-400/45 bg-rose-500/15 text-rose-200 hover:border-rose-400/60'
+              }`}
               aria-label={micEnabled ? 'Mute microphone' : 'Unmute microphone'}
             >
               {micEnabled ? <Mic className="h-4 w-4" /> : <MicOff className="h-4 w-4" />}
@@ -120,11 +126,14 @@ export default function HearingModeShell() {
           </button>
         </div>
       </div>
-      {phase === 'listening' && (
-        <p className="mt-2.5 text-[10px] text-slate-500 font-sans leading-relaxed">
-          Soft space. Speak when it feels easy — Help, Academy, or Passport.
-        </p>
-      )}
+      {/* Always mounted so listen/speak phase changes do not resize the shell */}
+      <p
+        className={`mt-2.5 min-h-[2.5rem] text-[10px] font-sans leading-relaxed ${
+          !micEnabled ? 'text-rose-300/80' : 'text-slate-400'
+        }`}
+      >
+        {footerHint}
+      </p>
     </div>
   );
 }

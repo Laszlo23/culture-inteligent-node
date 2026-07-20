@@ -13,6 +13,7 @@ export type AttentionEventName =
   | 'hearing_open'
   | 'hearing_exit'
   | 'hearing_command'
+  | 'hearing_mic'
   | 'academy_start'
   | 'zen_decision'
   | 'zen_mode_toggle'
@@ -39,7 +40,9 @@ export type AttentionEventName =
   | 'passport_share'
   | 'invite_land'
   | 'invite_claim'
-  | 'invite_spread';
+  | 'invite_spread'
+  | 'attention_share_show'
+  | 'attention_share_complete';
 
 export type AttentionEvent = {
   name: AttentionEventName;

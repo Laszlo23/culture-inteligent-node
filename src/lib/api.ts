@@ -1,6 +1,7 @@
 import { Keypair, PublicKey, Transaction, TransactionInstruction, Connection } from '@solana/web3.js';
 import bs58 from 'bs58';
-import nacl from 'tweetnacl';
+import { signMessageForSession } from './wallet/adapter';
+import { isLocalWallet, normalizeWalletProvider, type SessionWalletType } from './wallet/types';
 
 const DEVNET_RPC = 'https://api.devnet.solana.com';
 export const MEMO_PROGRAM_ID = new PublicKey('MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr');
@@ -40,7 +41,7 @@ function walletFromJwt(token: string): string | null {
 
 export async function ensureWalletApiSession(opts: {
   walletAddress: string;
-  walletType: 'extension' | 'local';
+  walletType: SessionWalletType;
   localKeypair?: Keypair | null;
 }): Promise<string> {
   const existing = getWalletToken();
@@ -61,26 +62,15 @@ export async function ensureWalletApiSession(opts: {
   const { message } = await challengeRes.json();
   const messageBytes = new TextEncoder().encode(message);
 
-  let signature: string;
-  let demoUnsigned = false;
-
-  if (opts.walletType === 'local' && opts.localKeypair) {
-    const sig = nacl.sign.detached(messageBytes, opts.localKeypair.secretKey);
-    signature = bs58.encode(sig);
-  } else {
-    const provider = (window as any).solana;
-    if (provider?.signMessage) {
-      const signed = await provider.signMessage(messageBytes, 'utf8');
-      const sigBytes = signed.signature instanceof Uint8Array
-        ? signed.signature
-        : new Uint8Array(signed.signature);
-      signature = bs58.encode(sigBytes);
-    } else {
-      // Jury / iframe fallback — server accepts demoUnsigned in non-prod
-      signature = 'demo';
-      demoUnsigned = true;
-    }
-  }
+  const signed = await signMessageForSession({
+    walletType: opts.walletType,
+    walletAddress: opts.walletAddress,
+    localKeypair: opts.localKeypair,
+    messageBytes,
+  });
+  // Jury / iframe fallback — server accepts demoUnsigned in non-prod
+  const signature = signed.demoUnsigned ? 'demo' : bs58.encode(signed.signatureBytes);
+  const demoUnsigned = signed.demoUnsigned;
 
   const loginRes = await fetch('/api/wallet/login', {
     method: 'POST',
@@ -296,14 +286,19 @@ export async function requestEconomyReward(opts: {
 /** Sign (as fee payer) and send a partially-signed economy tx from the server. */
 export async function sendPartialEconomyTx(opts: {
   serializedBase64: string;
-  walletType: 'extension' | 'local';
+  walletType: SessionWalletType;
   localKeypair?: Keypair | null;
 }): Promise<string> {
   const connection = new Connection(DEVNET_RPC, 'confirmed');
   const tx = Transaction.from(Buffer.from(opts.serializedBase64, 'base64'));
+  const providerId = normalizeWalletProvider(opts.walletType);
+
+  if (providerId === 'okx') {
+    throw new Error('OKX wallet send is not wired yet — use Phantom or local wallet.');
+  }
 
   let signature: string;
-  if (opts.walletType === 'local' && opts.localKeypair) {
+  if (isLocalWallet(opts.walletType) && opts.localKeypair) {
     tx.partialSign(opts.localKeypair);
     signature = await connection.sendRawTransaction(tx.serialize(), {
       skipPreflight: false,
@@ -480,12 +475,16 @@ export async function zkMintSoulbound() {
 
 export async function sendPoaMemoAttestation(opts: {
   walletAddress: string;
-  walletType: 'extension' | 'local';
+  walletType: SessionWalletType;
   localKeypair?: Keypair | null;
   memo: string;
 }): Promise<string> {
   const connection = new Connection(DEVNET_RPC, 'confirmed');
   const payer = new PublicKey(opts.walletAddress);
+
+  if (normalizeWalletProvider(opts.walletType) === 'okx') {
+    throw new Error('OKX wallet send is not wired yet — use Phantom or local wallet.');
+  }
 
   const memoIx = new TransactionInstruction({
     keys: [{ pubkey: payer, isSigner: true, isWritable: false }],
@@ -500,7 +499,7 @@ export async function sendPoaMemoAttestation(opts: {
   tx.feePayer = payer;
 
   let signature: string;
-  if (opts.walletType === 'local' && opts.localKeypair) {
+  if (isLocalWallet(opts.walletType) && opts.localKeypair) {
     tx.sign(opts.localKeypair);
     signature = await connection.sendRawTransaction(tx.serialize(), {
       skipPreflight: false,

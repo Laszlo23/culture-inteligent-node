@@ -66,10 +66,11 @@ export default function MakeItRainDeck({
 
   const rainAll = () => {
     const first = getCastTemplate('rain');
+    // Rotating OG attached inside openFarcasterCompose
     openFarcasterCompose(first.text, first.embedUrl);
     setProgress(markRainTask('cast_rain', true));
     track('rain_cast', { template: 'rain', burst: true });
-    flash('Compose open — post it. Then hit the next casts.');
+    flash('Compose open — new OG card each rain. Then hit the next casts.');
   };
 
   return (

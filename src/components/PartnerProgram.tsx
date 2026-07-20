@@ -7,6 +7,8 @@ import React from 'react';
 import { Handshake, CheckCircle2, Zap, ExternalLink } from 'lucide-react';
 import { GameState } from '../types';
 import EcosystemSlider from './EcosystemSlider';
+import InteractiveDeck from './fx/InteractiveDeck';
+import { PARTNERS_DECK } from '../lib/decks';
 
 interface PartnerProgramProps {
   state: GameState;
@@ -18,16 +20,19 @@ export default function PartnerProgram({ state, setState, addLog }: PartnerProgr
   const partners = state.partners || [];
 
   const handleEnlist = (partnerId: string) => {
-    const partner = partners.find(p => p.id === partnerId);
+    const partner = partners.find((p) => p.id === partnerId);
     if (!partner) return;
 
     if (state.credits < partner.bccRequired) {
-      addLog(`PARTNER BRIDGE REJECTED: Insufficient Building Culture Coins ($BCC). Need ${partner.bccRequired} $BCC, but you have ${state.credits} $BCC.`, 'warn');
+      addLog(
+        `PARTNER BRIDGE REJECTED: Insufficient Building Culture Coins ($BCC). Need ${partner.bccRequired} $BCC, but you have ${state.credits} $BCC.`,
+        'warn'
+      );
       return;
     }
 
-    setState(prev => {
-      const updatedPartners = (prev.partners || []).map(p => {
+    setState((prev) => {
+      const updatedPartners = (prev.partners || []).map((p) => {
         if (p.id === partnerId) {
           return { ...p, active: true };
         }
@@ -42,66 +47,54 @@ export default function PartnerProgram({ state, setState, addLog }: PartnerProgr
       } else if (partnerId === 'p_2') {
         additionalPower = 15;
       } else if (partnerId === 'p_3') {
-        additionalEff = 0.10;
+        additionalEff = 0.1;
       }
-
-      const newCredits = prev.credits - partner.bccRequired;
-      const newEfficiency = prev.efficiency + additionalEff;
-      const newMiningPower = prev.miningPower + additionalPower;
 
       return {
         ...prev,
-        credits: newCredits,
-        efficiency: newEfficiency,
-        miningPower: newMiningPower,
-        partners: updatedPartners
+        credits: prev.credits - partner.bccRequired,
+        efficiency: prev.efficiency + additionalEff,
+        miningPower: prev.miningPower + additionalPower,
+        partners: updatedPartners,
       };
     });
 
-    addLog(`COOPERATIVE BRIDGE ONLINE: Deployed ${partner.bccRequired} $BCC to establish node linkage with "${partner.name}". Perk activated: ${partner.bonus}!`, 'success');
+    addLog(
+      `COOPERATIVE BRIDGE ONLINE: Deployed ${partner.bccRequired} $BCC to establish node linkage with "${partner.name}". Perk activated: ${partner.bonus}!`,
+      'success'
+    );
+  };
+
+  const bookPilot = () => {
+    addLog('PARTNER: Pilot inquiry opened — Attention Session path.', 'success');
+    window.location.href = 'mailto:admin@buildingculture.space?subject=Attention%20Session%20pilot';
   };
 
   return (
     <div id="partner-program" className="space-y-6 max-w-4xl mx-auto">
-      {/* First-dollar path — Attention Session pilot */}
-      <div className="rounded-2xl border border-amber-400/35 bg-gradient-to-br from-amber-950/40 via-[#0a0a0c] to-cyan-950/30 p-6 md:p-7 relative overflow-hidden">
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_80%_0%,rgba(245,158,11,0.12),transparent_50%)] pointer-events-none" />
-        <div className="relative z-10">
-          <span className="text-[9px] font-mono font-black tracking-[0.22em] uppercase text-amber-300">
-            First dollar · Partner Attention Session
-          </span>
-          <h2 className="font-display text-2xl md:text-3xl font-extrabold italic text-white mt-2 tracking-tight">
-            Ship your insight. Measure attention.
-          </h2>
-          <p className="text-sm text-slate-300 font-sans mt-2 max-w-xl leading-relaxed">
-            We drop your session into Culture Node — learn → Zen → Proof of Attention → Spread.
-            Pilot week <span className="text-amber-200 font-semibold">$0–$1.5k or trade</span>.
-            Free First Spark stays free. No empty banner takeovers.
-          </p>
-          <div className="mt-4 flex flex-wrap gap-2">
-            <a
-              href="mailto:admin@buildingculture.space?subject=Attention%20Session%20pilot"
-              className="inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-black font-mono text-[11px] font-black uppercase tracking-wider"
-              onClick={() =>
-                addLog('PARTNER: Pilot inquiry opened — Attention Session path.', 'success')
-              }
-            >
-              <Handshake className="w-4 h-4" />
-              Book pilot week
-            </a>
-            <a
-              href="https://mining.buildingcultureid.space/?hear=1"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 px-4 py-3 rounded-xl border border-white/15 bg-white/5 hover:bg-white/10 text-slate-200 font-mono text-[10px] font-bold uppercase tracking-wider"
-            >
-              Demo Hearing <ExternalLink className="w-3.5 h-3.5" />
-            </a>
-          </div>
-          <p className="mt-3 text-[10px] font-mono text-slate-500">
-            Packages after pilot: Single $1.5–5k · Hearing week $3–8k · Always-on $3–12k/mo
-          </p>
-        </div>
+      <InteractiveDeck
+        slides={PARTNERS_DECK}
+        mood="awakening"
+        onCta={bookPilot}
+      />
+
+      <div className="flex flex-wrap gap-2">
+        <a
+          href="mailto:admin@buildingculture.space?subject=Attention%20Session%20pilot"
+          className="inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-black font-mono text-[11px] font-black uppercase tracking-wider"
+          onClick={() => addLog('PARTNER: Pilot inquiry opened — Attention Session path.', 'success')}
+        >
+          <Handshake className="w-4 h-4" />
+          Book pilot week
+        </a>
+        <a
+          href="https://mining.buildingcultureid.space/?hear=1"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-2 px-4 py-3 rounded-xl border border-white/15 bg-white/5 hover:bg-white/10 text-slate-200 font-mono text-[10px] font-bold uppercase tracking-wider"
+        >
+          Demo Hearing <ExternalLink className="w-3.5 h-3.5" />
+        </a>
       </div>
 
       <EcosystemSlider
@@ -110,23 +103,12 @@ export default function PartnerProgram({ state, setState, addLog }: PartnerProgr
         }
       />
 
-      <div className="bg-[#0a0a0c] border border-white/5 rounded-2xl p-6 shadow-xl relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/5 rounded-full blur-2xl pointer-events-none" />
-
-        <div className="flex items-center gap-2 mb-4">
-          <Handshake className="w-5 h-5 text-amber-400" />
-          <h3 className="font-mono text-sm font-semibold text-slate-100 tracking-wider">
-            ECOSYSTEM BRIDGES (optional depth)
-          </h3>
-        </div>
-        <p className="text-xs text-slate-400 font-sans leading-relaxed">
-          After the pilot path: link Solana-native rails for settlement depth. Cash starts with
-          Attention Sessions above — bridges are operational boosts, not the brand.
-        </p>
-      </div>
+      <p className="font-mono text-[10px] uppercase tracking-wider text-slate-500">
+        Ecosystem bridges · optional depth
+      </p>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {partners.map(partner => (
+        {partners.map((partner) => (
           <div
             key={partner.id}
             className={`bg-[#0a0a0c] border rounded-2xl p-5 shadow-xl flex flex-col justify-between relative overflow-hidden transition-all duration-300 ${
@@ -143,7 +125,6 @@ export default function PartnerProgram({ state, setState, addLog }: PartnerProgr
                   alt={`${partner.name} logo`}
                   className="relative z-10 w-16 h-16 object-contain drop-shadow-lg"
                 />
-
                 {partner.active && (
                   <span className="absolute top-2 right-2 z-20 px-2 py-0.5 bg-emerald-500 text-black text-[8px] font-black tracking-widest rounded uppercase flex items-center gap-1">
                     <CheckCircle2 className="w-3 h-3" /> ACTIVE BRIDGE
@@ -155,7 +136,9 @@ export default function PartnerProgram({ state, setState, addLog }: PartnerProgr
                 <div>
                   <h4 className="font-sans text-sm font-bold text-white tracking-tight">{partner.name}</h4>
                   {partner.role && (
-                    <span className="text-[9px] font-mono uppercase tracking-wider text-slate-500">{partner.role}</span>
+                    <span className="text-[9px] font-mono uppercase tracking-wider text-slate-500">
+                      {partner.role}
+                    </span>
                   )}
                 </div>
                 {partner.url && (
@@ -172,15 +155,8 @@ export default function PartnerProgram({ state, setState, addLog }: PartnerProgr
                 )}
               </div>
 
-              <p className="text-[11px] text-slate-400 font-sans mt-1.5 leading-relaxed min-h-[44px]">
-                {partner.description}
-              </p>
-
               {partner.wow && (
-                <p className="mt-2 text-[11px] leading-relaxed text-cyan-200/90 font-sans border border-cyan-500/15 bg-cyan-500/5 rounded-lg px-2.5 py-2">
-                  <span className="font-mono text-[8px] font-black uppercase tracking-widest text-cyan-400 block mb-0.5">
-                    Surprising fact
-                  </span>
+                <p className="mt-2 text-[11px] leading-snug text-cyan-200/90 font-sans border border-cyan-500/15 bg-cyan-500/5 rounded-lg px-2.5 py-2 line-clamp-2">
                   {partner.wow}
                 </p>
               )}

@@ -1,6 +1,6 @@
 /* Culture Node PWA service worker — network-first for app shell/API, cache-first for icons/static */
 /* Bump to invalidate stale shells that left Mini Apps / phones blank */
-const CACHE = 'culture-node-static-v3';
+const CACHE = 'culture-node-static-v4';
 const PRECACHE = [
   '/site.webmanifest',
   '/icon-192.png',

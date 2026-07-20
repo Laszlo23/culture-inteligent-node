@@ -202,7 +202,7 @@ export default function GuildHall({
         className="relative overflow-hidden rounded-2xl border border-amber-400/30 bg-[#08060a] min-h-[220px]"
       >
         <img
-          src="/atmosphere/arena-hero.png"
+          src="/atmosphere/arena-hero.webp"
           alt=""
           className="absolute inset-0 w-full h-full object-cover brightness-[0.35]"
           draggable={false}

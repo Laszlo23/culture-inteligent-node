@@ -2,7 +2,7 @@
  * Generic Attention Intelligence exercise renderer by exerciseType.
  */
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { motion } from 'motion/react';
 import { Zap, Check, Play, RotateCcw } from 'lucide-react';
 import type { AttentionSession } from '../content/attention-intelligence';
@@ -10,6 +10,9 @@ import { CinematicBackdrop } from './fx';
 import { useHearing } from '../lib/hearing/context';
 import { setHearingSessionHandler } from '../lib/hearing/session-bridge';
 import type { HearingCommand } from '../lib/hearing/commands';
+import ConversationalProof from './ConversationalProof';
+import type { ProofBeat } from '../hooks/useConversationalProof';
+import { formatHookMirrorJoined } from '../lib/hearing/conversational-proof';
 
 interface AttentionSessionPlayerProps {
   session: AttentionSession;
@@ -65,6 +68,61 @@ export default function AttentionSessionPlayer({
   const [hookNotice, setHookNotice] = useState('');
   const [hookWhy, setHookWhy] = useState('');
   const hookReadyAnnouncedRef = useRef(false);
+
+  const biasAllAnswered =
+    ex.type === 'bias_quiz' &&
+    biasAnswers.length === ex.questions.length &&
+    biasAnswers.every((a) => a != null);
+
+  const journalBeats: ProofBeat[] = useMemo(() => {
+    if (ex.type !== 'bias_quiz') return [];
+    return [
+      {
+        id: `${session.id}-journal`,
+        label: 'Reflect',
+        prompt: ex.journalPrompt,
+        minLen: ex.minJournalLen,
+        placeholder: 'Speak or type one honest line…',
+      },
+    ];
+  }, [ex, session.id]);
+
+  const hookBeats: ProofBeat[] = useMemo(() => {
+    if (ex.type !== 'hook_mirror') return [];
+    return [
+      {
+        id: `${session.id}-bait`,
+        label: 'Bait',
+        prompt: ex.hookPrompt,
+        minLen: ex.minLen,
+        placeholder: 'What pulls you in…',
+      },
+      {
+        id: `${session.id}-notice`,
+        label: 'Notice',
+        prompt: ex.noticePrompt,
+        minLen: ex.minLen,
+        placeholder: 'What you notice when you catch yourself…',
+      },
+      {
+        id: `${session.id}-why`,
+        label: 'Why',
+        prompt: ex.whyPrompt,
+        minLen: ex.minLen,
+        placeholder: 'Why you keep going anyway…',
+      },
+    ];
+  }, [ex, session.id]);
+
+  const onJournalChange = useCallback((answers: string[]) => {
+    setJournal(answers[0] || '');
+  }, []);
+
+  const onHookChange = useCallback((answers: string[]) => {
+    setHookBait(answers[0] || '');
+    setHookNotice(answers[1] || '');
+    setHookWhy(answers[2] || '');
+  }, []);
 
   useEffect(() => {
     // reset when session changes
@@ -180,17 +238,8 @@ export default function AttentionSessionPlayer({
         await speakLine(`${ex.skillPrompt} Type your skill on screen, then discharge reps.`);
       } else if (ex.type === 'hook_mirror') {
         await speakLine(
-          [
-            'Hook Mirror. Proof of Hook Awareness.',
-            ex.hookPrompt,
-            'Type your answer on screen.',
-            'Then the notice prompt.',
-            'Then why you keep going.',
-            'When all three are honest, Zen break waits — Mind or Machine.',
-          ].join(' ')
+          'Hook Mirror. Proof of Hook Awareness. Three short turns — speak or type. Say next when each turn feels honest.'
         );
-        await speakLine(ex.noticePrompt);
-        await speakLine(ex.whyPrompt);
       } else {
         await speakLine('Follow the on-screen prompts. Say help anytime.');
       }
@@ -228,7 +277,7 @@ export default function AttentionSessionPlayer({
     if (!hearingActive || !speakLine || ex.type !== 'body_scan' || !scanDone) return;
     if (lastScanCueRef.current === -1) return;
     lastScanCueRef.current = -1;
-    void speakLine('Landing complete. Type a short summary on screen.');
+    void speakLine('Landing complete. Add a short summary on screen.');
   }, [hearingActive, speakLine, scanDone, ex]);
 
   // Hearing Mode: voice answers while session is open
@@ -281,7 +330,9 @@ export default function AttentionSessionPlayer({
               .join('. ');
             await speakLine(`Question ${unanswered + 1}. ${nq.prompt}. ${opts}`);
           } else {
-            await speakLine(`${ex.journalPrompt} Type your answer on screen when ready.`);
+            await speakLine(
+              `${ex.journalPrompt} Speak a short reflection, then say next when ready.`
+            );
           }
         }
         return true;
@@ -297,7 +348,11 @@ export default function AttentionSessionPlayer({
           await speakLine(`Question ${unanswered + 1}. ${nq.prompt}. ${opts}`);
           return true;
         }
-        if (speakLine) await speakLine(ex.journalPrompt);
+        if (speakLine) {
+          await speakLine(
+            `${ex.journalPrompt} Speak your line, then say next or done.`
+          );
+        }
         return true;
       }
 
@@ -488,6 +543,54 @@ export default function AttentionSessionPlayer({
 
       {ex.type === 'bias_quiz' && (
         <div className="space-y-4">
+          {/* Desktop progress orbs: Q1…Qn → Reflect → Ready */}
+          <div className="flex flex-wrap items-center gap-2 rounded-xl border border-white/10 bg-black/30 px-3 py-2.5">
+            <p className="font-mono text-[9px] uppercase tracking-[0.2em] text-slate-500 mr-1">
+              Path
+            </p>
+            {ex.questions.map((_, i) => {
+              const done = biasAnswers[i] != null;
+              const active = !done && biasAnswers.findIndex((a) => a == null) === i;
+              return (
+                <span
+                  key={`q-orb-${i}`}
+                  className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-mono uppercase tracking-wider border ${
+                    done
+                      ? 'border-emerald-400/40 bg-emerald-500/15 text-emerald-200'
+                      : active
+                        ? 'border-fuchsia-400/45 bg-fuchsia-500/15 text-fuchsia-100'
+                        : 'border-white/10 text-slate-500'
+                  }`}
+                >
+                  <span
+                    className={`h-1.5 w-1.5 rounded-full ${
+                      done ? 'bg-emerald-400' : active ? 'bg-fuchsia-400' : 'bg-slate-600'
+                    }`}
+                  />
+                  Q{i + 1}
+                  {done && <Check className="h-3 w-3" />}
+                </span>
+              );
+            })}
+            <span
+              className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-mono uppercase tracking-wider border ${
+                journal.trim().length >= ex.minJournalLen
+                  ? 'border-emerald-400/40 bg-emerald-500/15 text-emerald-200'
+                  : biasAllAnswered
+                    ? 'border-cyan-400/45 bg-cyan-500/15 text-cyan-100'
+                    : 'border-white/10 text-slate-500'
+              }`}
+            >
+              Reflect
+              {journal.trim().length >= ex.minJournalLen && <Check className="h-3 w-3" />}
+            </span>
+            {biasAllAnswered && journal.trim().length >= ex.minJournalLen && !completed && (
+              <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-mono uppercase tracking-wider border border-amber-400/40 bg-amber-500/15 text-amber-200">
+                Ready
+              </span>
+            )}
+          </div>
+
           {ex.questions.map((q, i) => (
             <div key={i} className="rounded-xl border border-white/5 p-3 space-y-2">
               <p className="text-sm text-slate-200">{q.prompt}</p>
@@ -517,15 +620,19 @@ export default function AttentionSessionPlayer({
               )}
             </div>
           ))}
-          <div>
-            <label className={labelClass}>{ex.journalPrompt}</label>
-            <textarea
-              className={inputClass + ' min-h-[80px]'}
-              value={journal}
+
+          {biasAllAnswered && (
+            <ConversationalProof
+              beats={journalBeats}
               disabled={completed}
-              onChange={(e) => setJournal(e.target.value)}
+              hearingActive={hearingActive}
+              speakLine={speakLine}
+              narrateBeats={hearingActive}
+              onAnswersChange={(answers) => onJournalChange(answers)}
+              completeLabel="Lock reflection"
+              variant="dialogue"
             />
-          </div>
+          )}
         </div>
       )}
 
@@ -766,41 +873,19 @@ export default function AttentionSessionPlayer({
       {ex.type === 'hook_mirror' && (
         <div className="space-y-4">
           <p className="font-mono text-[9px] font-black uppercase tracking-[0.22em] text-amber-400/90">
-            Proof of Hook Awareness · three honest lines
+            Proof of Hook Awareness · three honest turns
           </p>
-          <div className="rounded-xl border border-amber-500/25 bg-amber-500/5 p-3">
-            <label className={labelClass}>1 · The bait · Mind</label>
-            <p className="text-[11px] text-slate-400 mb-2 leading-snug">{ex.hookPrompt}</p>
-            <textarea
-              className={inputClass + ' min-h-[72px]'}
-              value={hookBait}
-              disabled={completed}
-              placeholder="What pulls you in…"
-              onChange={(e) => setHookBait(e.target.value)}
-            />
-          </div>
-          <div className="rounded-xl border border-rose-500/20 bg-rose-500/5 p-3">
-            <label className={labelClass}>2 · The catch · Notice</label>
-            <p className="text-[11px] text-slate-400 mb-2 leading-snug">{ex.noticePrompt}</p>
-            <textarea
-              className={inputClass + ' min-h-[72px]'}
-              value={hookNotice}
-              disabled={completed}
-              placeholder="What you notice when you're scrolling again…"
-              onChange={(e) => setHookNotice(e.target.value)}
-            />
-          </div>
-          <div className="rounded-xl border border-cyan-500/25 bg-cyan-500/5 p-3">
-            <label className={labelClass}>3 · Why you stay · Honest</label>
-            <p className="text-[11px] text-slate-400 mb-2 leading-snug">{ex.whyPrompt}</p>
-            <textarea
-              className={inputClass + ' min-h-[72px]'}
-              value={hookWhy}
-              disabled={completed}
-              placeholder="Why you keep going anyway…"
-              onChange={(e) => setHookWhy(e.target.value)}
-            />
-          </div>
+          <ConversationalProof
+            beats={hookBeats}
+            disabled={completed}
+            hearingActive={hearingActive}
+            speakLine={speakLine}
+            narrateBeats={hearingActive}
+            formatJoined={formatHookMirrorJoined}
+            onAnswersChange={(answers) => onHookChange(answers)}
+            variant="quest"
+            completeLabel="Lock mirror"
+          />
           {hookBait.trim().length >= ex.minLen &&
             hookNotice.trim().length >= ex.minLen &&
             hookWhy.trim().length >= ex.minLen &&

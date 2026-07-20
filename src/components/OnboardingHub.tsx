@@ -6,16 +6,23 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
-  Sparkles, Wallet, Key, ShieldCheck, Trophy, HelpCircle, 
-  ChevronRight, Copy, Check, ExternalLink, Cpu, Info, 
-  Settings2, Rocket, ArrowRight, Share2, Network, Compass,
-  Flame, BookOpen, ShieldAlert, Terminal, CheckSquare, Globe, Coins,
+  Sparkles, Key, ShieldCheck, Trophy,
+  ChevronRight, Copy, Check, ExternalLink, Cpu,
+  Settings2, Rocket, ArrowRight, Network, Compass,
+  Terminal,
   MessageCircle,
 } from 'lucide-react';
 import { GameState, SoulboundReputation } from '../types';
 import SoulboundRitualOverlay from './SoulboundRitualOverlay';
 import EcosystemSlider from './EcosystemSlider';
 import DiscordCommunityHub from './DiscordCommunityHub';
+import InteractiveDeck from './fx/InteractiveDeck';
+import {
+  ECONOMY_DECK,
+  FAIRNESS_DECK,
+  PROOFS_DECK,
+  PARTNERS_DECK,
+} from '../lib/decks';
 import { Keypair } from '@solana/web3.js';
 import { friendlyFailureDetail } from '../lib/user-errors';
 
@@ -238,7 +245,7 @@ export default function OnboardingHub({
       name: "Building Culture ID",
       url: "https://buildingcultureid.space/",
       tagline: "Core Sovereign Web3 Identity Ledger",
-      desc: "The fundamental decentralized passport and identity mapping layer for the Building Culture ecosystem.",
+      desc: "Sovereign passport + identity layer.",
       accent: "from-cyan-500/20 to-blue-500/5",
       border: "hover:border-cyan-500/30",
       icon: <Key className="w-5 h-5 text-cyan-400" />
@@ -247,7 +254,7 @@ export default function OnboardingHub({
       name: "Building Culture App",
       url: "https://app.buildingcultureid.space/",
       tagline: "Primary Culture Mining Dashboard",
-      desc: "Deploy raw hardware reactors, monitor live hash operations, and manage active token yields.",
+      desc: "Hardware reactors + live mining dashboard.",
       accent: "from-amber-500/20 to-orange-500/5",
       border: "hover:border-amber-500/30",
       icon: <Cpu className="w-5 h-5 text-amber-400" />
@@ -256,7 +263,7 @@ export default function OnboardingHub({
       name: "Building Culture Agent",
       url: "https://agent.buildingcultureid.space/",
       tagline: "Autonomous Agent Core Node",
-      desc: "Deploy interactive neural workflows that auto-optimize compiler loops and monitor ledger balances.",
+      desc: "Autonomous agent workflows for builders.",
       accent: "from-purple-500/20 to-pink-500/5",
       border: "hover:border-purple-500/30",
       icon: <Network className="w-5 h-5 text-purple-400" />
@@ -265,7 +272,7 @@ export default function OnboardingHub({
       name: "Pepe Mining Hub",
       url: "https://pepe.buildingcultureid.space/",
       tagline: "Decentralized Meme Mining Reactor",
-      desc: "Leverage viral meme-energy coefficients to unlock high-yield visual mining and custom rig upgrades.",
+      desc: "Meme-energy mining + rig upgrades.",
       accent: "from-emerald-500/20 to-teal-500/5",
       border: "hover:border-emerald-500/30",
       icon: <Sparkles className="w-5 h-5 text-emerald-400" />
@@ -274,7 +281,7 @@ export default function OnboardingHub({
       name: "Match Engine Portal",
       url: "https://match.buildingcultureid.space/",
       tagline: "Algorithmic Alliance Matcher",
-      desc: "Match compatible operational nodes to construct synergized guilds and scale collective hash rates.",
+      desc: "Match nodes into synergized guilds.",
       accent: "from-rose-500/20 to-red-500/5",
       border: "hover:border-rose-500/30",
       icon: <Trophy className="w-5 h-5 text-rose-400" />
@@ -283,7 +290,7 @@ export default function OnboardingHub({
       name: "WMOS Portal",
       url: "https://wmos.buildingcultureid.space/",
       tagline: "World Map Operating System",
-      desc: "The universal visual layer charting physical culture nodes and geolocated Web3 guilds worldwide.",
+      desc: "World map of culture nodes + guilds.",
       accent: "from-indigo-500/20 to-violet-500/5",
       border: "hover:border-indigo-500/30",
       icon: <Compass className="w-5 h-5 text-indigo-400" />
@@ -313,8 +320,8 @@ export default function OnboardingHub({
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-teal-400 to-amber-400">Powering Communities.</span>
           </h1>
 
-          <p className="font-sans text-xs md:text-sm text-slate-400 leading-relaxed">
-            Welcome to the centralized onboarding center of the <strong>Building Culture Ecosystem</strong>. We transform passive online communities, viral attention energy, and custom project ecosystems into high-velocity interactive mining protocols. Secure, sovereign, and entirely built on decentralized pipelines.
+          <p className="font-sans text-sm text-slate-400 leading-relaxed max-w-xl">
+            Attention in. Culture out. Tap a tab for a short deck — then act.
           </p>
 
           {/* Token Address Display with Interactive Copy Utility */}
@@ -428,111 +435,32 @@ export default function OnboardingHub({
                   addLog(`DISCORD: Opening ${channel} — community home for all houses.`, 'info')
                 }
               />
-              <p className="text-[11px] text-slate-500 font-sans leading-relaxed max-w-2xl">
-                Discord is where onboarding meets the living community: welcome, weekly Hearing,
-                faction houses for Apex Summit, and partner pilots. Telegram stays the light daily
-                pulse — houses and deeper builder threads live here.
-              </p>
             </div>
           )}
 
           {subTab === 'economy' && (
-            <div className="space-y-8">
-              {/* Q&A Cards */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 font-mono text-xs">
-                <div className="bg-[#0a0a0c] border border-white/5 p-6 rounded-2xl relative overflow-hidden space-y-2">
-                  <div className="w-8 h-8 rounded-lg bg-amber-500/10 flex items-center justify-center text-amber-400 border border-amber-500/20">
-                    <Trophy className="w-4 h-4" />
-                  </div>
-                  <h3 className="font-bold text-slate-100 text-sm">What is BCC?</h3>
-                  <p className="font-sans text-slate-400 leading-relaxed text-[11px]">
-                    Building Culture Coin ($BCC) is the primary economic unit powering our decentralization network. It acts as both gas, voting consensus weight, and coordination liquidity.
-                  </p>
-                </div>
-                
-                <div className="bg-[#0a0a0c] border border-white/5 p-6 rounded-2xl relative overflow-hidden space-y-2">
-                  <div className="w-8 h-8 rounded-lg bg-cyan-500/10 flex items-center justify-center text-cyan-400 border border-cyan-500/20">
-                    <Sparkles className="w-4 h-4" />
-                  </div>
-                  <h3 className="font-bold text-slate-100 text-sm">Why does it have value?</h3>
-                  <p className="font-sans text-slate-400 leading-relaxed text-[11px]">
-                    Unlike traditional currencies backed by empty printing presses, BCC is backed by <strong>verified human attention energy</strong>, cognitive progress logs, and collaborative builder contributions.
-                  </p>
-                </div>
-
-                <div className="bg-[#0a0a0c] border border-white/5 p-6 rounded-2xl relative overflow-hidden space-y-2">
-                  <div className="w-8 h-8 rounded-lg bg-fuchsia-500/10 flex items-center justify-center text-fuchsia-400 border border-fuchsia-500/20">
-                    <Cpu className="w-4 h-4" />
-                  </div>
-                  <h3 className="font-bold text-slate-100 text-sm">What happens when I mine?</h3>
-                  <p className="font-sans text-slate-400 leading-relaxed text-[11px]">
-                    Your node processes learning proofs on the Solana ledger. Maintaining stasis, taking focus logs, and compiling lessons converts attention noise into cryptographically solid reputation hashes.
-                  </p>
-                </div>
-              </div>
-
-              {/* Economy Flow Map */}
-              <div className="bg-[#0a0a0c] border border-white/5 rounded-2xl p-6 md:p-8 relative overflow-hidden">
-                <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/5 rounded-full blur-2xl pointer-events-none" />
-                
-                <div className="flex items-center gap-2 mb-6">
-                  <Compass className="w-5 h-5 text-amber-400" />
-                  <h3 className="font-mono text-sm font-semibold text-slate-100 tracking-wider">THE CORE PROTOCOL ECONOMY FLOW</h3>
-                </div>
-
-                <div className="relative">
-                  {/* Flow Steps */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-7 gap-4 relative z-10 text-xs font-mono">
-                    {[
-                      { num: "01", label: "LEARN", icon: <BookOpen className="w-4 h-4 text-amber-400" />, desc: "Synthesize lessons in the Attention Academy" },
-                      { num: "02", label: "GENERATE ATTENTION ENERGY", icon: <Flame className="w-4 h-4 text-orange-400" />, desc: "Keep node core stasis fully charged" },
-                      { num: "03", label: "MINE BCC POINTS", icon: <Coins className="w-4 h-4 text-yellow-400" />, desc: "Mine $BCC and $COGNITIVE rewards" },
-                      { num: "04", label: "UPGRADE NODE", icon: <Settings2 className="w-4 h-4 text-cyan-400" />, desc: "Acquire better parts or construct facility sectors" },
-                      { num: "05", label: "INCREASE MINING EFFICIENCY", icon: <Cpu className="w-4 h-4 text-purple-400" />, desc: "Scale global multiplier metrics" },
-                      { num: "06", label: "EARN REPUTATION", icon: <ShieldCheck className="w-4 h-4 text-teal-400" />, desc: "Mint Soulbound Proof of Attention NFTs" },
-                      { num: "07", label: "PARTICIPATE IN ECOSYSTEM", icon: <Globe className="w-4 h-4 text-indigo-400" />, desc: "Join builder factions and run custom white-label camps" },
-                    ].map((step, idx) => (
-                      <div key={idx} className="bg-[#050506]/80 border border-white/5 hover:border-amber-500/20 rounded-xl p-4 flex flex-col justify-between min-h-[140px] relative transition-all group">
-                        <span className="absolute top-2 right-2 text-[10px] text-slate-600 font-bold">{step.num}</span>
-                        <div>
-                          <div className="mb-2">{step.icon}</div>
-                          <span className="text-[10px] font-black text-slate-200 block uppercase tracking-tight group-hover:text-amber-400 transition-colors">{step.label}</span>
-                        </div>
-                        <p className="font-sans text-[10px] text-slate-500 leading-normal mt-2">{step.desc}</p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </div>
+            <InteractiveDeck
+              slides={ECONOMY_DECK}
+              mood="facility"
+              onCta={() => onEnterApp?.()}
+              finishLabel="Enter protocol"
+              onFinish={() => onEnterApp?.()}
+            />
           )}
 
           {/* SubTab 2: Proof of Attention Ledger */}
           {subTab === 'proofs' && (
             <div className="space-y-6">
-              <div className="bg-[#0a0a0c] border border-white/5 p-5 rounded-2xl flex flex-col md:flex-row items-center justify-between gap-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-lg bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400">
-                    <ShieldCheck className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <h3 className="font-mono text-sm font-bold text-slate-100 tracking-wider">PROOF OF CONTRIBUTION LEDGER</h3>
-                    <p className="text-xs text-slate-400 font-sans mt-0.5 leading-relaxed">
-                      Every course module you graduate and focus session you maintain creates a verifiable cryptographic proof. Mint them as permanent Soulbound NFTs to secure passive reputation multipliers.
-                    </p>
-                  </div>
+              <InteractiveDeck slides={PROOFS_DECK} mood="spark" />
+              <div className="font-mono text-xs bg-[#050506] border border-white/10 px-4 py-2.5 rounded-xl flex gap-4 text-center justify-center max-w-md mx-auto">
+                <div>
+                  <span className="text-[8px] text-slate-500 block">PROOFS RECORDED</span>
+                  <span className="text-sm font-bold text-cyan-400 font-black">{(state.proofOfAttentions || proofs).length}</span>
                 </div>
-                
-                <div className="font-mono text-xs bg-[#050506] border border-white/10 px-4 py-2.5 rounded-xl flex gap-4 text-center">
-                  <div>
-                    <span className="text-[8px] text-slate-500 block">PROOFS RECORDED</span>
-                    <span className="text-sm font-bold text-cyan-400 font-black">{(state.proofOfAttentions || proofs).length}</span>
-                  </div>
-                  <div className="w-[1px] bg-white/10" />
-                  <div>
-                    <span className="text-[8px] text-slate-500 block">SOULBOUND BADGES</span>
-                    <span className="text-sm font-bold text-amber-400 font-black">{(state.proofOfAttentions || proofs).filter(p => p.minted).length}</span>
-                  </div>
+                <div className="w-[1px] bg-white/10" />
+                <div>
+                  <span className="text-[8px] text-slate-500 block">SOULBOUND BADGES</span>
+                  <span className="text-sm font-bold text-amber-400 font-black">{(state.proofOfAttentions || proofs).filter(p => p.minted).length}</span>
                 </div>
               </div>
 
@@ -630,36 +558,8 @@ export default function OnboardingHub({
           {/* SubTab 3: Fair Mining Page */}
           {subTab === 'fairness' && (
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 font-mono text-xs">
-              
-              {/* Philosophy */}
-              <div className="lg:col-span-7 bg-[#0a0a0c] border border-white/5 rounded-2xl p-6 space-y-4">
-                <div className="flex items-center gap-2">
-                  <ShieldAlert className="w-5 h-5 text-teal-400" />
-                  <h3 className="text-sm font-semibold text-slate-100 tracking-wider">FAIR MINING PROTOCOL PARAMETERS</h3>
-                </div>
-
-                <p className="font-sans text-slate-400 leading-relaxed text-xs">
-                  Many mining games use artificial algorithms, fake hash rates, or heavy venture-capital dumps that deplete retail builders. Building Culture stands strictly on <strong>Absolute Proof of Attention (PoA)</strong>:
-                </p>
-
-                <div className="space-y-3 pt-2">
-                  {[
-                    { label: "On-Chain Activity Proofs", desc: "Real Solana Devnet: KPI contribution transfer + optional PoA memo attestation after Gemini agent verify. Facility CP stays off-chain until SPL mint." },
-                    { label: "Verified Learning & Study Logs", desc: "Hash rate is powered by real attention. Complete modules, verify focus timers, and solve puzzles to expand node parameters." },
-                    { label: "Transparent Resource Distribution", desc: "Zero pre-mines. Developer allocations scale linearly with community growth. 100% of mining parameters are fully open-source and visible on-chain." },
-                    { label: "Proof of Attention Validation", desc: "Decentralized community oracles cross-examine focus logs to prevent script exploitation or click-bot harvesting." }
-                  ].map((item, idx) => (
-                    <div key={idx} className="flex gap-3 bg-[#050506] border border-white/5 p-3 rounded-xl">
-                      <div className="w-5 h-5 rounded bg-teal-500/10 border border-teal-500/20 text-teal-400 flex items-center justify-center font-bold shrink-0">
-                        ✓
-                      </div>
-                      <div>
-                        <h4 className="text-slate-200 font-bold">{item.label}</h4>
-                        <p className="font-sans text-[11px] text-slate-400 mt-0.5 leading-relaxed">{item.desc}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+              <div className="lg:col-span-7">
+                <InteractiveDeck slides={FAIRNESS_DECK} mood="problem" />
               </div>
 
               {/* Oracle Live Logs */}
@@ -700,45 +600,21 @@ export default function OnboardingHub({
           {/* SubTab 4: Partners & Products */}
           {subTab === 'partners' && (
             <div className="space-y-8">
-              
-              {/* Partner integration sandbox */}
-              <div className="bg-[#0a0a0c] border border-white/5 rounded-2xl p-6 md:p-8 shadow-xl relative overflow-hidden">
+              <InteractiveDeck
+                slides={PARTNERS_DECK}
+                mood="awakening"
+                onCta={() => {
+                  window.location.href =
+                    'mailto:admin@buildingculture.space?subject=Attention%20Session%20pilot';
+                  addLog('PARTNER: Pilot inquiry opened — Attention Session path.', 'success');
+                }}
+              />
+
+              {/* Partner session estimator */}
+              <div className="bg-[#0a0a0c] border border-white/5 rounded-2xl p-6 md:p-8 shadow-xl relative overflow-hidden max-w-xl mx-auto w-full">
                 <div className="absolute top-0 right-0 w-48 h-48 bg-cyan-500/5 rounded-full blur-3xl pointer-events-none" />
-
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
-                  <div className="lg:col-span-7 space-y-4">
-                    <div className="flex items-center gap-2">
-                      <Network className="w-5 h-5 text-cyan-400" />
-                      <h3 className="font-mono text-sm font-semibold text-slate-100 tracking-wider">CUSTOM MINING SESSIONS FOR WEB3 PARTNERS</h3>
-                    </div>
-                    
-                    <p className="text-xs text-slate-400 font-sans leading-relaxed">
-                      Are you building a Web3 protocol, launching a meme community, or administering an NFT collective? We can design, compile, and execute <strong>custom, white-labeled Mining Sessions</strong> tailored perfectly to your ecosystem metadata!
-                    </p>
-
-                    <div className="space-y-2.5 text-[11px] text-slate-400 font-sans leading-relaxed">
-                      <p>
-                        Instead of simple staking pools, your users actively execute diagnostic challenges, play microcode puzzles, and trigger customized lucky wheelspins designed to propagate <strong>your native token or custom NFT rewards</strong> alongside $BCC.
-                      </p>
-                      <ul className="grid grid-cols-1 sm:grid-cols-2 gap-2 font-mono text-[10px]">
-                        <li className="flex items-center gap-1.5 bg-[#050506] border border-white/5 p-2 rounded-lg">
-                          <span className="w-1.5 h-1.5 bg-cyan-400 rounded-full" /> Dynamic Metadata Injection
-                        </li>
-                        <li className="flex items-center gap-1.5 bg-[#050506] border border-white/5 p-2 rounded-lg">
-                          <span className="w-1.5 h-1.5 bg-cyan-400 rounded-full" /> Direct Smart Contract Audits
-                        </li>
-                        <li className="flex items-center gap-1.5 bg-[#050506] border border-white/5 p-2 rounded-lg">
-                          <span className="w-1.5 h-1.5 bg-cyan-400 rounded-full" /> Custom Cooldown Ratios
-                        </li>
-                        <li className="flex items-center gap-1.5 bg-[#050506] border border-white/5 p-2 rounded-lg">
-                          <span className="w-1.5 h-1.5 bg-cyan-400 rounded-full" /> Multitoken Liquidity Swaps
-                        </li>
-                      </ul>
-                    </div>
-                  </div>
-
-                  {/* Interactive Calculator Box */}
-                  <div className="lg:col-span-5 bg-[#050506] border border-white/10 rounded-2xl p-6 space-y-4 font-mono text-xs">
+                <div className="relative z-10">
+                  <div className="bg-[#050506] border border-white/10 rounded-2xl p-6 space-y-4 font-mono text-xs">
                     <h4 className="text-slate-200 font-black text-[10px] tracking-wider uppercase border-b border-white/5 pb-2 flex items-center gap-1.5">
                       <Settings2 className="w-4 h-4 text-amber-500 animate-spin" style={{ animationDuration: '6s' }} /> SESSION ESTIMATOR PIPELINE
                     </h4>
@@ -830,9 +706,7 @@ export default function OnboardingHub({
               <div className="space-y-6">
                 <div className="text-center max-w-2xl mx-auto space-y-2 font-mono">
                   <h3 className="text-sm font-semibold text-slate-100 tracking-wider uppercase">BUILDING CULTURE REGISTERED SUITE</h3>
-                  <p className="text-xs text-slate-400 font-sans">
-                    Explore the interconnected decentralized product lineup of the <strong>Building Culture ID</strong> network. All modules utilize shared consensus, native Base integration, and synergized identity vaults.
-                  </p>
+                  <p className="text-xs text-slate-400 font-sans">Shared identity. Tap a product to launch.</p>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -859,7 +733,7 @@ export default function OnboardingHub({
                           <span className="text-[10px] text-slate-500 font-mono mt-0.5 block">{prod.tagline}</span>
                         </div>
 
-                        <p className="text-[11px] text-slate-400 font-sans leading-relaxed min-h-[48px]">
+                        <p className="text-[11px] text-slate-400 font-sans leading-snug">
                           {prod.desc}
                         </p>
                       </div>

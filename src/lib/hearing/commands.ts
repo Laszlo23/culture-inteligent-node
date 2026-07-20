@@ -99,7 +99,7 @@ const RULES: Array<{ cmd: HearingCommand; patterns: RegExp[] }> = [
   },
   {
     cmd: 'next',
-    patterns: [/\bnext\b/, /\bcontinue\b/, /\bgo\s+on\b/],
+    patterns: [/\bnext\b/, /\bcontinue\b/, /\bgo\s+on\b/, /\bdone\b/, /\bready\b/],
   },
   {
     cmd: 'repeat',

@@ -6,10 +6,22 @@
 import { GoogleGenAI } from '@google/genai';
 import { getGeminiApiKey } from './gemini-key';
 
+/** Browser-safe env read — `process` is Node-only and crashes Vite client boot. */
+function envTrim(key: string): string | undefined {
+  try {
+    if (typeof process !== 'undefined' && process.env?.[key]) {
+      return String(process.env[key]).trim() || undefined;
+    }
+  } catch {
+    // ignore
+  }
+  return undefined;
+}
+
 export const GEMINI_TEXT_MODELS = [
-  process.env.GEMINI_TEXT_MODEL?.trim(),
-  process.env.PASSPORT_GEMINI_MODEL?.trim(),
-  process.env.ATTENTION_GEMINI_MODEL?.trim(),
+  envTrim('GEMINI_TEXT_MODEL'),
+  envTrim('PASSPORT_GEMINI_MODEL'),
+  envTrim('ATTENTION_GEMINI_MODEL'),
   'gemini-flash-latest',
   'gemini-2.5-flash',
   'gemini-2.0-flash',

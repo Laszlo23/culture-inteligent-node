@@ -21,6 +21,7 @@ import {
   zkVerify,
 } from '../lib/api';
 import type { SoulboundReputation } from '../types';
+import type { SessionWalletType } from '../lib/wallet/types';
 import { Keypair } from '@solana/web3.js';
 
 type Beat = 'prove' | 'bind' | 'mint' | 'done';
@@ -29,7 +30,7 @@ export type SoulboundRitualOverlayProps = {
   open: boolean;
   onClose: () => void;
   walletAddress: string;
-  walletType?: 'extension' | 'local';
+  walletType?: SessionWalletType;
   localKeypair?: Keypair | null;
   addLog?: (msg: string, level?: 'info' | 'success' | 'warn' | 'system') => void;
   onComplete?: (rep: SoulboundReputation) => void;

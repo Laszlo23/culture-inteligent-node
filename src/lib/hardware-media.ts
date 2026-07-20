@@ -5,13 +5,13 @@
 import type { ModuleType } from '../types';
 
 export const HARDWARE_PHOTOS: Record<ModuleType, string> = {
-  gpu: '/hardware/gpu.png',
-  memory: '/hardware/memory.png',
-  accelerator: '/hardware/accelerator.png',
-  battery: '/hardware/battery.png',
-  cooler: '/hardware/cooler.png',
-  dock: '/hardware/dock.png',
-  chip: '/hardware/chip.png',
+  gpu: '/hardware/gpu.webp',
+  memory: '/hardware/memory.webp',
+  accelerator: '/hardware/accelerator.webp',
+  battery: '/hardware/battery.webp',
+  cooler: '/hardware/cooler.webp',
+  dock: '/hardware/dock.webp',
+  chip: '/hardware/chip.webp',
 };
 
 export function resolveHardwarePhoto(type: ModuleType | string): string {
@@ -19,4 +19,4 @@ export function resolveHardwarePhoto(type: ModuleType | string): string {
   return HARDWARE_PHOTOS.chip;
 }
 
-export const ARENA_HERO = '/atmosphere/arena-hero.png';
+export const ARENA_HERO = '/atmosphere/arena-hero.webp';

@@ -157,7 +157,7 @@ export default function Workshop({ state, setState, addLog }: WorkshopProps) {
       {/* Cinematic bay hero */}
       <div className="relative overflow-hidden rounded-2xl border border-white/10 min-h-[140px] sm:min-h-[168px]">
         <img
-          src="/hardware/gpu.png"
+          src="/hardware/gpu.webp"
           alt=""
           className="absolute inset-0 w-full h-full object-cover scale-105 brightness-[0.45]"
           draggable={false}

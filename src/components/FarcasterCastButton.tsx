@@ -10,6 +10,7 @@ import {
   openFarcasterCompose,
   type CastTemplateId,
 } from '../lib/farcaster';
+import { OG_PACKS, type OgPackId } from '../lib/og-share';
 import { track } from '../lib/attention-metrics';
 import type { HookingTruth } from '../lib/hook-loop-campaign';
 
@@ -75,6 +76,7 @@ export default function FarcasterCastButton({
       castEmbed = castEmbed ?? t.embedUrl;
     }
 
+    // No fixed template image — openFarcasterCompose rotates OG every share
     openFarcasterCompose(castText!, castEmbed);
     track('farcaster_cast', { template: source });
     onCast?.();
@@ -107,7 +109,7 @@ export function FarcasterCastDeck({
         <span className="font-mono text-[9px] text-slate-500">{CAST_TEMPLATES.length} casts</span>
       </div>
       <p className="text-[12px] text-slate-400 leading-relaxed">
-        One tap opens compose with embed. Post the launch cast, then thread replies. Rain.
+        Every cast advances the OG pack — the feed image changes each share.
       </p>
       <div className="flex flex-wrap gap-2">
         {ids.map((id) => {
@@ -121,6 +123,62 @@ export function FarcasterCastDeck({
             />
           );
         })}
+      </div>
+    </div>
+  );
+}
+
+/** Visual OG pack picker — different image + copy per cast. */
+export function OgShareDeck({
+  packIds,
+}: {
+  packIds?: OgPackId[];
+}) {
+  const packs = packIds
+    ? OG_PACKS.filter((p) => packIds.includes(p.id))
+    : OG_PACKS;
+
+  return (
+    <div className="rounded-2xl border border-white/12 bg-black/40 p-4 space-y-3 backdrop-blur-md">
+      <div className="flex items-center justify-between gap-2">
+        <p className="font-mono text-[9px] font-black tracking-[0.28em] uppercase text-cyan-300">
+          Feed cards · OG pack
+        </p>
+        <span className="font-mono text-[9px] text-slate-500">{packs.length} looks</span>
+      </div>
+      <p className="text-[12px] text-slate-400 leading-relaxed">
+        Pick a look, or use Rain / Grow — each share cycles to the next card.
+      </p>
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+        {packs.map((pack) => (
+          <button
+            key={pack.id}
+            type="button"
+            onClick={() => {
+              // Explicit pick for this tap; rotator still advances for the next share
+              openFarcasterCompose(pack.message, pack.embedPage, pack.imageUrl);
+              track('farcaster_cast', { template: `og_${pack.id}` });
+            }}
+            className="group text-left rounded-xl border border-white/10 bg-[#0a0a0e]/80 overflow-hidden cursor-pointer hover:border-cyan-400/40 transition-colors"
+          >
+            <div className="aspect-[16/9] overflow-hidden bg-black/50">
+              <img
+                src={pack.path}
+                alt={pack.alt}
+                className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
+                draggable={false}
+              />
+            </div>
+            <div className="px-2.5 py-2">
+              <p className="font-mono text-[9px] font-black uppercase tracking-wider text-cyan-300/90">
+                {pack.title}
+              </p>
+              <p className="mt-0.5 text-[10px] text-slate-400 line-clamp-2 leading-snug">
+                {pack.message.split('\n')[0]}
+              </p>
+            </div>
+          </button>
+        ))}
       </div>
     </div>
   );

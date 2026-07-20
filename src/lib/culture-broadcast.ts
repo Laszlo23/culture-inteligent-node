@@ -4,6 +4,7 @@
  */
 
 import { BRAND, SLOGANS } from './brand-slogans';
+import { withRotatingOg } from './og-share';
 
 export const HEARING_MODE_URL = `${BRAND.url.replace(/\/?$/, '/')}?hear=1`;
 
@@ -47,12 +48,18 @@ export const CULTURE_BROADCAST = {
   notificationBody: `${SLOGANS.hero} ${SLOGANS.equation} · ${SLOGANS.spread}`,
   hearingBanner:
     'Hearing Mode — a soft listening space. Say Help. Prove attention without staring at the screen.',
-  /** Campaign art under /campaign/ */
+  /** Campaign art under /campaign/ + feed OG pack under /og/ */
   art: {
-    mineCulture: '/campaign/mine-culture.png',
-    failureCurve: '/campaign/failure-curve.png',
-    cultureClub: '/campaign/culture-club.png',
-    spreadLove: '/campaign/spread-love.png',
+    mineCulture: '/campaign/mine-culture.webp',
+    failureCurve: '/campaign/failure-curve.webp',
+    cultureClub: '/campaign/culture-club.webp',
+    spreadLove: '/campaign/spread-love.webp',
+    ogHumanValue: '/og/human-value.jpg',
+    ogPassportZero: '/og/passport-zero.jpg',
+    ogContribution: '/og/contribution.jpg',
+    ogFirstSpark: '/og/first-spark.jpg',
+    ogSpread: '/og/spread.jpg',
+    ogHearing: '/og/hearing.jpg',
   },
 } as const;
 
@@ -80,9 +87,18 @@ export async function shareCultureText(
   title = `${BRAND.product} — ${BRAND.parent}`,
   url: string = HEARING_MODE_URL
 ): Promise<'share' | 'clipboard'> {
+  // Rotate OG art into the body so native/clipboard shares also change image
+  const rotated = withRotatingOg({
+    text,
+    embedPage: url,
+    appendImageLink: true,
+  });
+  const shareText = rotated.text;
+  const shareUrl = rotated.embedUrl;
+
   if (typeof navigator !== 'undefined' && typeof navigator.share === 'function') {
     try {
-      await navigator.share({ title, text, url });
+      await navigator.share({ title, text: shareText, url: shareUrl });
       return 'share';
     } catch (err) {
       // User cancel — fall through only if not AbortError
@@ -91,7 +107,7 @@ export async function shareCultureText(
       }
     }
   }
-  await copyTextFallback(text);
+  await copyTextFallback(shareText);
   return 'clipboard';
 }
 

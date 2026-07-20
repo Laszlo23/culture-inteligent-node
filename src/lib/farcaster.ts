@@ -5,25 +5,64 @@
 
 import { BRAND, SLOGANS } from './brand-slogans';
 import { buildHookSharePost, hookLoopDeepLink, type HookingTruth } from './hook-loop-campaign';
+import {
+  getOgPack,
+  nextOgPack,
+  uniqueShareUrl,
+  versionedOgImage,
+  OG_ASSET_VERSION,
+  type OgPackId,
+} from './og-share';
 
 export const FARCASTER_HOME = `${BRAND.url.replace(/\/?$/, '/')}?fc=1`;
 export const FARCASTER_HEARING = `${BRAND.url.replace(/\/?$/, '/')}?hear=1&fc=1`;
 export const FARCASTER_HOOK_LOOP = `${BRAND.url.replace(/\/?$/, '/')}?room=hook-loop&fc=1`;
 export const FARCASTER_PASSPORT = `${BRAND.url.replace(/\/?$/, '/')}?room=passport&fc=1`;
 
-/** Warpcast / Farcaster compose (text + optional embed URL). */
-export function buildFarcasterComposeUrl(text: string, embedUrl?: string): string {
+/** Warpcast / Farcaster compose (text + embeds — page and/or OG image). */
+export function buildFarcasterComposeUrl(
+  text: string,
+  embedUrl?: string,
+  imageUrl?: string
+): string {
   const params = new URLSearchParams();
   params.set('text', text);
-  if (embedUrl) {
-    params.append('embeds[]', embedUrl);
-  }
+  // Image first so the feed card shows the visual pack
+  if (imageUrl) params.append('embeds[]', imageUrl);
+  if (embedUrl && embedUrl !== imageUrl) params.append('embeds[]', embedUrl);
   return `https://farcaster.xyz/~/compose?${params.toString()}`;
 }
 
-export function openFarcasterCompose(text: string, embedUrl?: string): void {
+/**
+ * Open compose with text + embeds.
+ * Always advances the OG rotator so consecutive shares get a different image.
+ * Pass `imageUrl` only when the user picked a specific card (still advances).
+ */
+export function openFarcasterCompose(
+  text: string,
+  embedUrl?: string,
+  imageUrl?: string
+): void {
   if (typeof window === 'undefined') return;
-  const url = buildFarcasterComposeUrl(text, embedUrl);
+  const pack = nextOgPack();
+  // Versioned image + unique share landing = fresh scrape every cast
+  const resolvedImage = versionedOgImage(imageUrl || pack.imageUrl);
+  let resolvedEmbed: string;
+  if (embedUrl) {
+    try {
+      const u = new URL(embedUrl, BRAND.url);
+      if (!u.searchParams.has('share')) u.searchParams.set('share', pack.id);
+      u.searchParams.set('n', Date.now().toString(36));
+      u.searchParams.set('v', OG_ASSET_VERSION);
+      if (!u.searchParams.has('fc')) u.searchParams.set('fc', '1');
+      resolvedEmbed = u.toString();
+    } catch {
+      resolvedEmbed = uniqueShareUrl(pack);
+    }
+  } else {
+    resolvedEmbed = uniqueShareUrl(pack);
+  }
+  const url = buildFarcasterComposeUrl(text, resolvedEmbed, resolvedImage);
   window.open(url, '_blank', 'noopener,noreferrer');
 }
 
@@ -48,48 +87,54 @@ export type CastTemplate = {
   channelHint: string;
   text: string;
   embedUrl: string;
+  /** Optional OG pack image for varied feed cards */
+  imageUrl?: string;
+  ogPackId?: OgPackId;
 };
 
+function withOg(
+  packId: OgPackId,
+  base: Omit<CastTemplate, 'imageUrl' | 'ogPackId' | 'text' | 'embedUrl'> & {
+    text?: string;
+    embedUrl?: string;
+  }
+): CastTemplate {
+  const pack = getOgPack(packId);
+  return {
+    ...base,
+    text: base.text ?? pack.message,
+    embedUrl: base.embedUrl ?? pack.embedPage,
+    imageUrl: pack.imageUrl,
+    ogPackId: packId,
+  };
+}
+
 export const CAST_TEMPLATES: CastTemplate[] = [
-  {
+  withOg('human_value', {
     id: 'launch',
     title: 'Launch — Human Economy',
     channelHint: '/base /builders /onchain',
-    embedUrl: FARCASTER_HOME,
-    text: [
-      SLOGANS.hero,
-      '',
-      'For centuries we measured people by the hours they worked.',
-      'The AI era needs a new measurement:',
-      'what you learn · create · contribute.',
-      '',
-      `${BRAND.parent} = ${BRAND.product}.`,
-      'Build your Human Passport.',
-      '',
-      FARCASTER_HOME,
-    ].join('\n'),
-  },
-  {
+  }),
+  withOg('passport_zero', {
     id: 'passport',
     title: 'Human Passport',
     channelHint: '/builders /creators',
-    embedUrl: FARCASTER_PASSPORT,
     text: [
       'Your LinkedIn flex is a résumé.',
       'Your Human Passport is reputation you own.',
       '',
+      'Starts at zero. Zero creates a journey.',
       SLOGANS.equation,
-      'Prove attention. Grow Knowledge · Creativity · Contribution.',
       '',
       SLOGANS.ctaPassport,
-      FARCASTER_HOME,
+      FARCASTER_PASSPORT,
     ].join('\n'),
-  },
-  {
+    embedUrl: FARCASTER_PASSPORT,
+  }),
+  withOg('contribution', {
     id: 'passport_card',
     title: 'See my Human Passport',
     channelHint: '/builders /creators',
-    embedUrl: FARCASTER_PASSPORT,
     text: [
       'See my Human Passport.',
       '',
@@ -99,12 +144,14 @@ export const CAST_TEMPLATES: CastTemplate[] = [
       SLOGANS.ctaPassport,
       FARCASTER_PASSPORT,
     ].join('\n'),
-  },
+    embedUrl: FARCASTER_PASSPORT,
+  }),
   {
     id: 'hook_loop',
     title: 'Hook Loop viral',
     channelHint: '/memes /attention',
     embedUrl: FARCASTER_HOOK_LOOP,
+    imageUrl: `${BRAND.url.replace(/\/?$/, '')}/campaign/failure-curve.webp`,
     text: [
       SLOGANS.hookLoop,
       '',
@@ -115,34 +162,16 @@ export const CAST_TEMPLATES: CastTemplate[] = [
       FARCASTER_HOOK_LOOP,
     ].join('\n'),
   },
-  {
+  withOg('first_spark', {
     id: 'proof',
     title: 'Proof of Attention',
     channelHint: '/learning /builders',
-    embedUrl: FARCASTER_HOME,
-    text: [
-      'Empty scrolling is not contribution.',
-      '',
-      'Proof of Attention = short challenges that move your Knowledge Score.',
-      '~2 minutes. Then your passport updates.',
-      '',
-      FARCASTER_HOME,
-    ].join('\n'),
-  },
-  {
+  }),
+  withOg('hearing', {
     id: 'hearing',
     title: 'Hearing Mode',
     channelHint: '/a11y /builders',
-    embedUrl: FARCASTER_HEARING,
-    text: [
-      'Prove attention without looking at the screen.',
-      '',
-      'Hearing Mode — ears-first Human Economy.',
-      'Say Help. Start a challenge. Own the receipt.',
-      '',
-      FARCASTER_HEARING,
-    ].join('\n'),
-  },
+  }),
   {
     id: 'pricing',
     title: 'Business model',
@@ -187,11 +216,10 @@ export const CAST_TEMPLATES: CastTemplate[] = [
       FARCASTER_HOME,
     ].join('\n'),
   },
-  {
+  withOg('contribution', {
     id: 'rain',
     title: 'Make it rain',
     channelHint: '/builders /base /onchain',
-    embedUrl: FARCASTER_HOME,
     text: [
       'Make it rain.',
       '',
@@ -204,12 +232,12 @@ export const CAST_TEMPLATES: CastTemplate[] = [
       FARCASTER_HOME,
       FARCASTER_HEARING,
     ].join('\n'),
-  },
-  {
+    embedUrl: FARCASTER_HOME,
+  }),
+  withOg('hearing', {
     id: 'weekly_hearing',
     title: 'Weekly Hearing demo',
     channelHint: '/a11y /builders /attention',
-    embedUrl: FARCASTER_HEARING,
     text: [
       'Community Hearing — 30 min live.',
       '',
@@ -221,7 +249,8 @@ export const CAST_TEMPLATES: CastTemplate[] = [
       'Join us. Bring one friend.',
       FARCASTER_HEARING,
     ].join('\n'),
-  },
+    embedUrl: FARCASTER_HEARING,
+  }),
   {
     id: 'partner_pilot',
     title: 'Partner Attention Session',
@@ -239,11 +268,10 @@ export const CAST_TEMPLATES: CastTemplate[] = [
       `${FARCASTER_HOME.replace('?fc=1', '?room=partners&fc=1')}`,
     ].join('\n'),
   },
-  {
+  withOg('spread', {
     id: 'spread_club',
     title: 'Spread the club',
     channelHint: '/builders',
-    embedUrl: FARCASTER_PASSPORT,
     text: [
       SLOGANS.spread,
       '',
@@ -253,7 +281,8 @@ export const CAST_TEMPLATES: CastTemplate[] = [
       'Copy your invite in-app. Cast it. Make it rain.',
       FARCASTER_PASSPORT,
     ].join('\n'),
-  },
+    embedUrl: FARCASTER_PASSPORT,
+  }),
 ];
 
 /** Ordered rain sequence for MakeItRainDeck */

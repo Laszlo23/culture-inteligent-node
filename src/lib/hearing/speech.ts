@@ -253,17 +253,32 @@ function speakBrowserFallback(text: string, gen: number): Promise<void> {
   });
 }
 
+/** Rejects the in-flight listenOnce when mute/speak interrupts recognition. */
+let abortActiveListen: (() => void) | null = null;
+
 export function stopListening(): void {
-  if (!activeRecognition) return;
+  const abort = abortActiveListen;
+  abortActiveListen = null;
   try {
-    activeRecognition.onresult = null;
-    activeRecognition.onerror = null;
-    activeRecognition.onend = null;
-    activeRecognition.abort();
+    if (activeRecognition) {
+      activeRecognition.onresult = null;
+      activeRecognition.onerror = null;
+      activeRecognition.onend = null;
+      activeRecognition.abort();
+    }
   } catch {
     // ignore
   }
   activeRecognition = null;
+  // Unblock the pending listenOnce so mute/speak can switch overlays immediately.
+  abort?.();
+}
+
+/** True while neural guide audio (or browser TTS) is actually playing. */
+export function isGuideSpeaking(): boolean {
+  if (activeAudio && !activeAudio.paused && !activeAudio.ended) return true;
+  if (typeof window !== 'undefined' && window.speechSynthesis?.speaking) return true;
+  return false;
 }
 
 export function listenOnce(opts?: { lang?: string; timeoutMs?: number }): Promise<string> {
@@ -281,21 +296,26 @@ export function listenOnce(opts?: { lang?: string; timeoutMs?: number }): Promis
     rec.maxAlternatives = 1;
 
     const timeoutMs = opts?.timeoutMs ?? 14_000;
+    let settled = false;
     const timer = window.setTimeout(() => {
+      finish(() => reject(new Error('stt_timeout')));
       try {
         rec.abort();
       } catch {
         // ignore
       }
-      if (activeRecognition === rec) activeRecognition = null;
-      reject(new Error('stt_timeout'));
     }, timeoutMs);
 
     const finish = (fn: () => void) => {
+      if (settled) return;
+      settled = true;
       window.clearTimeout(timer);
+      if (abortActiveListen) abortActiveListen = null;
       if (activeRecognition === rec) activeRecognition = null;
       fn();
     };
+
+    abortActiveListen = () => finish(() => reject(new Error('stt_aborted')));
 
     rec.onresult = (ev) => {
       const transcript = ev.results?.[0]?.[0]?.transcript?.trim() || '';
@@ -306,11 +326,17 @@ export function listenOnce(opts?: { lang?: string; timeoutMs?: number }): Promis
     };
 
     rec.onerror = (ev) => {
-      finish(() => reject(new Error(ev.error || 'stt_error')));
+      // aborted is expected when mute/speak interrupts — treat as soft end
+      const code = ev.error || 'stt_error';
+      if (code === 'aborted' || code === 'no-speech') {
+        finish(() => reject(new Error(code === 'aborted' ? 'stt_aborted' : 'stt_empty')));
+        return;
+      }
+      finish(() => reject(new Error(code)));
     };
 
     rec.onend = () => {
-      if (activeRecognition !== rec) return;
+      if (settled) return;
       finish(() => reject(new Error('stt_ended')));
     };
 

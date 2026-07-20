@@ -1,10 +1,10 @@
 /**
- * Public landing — cinematic story chapters first, then explore (pricing / community).
+ * Public landing — scroll-snap cinematic onboarding, then explore.
  */
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
-import { ArrowLeft, ArrowRight, Sparkles } from 'lucide-react';
+import { motion, useReducedMotion, useScroll, useSpring } from 'motion/react';
+import { ArrowDown, ArrowLeft, ArrowRight, Sparkles } from 'lucide-react';
 import { BRAND, SLOGANS } from '../lib/brand-slogans';
 import {
   JOURNEY_STEPS,
@@ -14,15 +14,18 @@ import {
   STORY_CHAPTERS,
   joinWaitlist,
   type PricingTierId,
+  type StoryChapterId,
 } from '../lib/human-economy';
+import { pickQuote } from '../lib/motivating-quotes';
 import {
   COMMUNITY_LINKS,
   captureInviteFromUrl,
   inviteWelcomeLine,
 } from '../lib/community-invite';
 import { CinematicBackdrop } from './fx';
-import { FarcasterCastDeck } from './FarcasterCastButton';
+import { FarcasterCastDeck, OgShareDeck } from './FarcasterCastButton';
 import MakeItRainDeck from './MakeItRainDeck';
+import StoryChapterArt, { CHAPTER_VISUALS } from './onboarding/StoryChapterArt';
 
 type Props = {
   onBuildPassport: () => void;
@@ -31,17 +34,27 @@ type Props = {
 
 type LandingMode = 'story' | 'explore';
 
+const ACCENT_DOT: Record<(typeof CHAPTER_VISUALS)[StoryChapterId]['accent'], string> = {
+  cyan: 'bg-cyan-400',
+  amber: 'bg-amber-400',
+  rose: 'bg-rose-400',
+  emerald: 'bg-emerald-400',
+};
+
 export default function HumanEconomyLanding({ onBuildPassport, onContinueSecure }: Props) {
   const reduceMotion = useReducedMotion();
   const economyRef = useRef<HTMLElement | null>(null);
+  const scrollerRef = useRef<HTMLDivElement | null>(null);
   const [mode, setMode] = useState<LandingMode>('story');
-  const [chapter, setChapter] = useState(0);
+  const [activeChapter, setActiveChapter] = useState(0);
   const [waitlistMsg, setWaitlistMsg] = useState<string | null>(null);
   const [inviteLine, setInviteLine] = useState<string | null>(null);
 
   const lastIndex = STORY_CHAPTERS.length - 1;
-  const isLast = chapter >= lastIndex;
-  const current = STORY_CHAPTERS[chapter] ?? STORY_CHAPTERS[0];
+  const chapterQuote = pickQuote(`landing:${activeChapter}`);
+
+  const { scrollYProgress } = useScroll({ container: scrollerRef });
+  const progress = useSpring(scrollYProgress, { stiffness: 120, damping: 28 });
 
   useEffect(() => {
     const { record } = captureInviteFromUrl();
@@ -52,13 +65,18 @@ export default function HumanEconomyLanding({ onBuildPassport, onContinueSecure 
     setMode('explore');
   }, []);
 
-  const nextChapter = useCallback(() => {
-    setChapter((c) => Math.min(lastIndex, c + 1));
-  }, [lastIndex]);
-
-  const prevChapter = useCallback(() => {
-    setChapter((c) => Math.max(0, c - 1));
-  }, []);
+  const scrollToChapter = useCallback(
+    (index: number) => {
+      const root = scrollerRef.current;
+      const el = root?.querySelector<HTMLElement>(`[data-chapter="${index}"]`);
+      if (!root || !el) return;
+      root.scrollTo({
+        top: el.offsetTop,
+        behavior: reduceMotion ? 'auto' : 'smooth',
+      });
+    },
+    [reduceMotion]
+  );
 
   useEffect(() => {
     if (mode !== 'explore') return;
@@ -69,20 +87,39 @@ export default function HumanEconomyLanding({ onBuildPassport, onContinueSecure 
   }, [mode]);
 
   useEffect(() => {
+    if (mode !== 'story' || !scrollerRef.current) return;
+    const root = scrollerRef.current;
+    const panels = [...root.querySelectorAll<HTMLElement>('[data-chapter]')];
+    const io = new IntersectionObserver(
+      (entries) => {
+        const visible = entries
+          .filter((e) => e.isIntersecting)
+          .sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
+        if (!visible) return;
+        const idx = Number((visible.target as HTMLElement).dataset.chapter);
+        if (!Number.isNaN(idx)) setActiveChapter(idx);
+      },
+      { root, threshold: [0.45, 0.6] }
+    );
+    panels.forEach((p) => io.observe(p));
+    return () => io.disconnect();
+  }, [mode]);
+
+  useEffect(() => {
     if (mode !== 'story') return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'ArrowRight' || e.key === ' ') {
+      if (e.key === 'ArrowDown' || e.key === 'ArrowRight' || e.key === ' ') {
         e.preventDefault();
-        if (isLast) onBuildPassport();
-        else nextChapter();
-      } else if (e.key === 'ArrowLeft') {
+        if (activeChapter >= lastIndex) onBuildPassport();
+        else scrollToChapter(activeChapter + 1);
+      } else if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') {
         e.preventDefault();
-        prevChapter();
+        scrollToChapter(Math.max(0, activeChapter - 1));
       }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [mode, isLast, nextChapter, prevChapter, onBuildPassport]);
+  }, [mode, activeChapter, lastIndex, scrollToChapter, onBuildPassport]);
 
   const onWaitlist = (tier: PricingTierId) => {
     joinWaitlist(tier);
@@ -97,155 +134,203 @@ export default function HumanEconomyLanding({ onBuildPassport, onContinueSecure 
 
   if (mode === 'story') {
     return (
-      <div className="relative h-[100dvh] overflow-hidden bg-[#050608] text-slate-300">
-        <div className="fixed inset-0 pointer-events-none z-0">
-          <CinematicBackdrop variant="duality" />
-          <div className="absolute inset-0 bg-gradient-to-b from-[#050608]/35 via-[#050608]/80 to-[#050608]" />
-        </div>
+      <div className="relative h-[100dvh] overflow-hidden bg-[#050608] text-slate-200">
+        {/* Scroll progress */}
+        <motion.div
+          className="fixed left-0 top-0 z-40 h-[2px] origin-left bg-gradient-to-r from-cyan-400 via-amber-300 to-emerald-400"
+          style={{ scaleX: progress }}
+        />
 
-        <div className="relative z-10 flex h-full flex-col px-5 md:px-10 py-6 md:py-10 max-w-3xl mx-auto">
-          <header className="flex items-center justify-between gap-3 shrink-0">
-            <p className="font-mono text-[10px] font-black tracking-[0.32em] uppercase text-cyan-400/90">
+        <header className="pointer-events-none fixed inset-x-0 top-0 z-30 flex items-start justify-between gap-3 px-5 pt-[max(1rem,env(safe-area-inset-top))] md:px-10">
+          <div className="pointer-events-auto">
+            <p className="font-mono text-[10px] font-black tracking-[0.32em] uppercase text-cyan-300 drop-shadow-[0_2px_12px_rgba(0,0,0,0.8)]">
               {BRAND.parent}
             </p>
-            <div className="flex items-center gap-1.5" aria-hidden>
-              {STORY_CHAPTERS.map((ch, i) => (
-                <span
+            <p className="mt-1 font-display text-sm italic text-white/90">{BRAND.product}</p>
+          </div>
+          <div className="pointer-events-auto flex items-center gap-1.5 rounded-full border border-white/10 bg-black/40 px-2.5 py-1.5 backdrop-blur-md">
+            {STORY_CHAPTERS.map((ch, i) => {
+              const accent = CHAPTER_VISUALS[ch.id].accent;
+              return (
+                <button
                   key={ch.id}
-                  className={`h-1 rounded-full transition-all duration-300 ${
-                    i === chapter
-                      ? 'w-6 bg-cyan-400'
-                      : i < chapter
-                        ? 'w-3 bg-cyan-400/50'
-                        : 'w-3 bg-white/15'
+                  type="button"
+                  aria-label={`Go to ${ch.eyebrow}`}
+                  onClick={() => scrollToChapter(i)}
+                  className={`h-1.5 rounded-full transition-all duration-300 cursor-pointer ${
+                    i === activeChapter
+                      ? `w-7 ${ACCENT_DOT[accent]}`
+                      : i < activeChapter
+                        ? `w-3 ${ACCENT_DOT[accent]} opacity-55`
+                        : 'w-3 bg-white/25'
                   }`}
                 />
-              ))}
-            </div>
-          </header>
-
-          {inviteLine && chapter === 0 && (
-            <p className="mt-4 shrink-0 max-w-xl rounded-xl border border-amber-400/25 bg-amber-950/35 px-4 py-3 text-sm text-amber-50/95 leading-relaxed">
-              {inviteLine}
-            </p>
-          )}
-
-          <div className="flex-1 flex flex-col justify-center min-h-0 py-6">
-            <AnimatePresence mode="wait">
-              <motion.div
-                key={current.id}
-                initial={reduceMotion ? false : { opacity: 0, y: 18 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={reduceMotion ? undefined : { opacity: 0, y: -12 }}
-                transition={{ duration: 0.4 }}
-                className="space-y-5"
-              >
-                <p className="font-mono text-[9px] font-black tracking-[0.28em] uppercase text-amber-400/85">
-                  {current.eyebrow}
-                </p>
-                <h1 className="font-display text-3xl sm:text-4xl md:text-5xl font-bold italic text-white tracking-tight leading-[1.12]">
-                  {current.title}
-                </h1>
-                <p className="text-base sm:text-lg text-slate-400 max-w-2xl leading-relaxed font-sans">
-                  {current.body}
-                </p>
-                {current.accent && (
-                  <p className="text-sm sm:text-base text-slate-200 max-w-2xl leading-relaxed font-medium">
-                    {current.accent}
-                  </p>
-                )}
-
-                {current.id === 'awakening' && (
-                  <ul className="mt-2 grid grid-cols-1 sm:grid-cols-3 gap-2">
-                    {PASSPORT_DIMENSIONS.map((d) => (
-                      <li
-                        key={d.id}
-                        className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-3"
-                      >
-                        <p className="font-mono text-[9px] uppercase tracking-widest text-cyan-400/80">
-                          {d.title}
-                        </p>
-                        <p className="mt-1 text-[11px] text-slate-500 leading-snug">{d.line}</p>
-                        <p className="mt-2 font-display text-2xl italic text-white/90">0</p>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-
-                {current.id === 'evolution' && (
-                  <ol className="mt-2 grid grid-cols-1 sm:grid-cols-5 gap-2">
-                    {JOURNEY_STEPS.map((step, i) => (
-                      <li
-                        key={step.id}
-                        className="rounded-xl border border-white/8 bg-white/[0.03] px-3 py-3"
-                      >
-                        <span className="font-mono text-[9px] text-cyan-400/70 tracking-widest">
-                          0{i + 1}
-                        </span>
-                        <p className="mt-1.5 font-semibold text-white text-sm">{step.title}</p>
-                        <p className="mt-0.5 text-[11px] text-slate-500 leading-snug">{step.line}</p>
-                      </li>
-                    ))}
-                  </ol>
-                )}
-              </motion.div>
-            </AnimatePresence>
+              );
+            })}
           </div>
+        </header>
 
-          <footer className="shrink-0 flex flex-col gap-3 pb-2">
-            <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-              {isLast ? (
-                <button
-                  type="button"
-                  onClick={onBuildPassport}
-                  className="inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-black font-mono text-xs font-black uppercase tracking-wider cursor-pointer shadow-[0_0_40px_rgba(34,211,238,0.35)]"
-                >
-                  <Sparkles className="w-4 h-4" />
-                  {SLOGANS.ctaPassport}
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={nextChapter}
-                  className="inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-black font-mono text-xs font-black uppercase tracking-wider cursor-pointer shadow-[0_0_40px_rgba(34,211,238,0.35)]"
-                >
-                  Continue
-                  <ArrowRight className="w-4 h-4" />
-                </button>
-              )}
-              {chapter >= 2 && (
-                <button
-                  type="button"
-                  onClick={goExplore}
-                  className="inline-flex items-center justify-center gap-2 px-5 py-3 text-[10px] font-mono uppercase tracking-wider text-slate-500 hover:text-slate-300 cursor-pointer"
-                >
-                  {SLOGANS.ctaExplore}
-                </button>
-              )}
-            </div>
-            <div className="flex items-center justify-between gap-2">
-              <button
-                type="button"
-                onClick={prevChapter}
-                disabled={chapter === 0}
-                className="inline-flex items-center gap-1.5 px-2 py-1.5 text-[10px] font-mono uppercase tracking-wider text-slate-600 hover:text-slate-400 disabled:opacity-30 disabled:pointer-events-none cursor-pointer"
-                aria-label="Previous chapter"
+        <div
+          ref={scrollerRef}
+          className="h-full overflow-y-auto overscroll-y-contain snap-y snap-mandatory scroll-smooth"
+        >
+          {STORY_CHAPTERS.map((ch, i) => {
+            const isLast = i === lastIndex;
+            const visual = CHAPTER_VISUALS[ch.id];
+            return (
+              <section
+                key={ch.id}
+                data-chapter={i}
+                className="relative flex min-h-[100dvh] snap-start snap-always flex-col justify-end overflow-hidden px-5 pb-28 pt-28 md:px-10 md:pb-32"
               >
-                <ArrowLeft className="w-3.5 h-3.5" />
-                Back
-              </button>
-              {chapter >= 2 && !isLast && (
-                <button
-                  type="button"
-                  onClick={onBuildPassport}
-                  className="text-[10px] font-mono uppercase tracking-wider text-slate-600 hover:text-cyan-400/80 cursor-pointer"
+                <StoryChapterArt chapterId={ch.id} />
+
+                <motion.div
+                  initial={reduceMotion ? false : { opacity: 0, y: 28 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: false, amount: 0.45 }}
+                  transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
+                  className="relative z-10 mx-auto w-full max-w-2xl"
                 >
-                  Skip to passport
-                </button>
-              )}
-            </div>
-          </footer>
+                  {inviteLine && i === 0 && (
+                    <p className="mb-5 max-w-xl rounded-2xl border border-amber-400/30 bg-amber-950/50 px-4 py-3 text-sm leading-relaxed text-amber-50 shadow-[0_12px_40px_rgba(0,0,0,0.45)] backdrop-blur-md">
+                      {inviteLine}
+                    </p>
+                  )}
+
+                  {i === activeChapter && (
+                    <p className="mb-4 max-w-xl text-sm italic leading-relaxed text-white/75 drop-shadow-[0_2px_16px_rgba(0,0,0,0.65)]">
+                      {chapterQuote}
+                    </p>
+                  )}
+
+                  <p
+                    className={`font-mono text-[10px] font-black uppercase tracking-[0.28em] ${
+                      visual.accent === 'amber'
+                        ? 'text-amber-300'
+                        : visual.accent === 'rose'
+                          ? 'text-rose-300'
+                          : visual.accent === 'emerald'
+                            ? 'text-emerald-300'
+                            : 'text-cyan-300'
+                    }`}
+                  >
+                    {ch.eyebrow}
+                  </p>
+                  <h1 className="mt-3 font-display text-4xl font-bold italic leading-[1.08] tracking-tight text-white drop-shadow-[0_4px_28px_rgba(0,0,0,0.75)] sm:text-5xl md:text-6xl">
+                    {ch.title}
+                  </h1>
+                  <p className="mt-5 max-w-xl text-base leading-relaxed text-slate-100/95 sm:text-lg">
+                    {ch.body}
+                  </p>
+                  {ch.accent && (
+                    <p className="mt-3 max-w-xl text-sm font-medium leading-relaxed text-cyan-100/90 sm:text-base">
+                      {ch.accent}
+                    </p>
+                  )}
+
+                  {ch.id === 'awakening' && (
+                    <ul className="mt-6 grid grid-cols-3 gap-2">
+                      {PASSPORT_DIMENSIONS.map((d) => (
+                        <li
+                          key={d.id}
+                          className="rounded-2xl border border-white/15 bg-black/45 px-3 py-3 backdrop-blur-md"
+                        >
+                          <p className="font-mono text-[9px] uppercase tracking-widest text-amber-300/90">
+                            {d.title}
+                          </p>
+                          <p className="mt-2 font-display text-3xl italic text-white">0</p>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+
+                  {ch.id === 'evolution' && (
+                    <ol className="mt-6 flex gap-2 overflow-x-auto pb-1">
+                      {JOURNEY_STEPS.map((step, si) => (
+                        <li
+                          key={step.id}
+                          className="min-w-[7.5rem] shrink-0 rounded-2xl border border-white/12 bg-black/45 px-3 py-3 backdrop-blur-md"
+                        >
+                          <span className="font-mono text-[9px] tracking-widest text-emerald-300/80">
+                            0{si + 1}
+                          </span>
+                          <p className="mt-1.5 text-sm font-semibold text-white">{step.title}</p>
+                        </li>
+                      ))}
+                    </ol>
+                  )}
+
+                  <div className="mt-8 flex flex-wrap items-center gap-3">
+                    {isLast ? (
+                      <button
+                        type="button"
+                        onClick={onBuildPassport}
+                        className="inline-flex items-center justify-center gap-2 rounded-2xl bg-cyan-400 px-6 py-3.5 font-mono text-xs font-black uppercase tracking-wider text-black shadow-[0_0_48px_rgba(34,211,238,0.45)] hover:bg-cyan-300 cursor-pointer"
+                      >
+                        <Sparkles className="h-4 w-4" />
+                        {SLOGANS.ctaPassport}
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => scrollToChapter(i + 1)}
+                        className="inline-flex items-center justify-center gap-2 rounded-2xl bg-white px-6 py-3.5 font-mono text-xs font-black uppercase tracking-wider text-black hover:bg-cyan-100 cursor-pointer"
+                      >
+                        Scroll onward
+                        <ArrowDown className="h-4 w-4" />
+                      </button>
+                    )}
+                    {i >= 2 && (
+                      <button
+                        type="button"
+                        onClick={goExplore}
+                        className="inline-flex items-center gap-2 px-3 py-2 font-mono text-[10px] uppercase tracking-wider text-slate-300/80 hover:text-white cursor-pointer"
+                      >
+                        {SLOGANS.ctaExplore}
+                        <ArrowRight className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+                  </div>
+                </motion.div>
+              </section>
+            );
+          })}
         </div>
+
+        <footer className="pointer-events-none fixed inset-x-0 bottom-0 z-30 flex items-center justify-between gap-3 px-5 pb-[max(1rem,env(safe-area-inset-bottom))] pt-8 bg-gradient-to-t from-[#050608] via-[#050608]/85 to-transparent md:px-10">
+          <button
+            type="button"
+            onClick={() => scrollToChapter(Math.max(0, activeChapter - 1))}
+            disabled={activeChapter === 0}
+            className="pointer-events-auto inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-black/40 px-3 py-2 font-mono text-[10px] uppercase tracking-wider text-slate-300 backdrop-blur-md hover:text-white disabled:opacity-30 disabled:pointer-events-none cursor-pointer"
+          >
+            <ArrowLeft className="h-3.5 w-3.5" />
+            Back
+          </button>
+          <p className="pointer-events-none font-mono text-[9px] uppercase tracking-[0.22em] text-slate-400">
+            {activeChapter + 1} / {STORY_CHAPTERS.length}
+          </p>
+          {activeChapter >= lastIndex ? (
+            <button
+              type="button"
+              onClick={onBuildPassport}
+              className="pointer-events-auto inline-flex items-center gap-1.5 rounded-xl bg-cyan-400 px-3.5 py-2 font-mono text-[10px] font-black uppercase tracking-wider text-black cursor-pointer"
+            >
+              Begin
+              <Sparkles className="h-3.5 w-3.5" />
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => scrollToChapter(activeChapter + 1)}
+              className="pointer-events-auto inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-black/40 px-3 py-2 font-mono text-[10px] uppercase tracking-wider text-slate-200 backdrop-blur-md hover:text-white cursor-pointer"
+            >
+              Next
+              <ArrowRight className="h-3.5 w-3.5" />
+            </button>
+          )}
+        </footer>
       </div>
     );
   }
@@ -263,7 +348,7 @@ export default function HumanEconomyLanding({ onBuildPassport, onContinueSecure 
             type="button"
             onClick={() => {
               setMode('story');
-              setChapter(0);
+              setActiveChapter(0);
             }}
             className="inline-flex items-center gap-1.5 text-[10px] font-mono uppercase tracking-wider text-slate-500 hover:text-cyan-300 cursor-pointer"
           >
@@ -287,7 +372,8 @@ export default function HumanEconomyLanding({ onBuildPassport, onContinueSecure 
               {SLOGANS.ctaPassport}
             </button>
           </div>
-          <div className="mt-8 max-w-xl space-y-4">
+          <div className="mt-8 max-w-2xl space-y-4">
+            <OgShareDeck />
             <MakeItRainDeck />
             <FarcasterCastDeck />
           </div>

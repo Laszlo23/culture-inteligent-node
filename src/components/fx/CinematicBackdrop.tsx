@@ -15,7 +15,7 @@ const SOURCES: Record<AtmosphereVariant, { mp4: string; poster?: string }> = {
   /** Soft Mind/Machine wash — single quiet plate (no dual video stack) */
   duality: {
     mp4: '/atmosphere/facility-grid.mp4',
-    poster: '/atmosphere/arena-hero.png',
+    poster: '/atmosphere/arena-hero.webp',
   },
 };
 

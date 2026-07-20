@@ -5,6 +5,7 @@
 import { BRAND } from './brand-slogans';
 import type { HumanScores } from './human-economy';
 import { buildFarcasterComposeUrl } from './farcaster';
+import { nextOgPack, withRotatingOg } from './og-share';
 
 export type PassportSharePayload = {
   name: string;
@@ -79,10 +80,14 @@ export function passportShareUrl(payload: PassportSharePayload, baseUrl?: string
   return `${base}?passport=${encodeURIComponent(code)}`;
 }
 
-export function buildPassportShareText(payload: PassportSharePayload, url: string): string {
+export function buildPassportShareText(
+  payload: PassportSharePayload,
+  url: string,
+  opts?: { rotateImage?: boolean }
+): string {
   const name = payload.name.replace(/^@/, '');
   const creativity = payload.scores.creativity ?? payload.scores.builder;
-  return [
+  const base = [
     `${name}`,
     `Human Value Score: ${payload.scores.humanValue}`,
     '',
@@ -95,11 +100,16 @@ export function buildPassportShareText(payload: PassportSharePayload, url: strin
     'See my Human Passport',
     url,
   ].join('\n');
+  if (opts?.rotateImage === false) return base;
+  return withRotatingOg({ text: base, embedPage: url, appendImageLink: true }).text;
 }
 
 export function buildPassportCastCompose(payload: PassportSharePayload, baseUrl?: string): string {
   const url = passportShareUrl(payload, baseUrl);
-  return buildFarcasterComposeUrl(buildPassportShareText(payload, url), url);
+  const pack = nextOgPack();
+  // Plain text (image is an embed — don't double-append link)
+  const text = buildPassportShareText(payload, url, { rotateImage: false });
+  return buildFarcasterComposeUrl(text, url, pack.imageUrl);
 }
 
 export function achievementsFromScores(scores: HumanScores): string[] {

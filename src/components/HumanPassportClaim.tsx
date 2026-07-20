@@ -20,16 +20,18 @@ import {
   inviteWelcomeLine,
 } from '../lib/community-invite';
 import { copyTextFallback } from '../lib/culture-broadcast';
+import { withRotatingOg } from '../lib/og-share';
 import { sendAttentionProofMemo } from '../lib/poa-chain';
 import { track } from '../lib/attention-metrics';
 import { inviteCodeFromWallet, reportGrowthEvent } from '../lib/growth-loop';
 import { CinematicBackdrop } from './fx';
 import { useSound } from '../lib/sound/SoundContext';
 import FarcasterCastButton from './FarcasterCastButton';
+import type { SessionWalletType } from '../lib/wallet/types';
 
 type Props = {
   walletAddress: string;
-  walletType: 'extension' | 'local';
+  walletType: SessionWalletType;
   displayName?: string;
   inviteCode?: string | null;
   addLog: (message: string, type: 'info' | 'success' | 'warn' | 'system') => void;
@@ -94,7 +96,8 @@ export default function HumanPassportClaim({
 
   const invite = async () => {
     try {
-      const post = buildMemberInvitePost({ displayName, walletAddress });
+      const base = buildMemberInvitePost({ displayName, walletAddress });
+      const post = withRotatingOg({ text: base, appendImageLink: true }).text;
       await copyTextFallback(post);
       const first = !hasSpreadLove(walletAddress);
       markSpreadLove(walletAddress);

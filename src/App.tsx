@@ -26,8 +26,15 @@ import Treasury from './components/Treasury';
 import MemberProfile from './components/MemberProfile';
 import Leaderboard from './components/Leaderboard';
 import NftGallery from './components/nft/NftGallery';
+import DashboardNftDeck from './components/nft/DashboardNftDeck';
 import { NFT_POSTERS } from './lib/nft-media';
 import OnboardingModal from './components/OnboardingModal';
+import AttentionShareModal from './components/AttentionShareModal';
+import {
+  markAttentionShareShown,
+  pickAttentionShareTask,
+  type AttentionShareTask,
+} from './lib/attention-share-prompt';
 import AuthPortal, { AuthAutoStart } from './components/AuthPortal';
 import EconomyStatusBanner, { EconomyStatus } from './components/EconomyStatusBanner';
 import AdminPanel from './components/AdminPanel';
@@ -107,6 +114,8 @@ import {
   readFirstContribution,
 } from './lib/first-contribution';
 import { computeHumanScores } from './lib/human-economy';
+import { pickQuote } from './lib/motivating-quotes';
+import { resolveProgressTitle } from './lib/progress-title';
 import { decodePassportShare } from './lib/passport-share';
 import {
   captureInviteFromUrl,
@@ -128,6 +137,7 @@ import {
   markCultureBroadcastSeen,
   shareCultureText,
 } from './lib/culture-broadcast';
+import { withRotatingOg } from './lib/og-share';
 import { HearingModeContext } from './lib/hearing/context';
 import { dispatchHearingSessionCommand } from './lib/hearing/session-bridge';
 import {
@@ -479,7 +489,7 @@ export default function App() {
     username: string;
     email: string;
     walletAddress?: string;
-    walletType?: 'extension' | 'local';
+    walletType?: import('./lib/wallet/types').SessionWalletType;
   } | null>(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('solana_current_user_session_v1');
@@ -556,6 +566,10 @@ export default function App() {
   const [showCultureBroadcast, setShowCultureBroadcast] = useState(
     () => !hasSeenCultureBroadcast()
   );
+  const [attentionShareTask, setAttentionShareTask] = useState<AttentionShareTask | null>(
+    null
+  );
+  const [showAttentionShare, setShowAttentionShare] = useState(false);
 
   const dismissStoryToAuth = (auto: AuthAutoStart = null) => {
     dismissStory();
@@ -594,6 +608,14 @@ export default function App() {
       if (stats) setLoopConnections(stats.connections);
     });
   }, [currentUser?.walletAddress]);
+
+  // After a return greeting, room changes rotate into motivating quotes
+  const prevMotivationRoom = useRef(activeRoom);
+  useEffect(() => {
+    if (prevMotivationRoom.current === activeRoom) return;
+    prevMotivationRoom.current = activeRoom;
+    setReturnGreeting(null);
+  }, [activeRoom]);
 
   useEffect(() => {
     if (!currentUser?.walletAddress) {
@@ -650,7 +672,7 @@ export default function App() {
       }
       await ensureWalletApiSession({
         walletAddress: currentUser.walletAddress,
-        walletType: currentUser.walletType === 'extension' ? 'extension' : 'local',
+        walletType: currentUser.walletType,
         localKeypair,
       });
       setApiSessionMissing(false);
@@ -726,7 +748,7 @@ export default function App() {
     username: string;
     email: string;
     walletAddress?: string;
-    walletType?: 'extension' | 'local';
+    walletType?: import('./lib/wallet/types').SessionWalletType;
   }) => {
     setCurrentUser(user);
     localStorage.setItem('solana_current_user_session_v1', JSON.stringify(user));
@@ -816,6 +838,35 @@ export default function App() {
   const focusPinnedRef = useRef(false);
   const focusModeRef = useRef(focusMode);
   focusModeRef.current = focusMode;
+
+  // Attention share modal — one social task after the member is in the workspace
+  useEffect(() => {
+    if (!currentUser) return;
+    if (firstRitualPending || !hasCompletedFirstContribution()) return;
+    if (focusMode || showCultureBroadcast || showStory || passportPending) return;
+    if (showAttentionShare) return;
+
+    const delayMs = 12_000;
+    const timer = window.setTimeout(() => {
+      if (focusModeRef.current) return;
+      const task = pickAttentionShareTask();
+      if (!task) return;
+      markAttentionShareShown(task.id);
+      setAttentionShareTask(task);
+      setShowAttentionShare(true);
+      track('attention_share_show', { task: task.id });
+    }, delayMs);
+
+    return () => window.clearTimeout(timer);
+  }, [
+    currentUser?.walletAddress,
+    firstRitualPending,
+    focusMode,
+    showCultureBroadcast,
+    showStory,
+    passportPending,
+    showAttentionShare,
+  ]);
 
   const setFocusMode = useCallback((on: boolean, opts?: { pinned?: boolean; source?: string }) => {
     if (opts?.pinned != null) focusPinnedRef.current = opts.pinned;
@@ -1467,6 +1518,18 @@ export default function App() {
     spreadDone,
   ]);
 
+  const progressTitle = useMemo(() => {
+    const wallet = currentUser?.walletAddress;
+    return resolveProgressTitle(passportScores, {
+      firstContribution: hasCompletedFirstContribution(),
+      passportClaimed: wallet ? hasHumanPassport(wallet) : false,
+    });
+  }, [passportScores, currentUser?.walletAddress, firstRitualPending, fuelWin]);
+
+  /** One strip: return greeting wins; otherwise room/phase quote */
+  const loopMotivation =
+    returnGreeting ?? pickQuote(`${activeRoom}:${navPhase}`);
+
   const enterHearingFromLoop = () => {
     markHearTouched();
     setHearTouched(true);
@@ -1596,10 +1659,13 @@ export default function App() {
       addLog('Connect a wallet to copy your invite.', 'warn');
       return;
     }
-    const post = buildMemberInvitePost({
-      displayName: currentUser.username,
-      walletAddress: currentUser.walletAddress,
-    });
+    const post = withRotatingOg({
+      text: buildMemberInvitePost({
+        displayName: currentUser.username,
+        walletAddress: currentUser.walletAddress,
+      }),
+      appendImageLink: true,
+    }).text;
     void navigator.clipboard?.writeText(post).then(async () => {
       const first = !hasSpreadLove(currentUser.walletAddress!);
       markSpreadLove(currentUser.walletAddress!);
@@ -1916,7 +1982,7 @@ export default function App() {
         <div className="min-h-screen bg-[#050608] text-slate-300 font-sans selection:bg-cyan-500/30 selection:text-cyan-300 relative overflow-hidden">
           <HumanPassportClaim
             walletAddress={currentUser.walletAddress}
-            walletType={currentUser.walletType === 'extension' ? 'extension' : 'local'}
+            walletType={currentUser.walletType}
             displayName={currentUser.username}
             inviteCode={inviteCode}
             addLog={addLog}
@@ -1979,12 +2045,13 @@ export default function App() {
       }`}
     >
 
-      {/* Background Atmosphere — quiet single-plate field */}
+      {/* Background Atmosphere — presentation-grade field */}
       <div className="absolute inset-0 pointer-events-none z-0 overflow-hidden">
         <AmbientField
           variant={firstRitualPending ? 'ritual' : 'duality'}
-          dim={!firstRitualPending || focusMode}
+          dim={focusMode}
         />
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_50%_at_50%_-10%,rgba(34,211,238,0.08),transparent_55%),radial-gradient(ellipse_60%_40%_at_90%_20%,rgba(245,158,11,0.06),transparent_50%)]" />
       </div>
 
       {focusMode && (
@@ -2108,8 +2175,14 @@ export default function App() {
 
       {/* Top bar — slim on mobile; desktop keeps facility metrics */}
       <header className="border border-white/8 bg-[#0a0a0c]/75 backdrop-blur-xl sticky top-2 z-40 mx-3 sm:mx-4 mt-2 px-3 sm:px-6 py-3 sm:py-4 rounded-2xl flex items-center justify-between gap-3 shadow-[0_12px_40px_rgba(0,0,0,0.45)]">
-        {/* Left branding */}
-        <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+        {/* Left branding — tap home */}
+        <button
+          type="button"
+          onClick={() => handleNavNavigate('map')}
+          title="Home"
+          aria-label="Go to home"
+          className="flex items-center gap-2.5 sm:gap-3 min-w-0 text-left cursor-pointer rounded-xl hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/50"
+        >
           <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-cyan-500/20 border border-cyan-500/30 flex items-center justify-center relative overflow-hidden shrink-0">
             <div className="absolute inset-0 bg-cyan-400/10 animate-pulse" />
             <Cpu className="w-4 h-4 sm:w-5 sm:h-5 text-cyan-400 relative z-10" />
@@ -2125,7 +2198,7 @@ export default function App() {
               </span>
             </h1>
           </div>
-        </div>
+        </button>
 
         {/* Desktop facility metrics — hidden during loop sanctuary + phone */}
         {!loopSanctuary && (
@@ -2171,12 +2244,13 @@ export default function App() {
         </div>
         )}
 
-        {/* Actions — phone: Hear + bell only; desktop: full toolkit */}
+        {/* Actions — Menu always available; Hear + bell on all viewports */}
         <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
           {currentUser && (
-            <div className="hidden md:flex items-center gap-2 px-3 py-1.5 bg-cyan-950/20 border border-cyan-500/20 rounded-lg font-mono text-[10px] text-cyan-400 font-bold uppercase" title={currentUser.walletAddress || currentUser.username}>
+            <div className="hidden md:flex items-center gap-2 px-3 py-1.5 bg-cyan-950/20 border border-cyan-500/20 rounded-lg font-mono text-[10px] text-cyan-400 font-bold uppercase" title={`@${currentUser.username}${currentUser.walletAddress ? ` · ${currentUser.walletAddress}` : ''}`}>
               <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
-              <span>@{currentUser.username}</span>
+              <span className="normal-case tracking-wide text-cyan-200">{progressTitle.title}</span>
+              <span className="text-slate-500 font-normal">@{currentUser.username}</span>
               {currentUser.walletAddress && hasHumanPassport(currentUser.walletAddress) && (
                 <span className="text-amber-400/90 border border-amber-500/30 bg-amber-500/10 px-1.5 py-0.5 rounded" title="Human Passport claimed">
                   Passport
@@ -2192,10 +2266,13 @@ export default function App() {
                   type="button"
                   title="Copy your Human Passport invite"
                   onClick={() => {
-                    const post = buildMemberInvitePost({
-                      displayName: currentUser.username,
-                      walletAddress: currentUser.walletAddress!,
-                    });
+                    const post = withRotatingOg({
+                      text: buildMemberInvitePost({
+                        displayName: currentUser.username,
+                        walletAddress: currentUser.walletAddress!,
+                      }),
+                      appendImageLink: true,
+                    }).text;
                     void navigator.clipboard?.writeText(post).then(async () => {
                       const first = !hasSpreadLove(currentUser.walletAddress!);
                       markSpreadLove(currentUser.walletAddress!);
@@ -2311,19 +2388,17 @@ export default function App() {
           </button>
           )}
 
-          {!loopSanctuary && (
           <button
             type="button"
             onClick={() => setMenuOpen(true)}
             title="Open navigation"
-            className={`hidden md:flex items-center gap-1.5 px-2.5 py-1.5 bg-white/5 border border-white/10 hover:border-white/20 text-slate-400 hover:text-slate-200 rounded-lg font-mono text-[10px] tracking-wider uppercase font-black transition-all cursor-pointer ${
+            className={`flex items-center gap-1.5 px-2.5 py-1.5 bg-white/5 border border-white/10 hover:border-white/20 text-slate-400 hover:text-slate-200 rounded-lg font-mono text-[10px] tracking-wider uppercase font-black transition-all cursor-pointer ${
               focusMode ? 'opacity-40' : ''
             }`}
           >
             <Menu className="w-4 h-4" />
-            <span>More</span>
+            <span className="hidden sm:inline">More</span>
           </button>
-          )}
 
           {!firstRitualPending && navPhase === 'open' && (
             <button
@@ -2481,12 +2556,13 @@ export default function App() {
                   flags={loopFlags}
                   phase={navPhase === 'ritual' ? 'ritual' : 'guided'}
                   username={currentUser?.username}
+                  progressTitle={progressTitle.title}
                   energy={state.energy}
                   streak={dailyStreak}
                   connections={loopConnections}
                   fuelWin={fuelWin}
                   zenNote={zenNote}
-                  returnGreeting={returnGreeting}
+                  returnGreeting={loopMotivation}
                   passportScores={passportScores}
                   cta={{
                     label: navNextStep.label,
@@ -2515,6 +2591,15 @@ export default function App() {
                     }}
                   />
                 )}
+                {!firstRitualPending && (
+                  <DashboardNftDeck
+                    state={state}
+                    username={currentUser?.username}
+                    compact
+                    onOpenGallery={() => changeRoom('gallery')}
+                    onOpenReactor={() => changeRoom('reactor')}
+                  />
+                )}
                 </>
               ) : (
               <>
@@ -2530,6 +2615,8 @@ export default function App() {
               {currentUser && (
                 <HumanPassportDashboard
                   username={currentUser.username}
+                  progressTitle={progressTitle.title}
+                  progressBlurb={progressTitle.blurb}
                   avatarUrl={state.profile?.avatarUrl}
                   walletAddress={currentUser.walletAddress}
                   state={state}
@@ -2556,20 +2643,27 @@ export default function App() {
                 <motion.div
                   initial={{ opacity: 0, y: 8 }}
                   animate={{ opacity: 1, y: 0 }}
-                  className="relative overflow-hidden rounded-2xl border border-rose-500/30 bg-gradient-to-r from-rose-950/50 via-[#0a080c]/90 to-amber-950/30 px-4 py-3.5 flex flex-wrap items-center justify-between gap-3"
+                  className="relative overflow-hidden rounded-2xl border border-rose-400/35 shadow-[0_20px_60px_rgba(0,0,0,0.45)] px-4 py-4 md:px-5 flex flex-wrap items-center justify-between gap-3"
                 >
-                  <div className="min-w-0 flex items-start gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-rose-500/15 border border-rose-400/40 flex items-center justify-center shrink-0">
-                      <Share2 className="w-4 h-4 text-rose-300" />
+                  <img
+                    src="/campaign/failure-curve.webp"
+                    alt=""
+                    className="absolute inset-0 h-full w-full object-cover opacity-45"
+                    draggable={false}
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-r from-[#0a0608]/90 via-[#0a080c]/75 to-amber-950/40" />
+                  <div className="relative z-10 min-w-0 flex items-start gap-3">
+                    <div className="w-11 h-11 rounded-2xl bg-rose-500/20 border border-rose-300/45 flex items-center justify-center shrink-0 backdrop-blur-md">
+                      <Share2 className="w-4 h-4 text-rose-200" />
                     </div>
                     <div className="min-w-0">
-                      <p className="font-mono text-[9px] font-black tracking-[0.22em] uppercase text-rose-300/90">
+                      <p className="font-mono text-[9px] font-black tracking-[0.22em] uppercase text-rose-300">
                         Campaign · Hook Loop
                       </p>
-                      <p className="mt-0.5 text-sm font-semibold text-white leading-snug">
+                      <p className="mt-1 font-display text-lg font-bold italic text-white leading-snug">
                         {SLOGANS.hookLoop}
                       </p>
-                      <p className="mt-0.5 text-[11px] text-slate-400 leading-relaxed">
+                      <p className="mt-0.5 text-[12px] text-slate-200/85 leading-relaxed">
                         {SLOGANS.hookLoopShare}
                       </p>
                     </div>
@@ -2580,7 +2674,7 @@ export default function App() {
                       setPendingTruthId(null);
                       changeRoom('hook-loop');
                     }}
-                    className="px-3.5 py-2 rounded-lg bg-rose-500 hover:bg-rose-400 text-black font-mono text-[10px] font-black uppercase tracking-wider cursor-pointer shrink-0"
+                    className="relative z-10 px-4 py-2.5 rounded-2xl bg-white hover:bg-rose-100 text-black font-mono text-[10px] font-black uppercase tracking-wider cursor-pointer shrink-0"
                   >
                     Enter loop
                   </button>
@@ -2849,104 +2943,36 @@ export default function App() {
                 </>
               )}
 
-              {/* Your facility — rigs wake when your fuel is live */}
+              {/* Living NFT deck — owned rigs or showcase skins */}
               {!firstRitualPending && (
-              <div className="p-5 md:p-6 bg-[#0a0a0c] border border-cyan-500/15 rounded-2xl relative overflow-hidden shadow-2xl">
-                <div className="absolute inset-0 bg-cyber-grid bg-[size:24px_24px] opacity-[0.05]" />
-                <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-5">
-                  <div className="min-w-0 max-w-xl">
-                    <span className="text-[10px] font-mono text-cyan-400 tracking-[0.2em] block uppercase font-bold">
-                      {currentUser
-                        ? `@${currentUser.username.replace(/^@/, '')} · your facility`
-                        : 'Your facility'}
-                    </span>
-                    <h2 className="font-display text-2xl md:text-3xl font-extrabold italic text-white leading-tight mt-1.5">
-                      {state.energy > 0 ? (
-                        <>
-                          Your rigs can wake —{' '}
-                          <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-300 to-amber-300">
-                            Impact is live
-                          </span>
-                        </>
-                      ) : (
-                        <>
-                          Your art stays still until{' '}
-                          <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-300 to-amber-300">
-                            you earn Impact
-                          </span>
-                        </>
-                      )}
-                    </h2>
-                    <p className="text-xs text-slate-400 font-sans mt-2 leading-relaxed">
-                      Academy fills your reactor. Owned NFTs loop their feed only while your
-                      Impact Score lasts.
-                    </p>
-                    <div className="flex flex-wrap gap-2 mt-4 font-mono text-xs">
-                      <button
-                        type="button"
-                        onClick={() => changeRoom('reactor')}
-                        className="px-4 py-2.5 bg-cyan-500 hover:bg-cyan-400 text-black font-black uppercase tracking-wider rounded-xl cursor-pointer"
-                      >
-                        Your Reactor
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => changeRoom('gallery')}
-                        className="px-4 py-2.5 bg-amber-500/15 hover:bg-amber-500/25 border border-amber-400/35 text-amber-100 font-black uppercase tracking-wider rounded-xl cursor-pointer inline-flex items-center gap-2"
-                      >
-                        <Images className="w-3.5 h-3.5" />
-                        Your Gallery
-                      </button>
-                    </div>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={() => changeRoom('gallery')}
-                    className="w-full md:w-56 shrink-0 group cursor-pointer text-left"
-                  >
-                    <div className="grid grid-cols-2 gap-1.5">
-                      {(Object.entries(NFT_POSTERS) as [string, string][]).slice(0, 4).map(([key, src], i) => (
-                        <div
-                          key={key}
-                          className={`relative aspect-square rounded-lg overflow-hidden border border-white/10 bg-black/40 ${
-                            i === 0 && state.energy > 0 ? 'ring-1 ring-cyan-400/50' : ''
-                          }`}
-                        >
-                          <img
-                            src={src}
-                            alt={`${key} miner`}
-                            className={`h-full w-full object-cover transition duration-700 group-hover:scale-105 ${
-                              state.energy > 0 ? 'brightness-110' : 'brightness-75'
-                            }`}
-                            draggable={false}
-                          />
-                          {state.energy > 0 && (
-                            <div className="nft-mining-feed absolute inset-0 pointer-events-none opacity-80">
-                              <div className="nft-mining-scan" />
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                    <p className="mt-2 text-[9px] font-mono text-slate-500 uppercase tracking-widest text-center group-hover:text-cyan-400 transition-colors">
-                      {state.energy > 0 ? 'Your feeds live' : 'Your art · waiting on fuel'}
-                    </p>
-                  </button>
-                </div>
-              </div>
+                <DashboardNftDeck
+                  state={state}
+                  username={currentUser?.username}
+                  onOpenGallery={() => changeRoom('gallery')}
+                  onOpenReactor={() => changeRoom('reactor')}
+                />
               )}
 
               {/* Sectors — filtered to Academy until First Spark */}
               <div>
-                <h3 className="font-mono text-[10px] font-bold text-slate-500 tracking-[0.2em] uppercase mb-4 flex items-center gap-2">
-                  <LayoutGrid className="w-4 h-4 text-cyan-400" />
-                  {firstRitualPending
-                    ? 'YOUR NEXT ROOM · ACADEMY'
-                    : currentUser
-                      ? `@${currentUser.username.replace(/^@/, '')} · FACILITY MAP`
-                      : 'FACILITY SCHEMATIC'}
-                </h3>
+                <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
+                  <div>
+                    <p className="font-mono text-[9px] font-black tracking-[0.28em] uppercase text-cyan-300/90">
+                      Facility map
+                    </p>
+                    <h3 className="mt-1 font-display text-xl md:text-2xl font-extrabold italic text-white tracking-tight flex items-center gap-2">
+                      <LayoutGrid className="w-5 h-5 text-cyan-400" />
+                      {firstRitualPending
+                        ? 'Your next room · Academy'
+                        : currentUser
+                          ? `@${currentUser.username.replace(/^@/, '')} · rooms`
+                          : 'Facility schematic'}
+                    </h3>
+                  </div>
+                  <p className="text-[11px] text-slate-400 max-w-xs leading-relaxed">
+                    Enter a sector — art wakes as you focus.
+                  </p>
+                </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                   {state.rooms
@@ -3081,7 +3107,7 @@ export default function App() {
                     className="border border-amber-500/25 hover:border-amber-400/50 rounded-2xl p-5 shadow-xl flex flex-col justify-between overflow-hidden relative min-h-[210px] transition-all duration-300 group"
                   >
                     <img
-                      src="/atmosphere/arena-hero.png"
+                      src="/atmosphere/arena-hero.webp"
                       alt=""
                       className="absolute inset-0 w-full h-full object-cover brightness-[0.4] group-hover:brightness-[0.5] group-hover:scale-105 transition-all duration-700"
                       draggable={false}
@@ -3413,6 +3439,8 @@ export default function App() {
               {activeRoom === 'passport' && currentUser && (
                 <HumanPassportDashboard
                   username={currentUser.username}
+                  progressTitle={progressTitle.title}
+                  progressBlurb={progressTitle.blurb}
                   avatarUrl={state.profile?.avatarUrl}
                   walletAddress={currentUser.walletAddress}
                   state={state}
@@ -3528,9 +3556,7 @@ export default function App() {
       <InstallPrompt />
 
       <footer
-        className={`${
-          loopSanctuary ? 'hidden' : 'hidden md:flex'
-        } border-t border-white/5 bg-[#0a0a0c]/80 py-3 px-5 mx-4 mb-2 rounded-2xl text-slate-500 flex-col gap-2 shadow-lg z-10 relative backdrop-blur-md transition-opacity ${
+        className={`hidden md:flex border-t border-white/5 bg-[#0a0a0c]/80 py-3 px-5 mx-4 mb-2 rounded-2xl text-slate-500 flex-col gap-2 shadow-lg z-10 relative backdrop-blur-md transition-opacity ${
           focusMode ? 'opacity-25 pointer-events-none' : ''
         }`}
       >
@@ -3547,46 +3573,40 @@ export default function App() {
             >
               {navNextStep.label}
             </button>
-            {!firstRitualPending && (
-              <>
-                <span className="text-white/10">·</span>
-                <button
-                  type="button"
-                  onClick={() => setMenuOpen(true)}
-                  className="hover:text-cyan-400 transition-colors cursor-pointer uppercase"
-                >
-                  More
-                </button>
-              </>
-            )}
+            <span className="text-white/10">·</span>
+            <button
+              type="button"
+              onClick={() => setMenuOpen(true)}
+              className="hover:text-cyan-400 transition-colors cursor-pointer uppercase"
+            >
+              More
+            </button>
           </div>
         </div>
-        {navPhase === 'open' && (
-          <div className="flex flex-wrap justify-center gap-x-4 gap-y-1 border-t border-white/[0.04] pt-2 text-[10px] font-sans tracking-normal text-slate-600">
-            <button
-              type="button"
-              onClick={() => changeRoom('legal-privacy')}
-              className="hover:text-slate-400 transition-colors cursor-pointer"
-            >
-              Privacy
-            </button>
-            <button
-              type="button"
-              onClick={() => changeRoom('legal-terms')}
-              className="hover:text-slate-400 transition-colors cursor-pointer"
-            >
-              Terms
-            </button>
-            <button
-              type="button"
-              onClick={() => changeRoom('legal-disclaimer')}
-              className="hover:text-slate-400 transition-colors cursor-pointer"
-            >
-              Disclaimer
-            </button>
-            <span className="text-slate-700">Building Culture · Solana Devnet</span>
-          </div>
-        )}
+        <div className="flex flex-wrap justify-center gap-x-4 gap-y-1 border-t border-white/[0.04] pt-2 text-[10px] font-sans tracking-normal text-slate-600">
+          <button
+            type="button"
+            onClick={() => changeRoom('legal-privacy')}
+            className="hover:text-slate-400 transition-colors cursor-pointer"
+          >
+            Privacy
+          </button>
+          <button
+            type="button"
+            onClick={() => changeRoom('legal-terms')}
+            className="hover:text-slate-400 transition-colors cursor-pointer"
+          >
+            Terms
+          </button>
+          <button
+            type="button"
+            onClick={() => changeRoom('legal-disclaimer')}
+            className="hover:text-slate-400 transition-colors cursor-pointer"
+          >
+            Disclaimer
+          </button>
+          <span className="text-slate-700">Building Culture · Solana Devnet</span>
+        </div>
       </footer>
 
       {/* Notifications panel — fixed to viewport so mobile isn't clipped by header overflow */}
@@ -3761,6 +3781,20 @@ export default function App() {
           />
         )}
       </AnimatePresence>
+
+      <AttentionShareModal
+        open={showAttentionShare}
+        task={attentionShareTask}
+        onClose={() => {
+          setShowAttentionShare(false);
+        }}
+        onCompleted={(task) => {
+          addLog(
+            `ATTENTION SPREAD: ${task.title} — reputation compounds when you lift others.`,
+            'success'
+          );
+        }}
+      />
 
       <AttentionMetricsPanel
         open={showMetricsPanel}

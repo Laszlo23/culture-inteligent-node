@@ -22,7 +22,7 @@ export const SECTOR_ART: Record<string, SectorArt> = {
     hook: 'How long can you hold focus?',
   },
   workshop: {
-    src: '/hardware/gpu.png',
+    src: '/hardware/gpu.webp',
     accent: 'fuchsia',
     hook: 'What if hardware learned with you?',
   },
@@ -32,12 +32,12 @@ export const SECTOR_ART: Record<string, SectorArt> = {
     hook: 'Ready for your First Spark?',
   },
   ai: {
-    src: '/hardware/chip.png',
+    src: '/hardware/chip.webp',
     accent: 'pink',
     hook: 'Who mines while you sleep?',
   },
   treasury: {
-    src: '/hardware/battery.png',
+    src: '/hardware/battery.webp',
     accent: 'emerald',
     hook: 'What did attention earn today?',
   },

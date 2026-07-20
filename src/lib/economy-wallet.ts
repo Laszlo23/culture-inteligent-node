@@ -3,37 +3,32 @@
  */
 
 import { Keypair } from '@solana/web3.js';
+import { readWalletSession } from './wallet/adapter';
+import { normalizeWalletProvider, type SessionWalletType } from './wallet/types';
 
 export type EconomyWalletCtx = {
   walletAddress: string;
-  walletType: 'extension' | 'local';
+  /**
+   * Legacy-compatible type for existing call sites.
+   * Phantom sessions surface as `extension`; OKX as `okx`.
+   */
+  walletType: 'extension' | 'local' | 'okx';
   localKeypair: Keypair | null;
 };
 
+function toEconomyWalletType(type?: SessionWalletType | string | null): 'extension' | 'local' | 'okx' {
+  const id = normalizeWalletProvider(type);
+  if (id === 'local') return 'local';
+  if (id === 'okx') return 'okx';
+  return 'extension';
+}
+
 export function resolveEconomyWallet(): EconomyWalletCtx | null {
-  try {
-    const raw = localStorage.getItem('solana_current_user_session_v1');
-    if (!raw) return null;
-    const session = JSON.parse(raw) as {
-      walletAddress?: string;
-      walletType?: 'extension' | 'local';
-    };
-    if (!session.walletAddress) return null;
-
-    let localKeypair: Keypair | null = null;
-    if (session.walletType === 'local') {
-      const secret = localStorage.getItem('solana_local_secret');
-      if (secret) {
-        localKeypair = Keypair.fromSecretKey(Uint8Array.from(JSON.parse(secret)));
-      }
-    }
-
-    return {
-      walletAddress: session.walletAddress,
-      walletType: session.walletType === 'local' ? 'local' : 'extension',
-      localKeypair,
-    };
-  } catch {
-    return null;
-  }
+  const snap = readWalletSession();
+  if (!snap) return null;
+  return {
+    walletAddress: snap.walletAddress,
+    walletType: toEconomyWalletType(snap.walletType),
+    localKeypair: snap.localKeypair,
+  };
 }

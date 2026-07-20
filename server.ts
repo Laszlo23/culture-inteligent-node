@@ -5,6 +5,16 @@ import nacl from "tweetnacl";
 import bs58Import from "bs58";
 import dotenv from "dotenv";
 import { createServer as createViteServer } from "vite";
+import { readFile } from "fs/promises";
+import {
+  OG_ASSET_VERSION,
+  buildMiniAppEmbedJson,
+  defaultOgImageUrl,
+  getOgPack,
+  isOgPackId,
+  versionedOgImage,
+  type OgPack,
+} from "./src/lib/og-share.ts";
 
 dotenv.config();
 
@@ -1509,6 +1519,81 @@ async function startServer() {
     }
   });
 
+  /** Inject pack-specific OG + fc:miniapp so each ?share= URL scrapes differently. */
+  function injectShareMeta(html: string, pack: OgPack | null): string {
+    const imageUrl = pack?.imageUrl ?? defaultOgImageUrl();
+    const title = pack
+      ? `${pack.title} — Building Culture`
+      : "Human value was never measured correctly — Building Culture";
+    const description = pack?.alt
+      ?? "The AI era needs a new measurement: what you learn, create, and contribute. Build your Human Passport.";
+    const pageUrl = pack?.embedPage ?? "https://mining.buildingcultureid.space/";
+    const mini = pack
+      ? buildMiniAppEmbedJson(pack)
+      : JSON.stringify({
+          version: "next",
+          imageUrl: versionedOgImage("/miniapp/hero-1200x630.png"),
+          button: {
+            title: "Build Passport",
+            action: {
+              type: "launch_miniapp",
+              name: "Building Culture",
+              url: "https://mining.buildingcultureid.space/?fc=1",
+              splashImageUrl: versionedOgImage("/miniapp/splash-200.png"),
+              splashBackgroundColor: "#050608",
+            },
+          },
+        });
+
+    let out = html;
+    out = out.replace(
+      /<meta property="og:url" content="[^"]*"\s*\/>/,
+      `<meta property="og:url" content="${pageUrl}" />`
+    );
+    out = out.replace(
+      /<meta property="og:title" content="[^"]*"\s*\/>/,
+      `<meta property="og:title" content="${title.replace(/"/g, "&quot;")}" />`
+    );
+    out = out.replace(
+      /(<meta\s+property="og:description"\s+content=")[^"]*("\s*\/>)/,
+      `$1${description.replace(/"/g, "&quot;")}$2`
+    );
+    out = out.replace(
+      /<meta property="og:image" content="[^"]*"\s*\/>/g,
+      `<meta property="og:image" content="${imageUrl}" />`
+    );
+    out = out.replace(
+      /<meta property="og:image:secure_url" content="[^"]*"\s*\/>/,
+      `<meta property="og:image:secure_url" content="${imageUrl}" />`
+    );
+    out = out.replace(
+      /<meta name="twitter:title" content="[^"]*"\s*\/>/,
+      `<meta name="twitter:title" content="${title.replace(/"/g, "&quot;")}" />`
+    );
+    out = out.replace(
+      /<meta name="twitter:image" content="[^"]*"\s*\/>/,
+      `<meta name="twitter:image" content="${imageUrl}" />`
+    );
+    out = out.replace(
+      /<meta\s+name="fc:miniapp"\s+content='[^']*'\s*\/>/,
+      `<meta name="fc:miniapp" content='${mini.replace(/'/g, "&#39;")}' />`
+    );
+    out = out.replace(
+      /<meta\s+name="fc:frame"\s+content='[^']*'\s*\/>/,
+      `<meta name="fc:frame" content='${mini.replace(/'/g, "&#39;")}' />`
+    );
+    // Cache-bust default asset URLs (avoid doubling ?v= when already versioned)
+    out = out.replace(
+      /https:\/\/mining\.buildingcultureid\.space\/og\.jpg(\?v=[^"&\s]*)?/g,
+      defaultOgImageUrl()
+    );
+    out = out.replace(
+      /https:\/\/mining\.buildingcultureid\.space\/miniapp\/hero-1200x630\.png(\?v=[^"&\s]*)?/g,
+      versionedOgImage("/miniapp/hero-1200x630.png")
+    );
+    return out;
+  }
+
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({
       server: { middlewareMode: true },
@@ -1517,12 +1602,35 @@ async function startServer() {
     app.use(vite.middlewares);
   } else {
     const distPath = path.join(process.cwd(), "dist");
-    app.use(express.static(distPath));
-    app.get("*", (req, res) => {
+    // Short cache on HTML so share scrapers pick up pack meta; long cache on versioned assets
+    // index: false — SPA shell must go through injectShareMeta (?share= packs).
+    app.use(
+      express.static(distPath, {
+        index: false,
+        setHeaders(res, filePath) {
+          if (filePath.endsWith(".html")) {
+            res.setHeader("Cache-Control", "public, max-age=60, must-revalidate");
+          } else if (/\/og\/|\bog\.(jpg|png)|miniapp\//.test(filePath)) {
+            res.setHeader("Cache-Control", "public, max-age=86400, stale-while-revalidate=604800");
+          }
+        },
+      })
+    );
+    app.get("*", async (req, res) => {
       if (req.path.startsWith("/api/")) {
         return res.status(404).json({ error: "API route not found" });
       }
-      res.sendFile(path.join(distPath, "index.html"));
+      try {
+        const raw = await readFile(path.join(distPath, "index.html"), "utf8");
+        const shareRaw = typeof req.query.share === "string" ? req.query.share : null;
+        const pack = isOgPackId(shareRaw) ? getOgPack(shareRaw) : null;
+        const html = injectShareMeta(raw, pack);
+        res.setHeader("Cache-Control", "public, max-age=60, must-revalidate");
+        res.type("html").send(html);
+      } catch (err) {
+        console.error("SPA shell failed", err);
+        res.sendFile(path.join(distPath, "index.html"));
+      }
     });
   }
 

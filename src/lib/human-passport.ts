@@ -5,9 +5,9 @@
 
 import { Keypair } from '@solana/web3.js';
 import bs58 from 'bs58';
-import nacl from 'tweetnacl';
 import { BRAND, SLOGANS } from './brand-slogans';
 import { PASSPORT_PRINCIPLES } from './human-economy';
+import type { SessionWalletType } from './wallet/types';
 
 export const HUMAN_PASSPORT_VERSION = 'human_passport_v1';
 export const HUMAN_PASSPORT_STORAGE_KEY = 'building_culture_human_passport_v1';
@@ -146,43 +146,23 @@ export function markSpreadLove(walletAddress: string): boolean {
 
 export async function claimHumanPassport(opts: {
   walletAddress: string;
-  walletType: 'extension' | 'local';
+  walletType: SessionWalletType;
   localKeypair?: Keypair | null;
 }): Promise<HumanPassportRecord> {
   const message = buildPassportMessage(opts.walletAddress);
   const messageBytes = new TextEncoder().encode(message);
 
-  let signature: string;
-  let demoUnsigned = false;
-
-  if (opts.walletType === 'local' && opts.localKeypair) {
-    const sig = nacl.sign.detached(messageBytes, opts.localKeypair.secretKey);
-    signature = bs58.encode(sig);
-  } else {
-    const provider = (
-      window as unknown as {
-        solana?: {
-          signMessage?: (
-            m: Uint8Array,
-            enc: string
-          ) => Promise<{ signature: Uint8Array }>;
-        };
-      }
-    ).solana;
-    if (provider?.signMessage) {
-      const signed = await provider.signMessage(messageBytes, 'utf8');
-      const sigBytes =
-        signed.signature instanceof Uint8Array
-          ? signed.signature
-          : new Uint8Array(signed.signature);
-      signature = bs58.encode(sigBytes);
-    } else if (opts.walletType === 'local') {
-      throw new Error('Secure ID missing — reload and continue again to claim.');
-    } else {
-      signature = `demo_passport_${opts.walletAddress.slice(0, 8)}`;
-      demoUnsigned = true;
-    }
-  }
+  const { signMessageForSession } = await import('./wallet/adapter');
+  const signed = await signMessageForSession({
+    walletType: opts.walletType,
+    walletAddress: opts.walletAddress,
+    localKeypair: opts.localKeypair,
+    messageBytes,
+  });
+  const signature = signed.demoUnsigned
+    ? `demo_passport_${opts.walletAddress.slice(0, 8)}`
+    : bs58.encode(signed.signatureBytes);
+  const demoUnsigned = signed.demoUnsigned;
 
   const record: HumanPassportRecord = {
     version: HUMAN_PASSPORT_VERSION,

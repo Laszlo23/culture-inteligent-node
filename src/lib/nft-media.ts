@@ -5,10 +5,10 @@
 export type NftSkinKey = 'obsidian' | 'helix' | 'reactor' | 'quantum';
 
 export const NFT_POSTERS: Record<NftSkinKey, string> = {
-  obsidian: '/nft/obsidian.png',
-  helix: '/nft/helix.png',
-  reactor: '/nft/reactor.png',
-  quantum: '/nft/quantum.png',
+  obsidian: '/nft/obsidian.webp',
+  helix: '/nft/helix.webp',
+  reactor: '/nft/reactor.webp',
+  quantum: '/nft/quantum.webp',
 };
 
 export function resolveNftPoster(imageKey: string): string {
