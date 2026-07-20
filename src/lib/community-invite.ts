@@ -10,6 +10,7 @@ export const COMMUNITY_LINKS = {
   live: BRAND.url,
   hearing: `${BRAND.url.replace(/\/?$/, '/')}?hear=1`,
   hookLoop: `${BRAND.url.replace(/\/?$/, '/')}?room=hook-loop&fc=1`,
+  trapId: `${BRAND.url.replace(/\/?$/, '/')}?room=trap-id&fc=1`,
   passport: `${BRAND.url.replace(/\/?$/, '/')}?room=passport&fc=1`,
   telegram: 'https://t.me/+4zFH7-2tyW0yOTBk',
   discord: 'https://discord.gg/geUpHt3eSb',

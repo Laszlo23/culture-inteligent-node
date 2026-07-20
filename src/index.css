@@ -416,3 +416,73 @@ h2.italic,
     animation: none;
   }
 }
+
+/* Human Value OS — living chrome */
+@keyframes livingDrift {
+  0% {
+    transform: translate3d(-2%, -1%, 0) scale(1);
+    background-position: 0% 40%;
+  }
+  50% {
+    transform: translate3d(2%, 1.5%, 0) scale(1.04);
+    background-position: 100% 60%;
+  }
+  100% {
+    transform: translate3d(-2%, -1%, 0) scale(1);
+    background-position: 0% 40%;
+  }
+}
+
+.living-drift {
+  background:
+    radial-gradient(ellipse 50% 40% at 20% 30%, rgba(34, 211, 238, 0.18), transparent 55%),
+    radial-gradient(ellipse 45% 35% at 80% 70%, rgba(245, 158, 11, 0.14), transparent 55%),
+    radial-gradient(ellipse 60% 50% at 50% 50%, rgba(244, 114, 182, 0.06), transparent 60%);
+  animation: livingDrift 18s ease-in-out infinite;
+  will-change: transform;
+  contain: strict;
+  transform: translateZ(0);
+}
+
+@keyframes livingMote {
+  0% {
+    opacity: 0.9;
+    transform: translate(-50%, -50%) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -120%) scale(0.2);
+  }
+}
+
+.living-mote {
+  animation: livingMote 0.9s ease-out forwards;
+}
+
+@keyframes ctaBreathe {
+  0%,
+  100% {
+    box-shadow: 0 0 22px rgba(251, 191, 36, 0.28);
+    transform: scale(1);
+  }
+  50% {
+    box-shadow: 0 0 36px rgba(251, 191, 36, 0.48);
+    transform: scale(1.015);
+  }
+}
+
+.cta-breathe {
+  animation: ctaBreathe 2.8s ease-in-out infinite;
+}
+
+.passport-level-glow {
+  transition: box-shadow 0.4s ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .living-drift,
+  .living-mote,
+  .cta-breathe {
+    animation: none !important;
+  }
+}

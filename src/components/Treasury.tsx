@@ -210,9 +210,16 @@ export default function Treasury({
       localStorage.setItem('solana_daily_last_claim_v1', now);
       setLastClaimTime(now);
       setClaimedToday(true);
-      setStreak((s) => s + 1);
-      localStorage.setItem('solana_daily_streak_v1', String(streak + 1));
+      const nextStreak = streak + 1;
+      setStreak(nextStreak);
+      localStorage.setItem('solana_daily_streak_v1', String(nextStreak));
       setCooldownHint('Next free refill in ~20h — see you then');
+      const { rewardAction } = await import('../lib/reward-bus');
+      // Single action — daily_claim already applies streak thresholds (no double XP)
+      rewardAction('daily_claim', {
+        streakDays: nextStreak,
+        label: `Daily Impact · Day ${nextStreak}`,
+      });
       addLog(
         `Daily fuel + PoA memo on-chain — +15% energy · +50 BCC. https://solscan.io/tx/${sig}?cluster=devnet`,
         'success'

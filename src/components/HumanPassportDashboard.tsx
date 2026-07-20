@@ -2,7 +2,7 @@
  * Human Passport dashboard — cinematic presentation energy.
  */
 
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { motion } from 'motion/react';
 import { ArrowRight, Award, Sparkles } from 'lucide-react';
 import type { GameState } from '../types';
@@ -13,10 +13,19 @@ import {
 } from '../lib/human-economy';
 import { buildAttentionSnapshot } from '../lib/attention-metrics';
 import { readFirstContribution } from '../lib/first-contribution';
+import { resolveDisplayIdentity } from '../lib/display-identity';
 import ReputationGraph from './ReputationGraph';
 import GrowthLoopPanel from './GrowthLoopPanel';
 import PassportShareCard from './PassportShareCard';
 import CinematicPanel from './fx/CinematicPanel';
+import PlayerLevelChip from './PlayerLevelChip';
+import AchievementGallery from './AchievementGallery';
+import LivingAmbient from './fx/LivingAmbient';
+import {
+  readLevelSnapshot,
+  subscribePlayerProgress,
+  type LevelSnapshot,
+} from '../lib/player-progress';
 
 export type PassportNextStep = {
   label: string;
@@ -117,14 +126,28 @@ export default function HumanPassportDashboard({
     state.dailyMissions.length,
   ]);
   const skills = skillChipsFromScores(scores);
-  const handle = username.replace(/^@/, '');
+  const identity = resolveDisplayIdentity({
+    username,
+    walletAddress,
+    progressTitle,
+  });
+  const handle = identity.handle;
+  const [levelSnap, setLevelSnap] = useState<LevelSnapshot>(() => readLevelSnapshot());
+  useEffect(() => subscribePlayerProgress(() => setLevelSnap(readLevelSnapshot())), []);
+  const passportGlow = Math.min(48, 16 + levelSnap.level * 1.4);
 
   return (
     <CinematicPanel mood="awakening" compact={compact}>
-      <div className={compact ? 'p-5 md:p-6' : 'p-5 md:p-8'}>
-        <div className="flex flex-wrap items-start justify-between gap-4">
+      <div className={`relative ${compact ? 'p-5 md:p-6' : 'p-5 md:p-8'}`}>
+        <LivingAmbient reactive={!compact} intensity="soft" />
+        <div className="relative z-[1] flex flex-wrap items-start justify-between gap-4">
           <div className="flex items-center gap-3.5 min-w-0">
-            <div className="w-14 h-14 rounded-2xl overflow-hidden border border-amber-400/35 bg-black/40 shrink-0 shadow-[0_0_28px_rgba(245,158,11,0.25)]">
+            <div
+              className="passport-level-glow w-14 h-14 rounded-2xl overflow-hidden border border-amber-400/35 bg-black/40 shrink-0"
+              style={{
+                boxShadow: `0 0 ${passportGlow}px rgba(245,158,11,${0.2 + Math.min(0.4, levelSnap.level * 0.012)})`,
+              }}
+            >
               {avatarUrl ? (
                 <img src={avatarUrl} alt="" className="w-full h-full object-cover" />
               ) : (
@@ -136,13 +159,21 @@ export default function HumanPassportDashboard({
             <div className="min-w-0">
               <p className="font-mono text-[10px] font-black tracking-[0.28em] uppercase text-amber-300">
                 Chapter · {BRAND.passport}
+                {identity.isCultureName ? ' · .CULTURE' : ''}
               </p>
               <h2 className="font-display text-2xl md:text-3xl font-extrabold italic text-white truncate drop-shadow-[0_4px_24px_rgba(0,0,0,0.7)]">
-                {progressTitle || `@${handle}`}
+                {identity.isCultureName
+                  ? identity.handle
+                  : progressTitle || identity.atHandle}
               </h2>
-              {progressTitle ? (
+              {identity.isCultureName ? (
                 <p className="text-[11px] text-slate-400 mt-0.5">
-                  @{handle}
+                  {progressTitle || SLOGANS.equation}
+                  {progressBlurb && progressTitle ? ` · ${progressBlurb}` : ''}
+                </p>
+              ) : progressTitle ? (
+                <p className="text-[11px] text-slate-400 mt-0.5">
+                  {identity.atHandle}
                   {progressBlurb ? ` · ${progressBlurb}` : ''}
                 </p>
               ) : (
@@ -150,17 +181,20 @@ export default function HumanPassportDashboard({
               )}
             </div>
           </div>
-          <div className="rounded-2xl border border-white/12 bg-black/45 px-4 py-3 text-right backdrop-blur-md">
-            <p className="font-mono text-[9px] uppercase tracking-widest text-amber-200/80">
-              Your Human Value
-            </p>
-            <p className="font-display text-5xl font-bold italic text-white leading-none mt-1">
-              {scores.humanValue}
-            </p>
+          <div className="flex flex-col items-end gap-2">
+            <PlayerLevelChip />
+            <div className="rounded-2xl border border-white/12 bg-black/45 px-4 py-3 text-right backdrop-blur-md">
+              <p className="font-mono text-[9px] uppercase tracking-widest text-amber-200/80">
+                Your Human Value
+              </p>
+              <p className="font-display text-5xl font-bold italic text-white leading-none mt-1">
+                {scores.humanValue}
+              </p>
+            </div>
           </div>
         </div>
 
-        <div className="mt-7 flex flex-wrap gap-3">
+        <div className="relative z-[1] mt-7 flex flex-wrap gap-3">
           <ScoreCard
             label="Knowledge"
             value={scores.knowledge}
@@ -178,7 +212,7 @@ export default function HumanPassportDashboard({
           />
         </div>
 
-        <div className="mt-5 flex flex-wrap gap-1.5">
+        <div className="relative z-[1] mt-5 flex flex-wrap gap-1.5">
           {skills.map((s) => (
             <span
               key={s}
@@ -195,19 +229,23 @@ export default function HumanPassportDashboard({
           </span>
         </div>
 
+        <div className="relative z-[1] mt-5">
+          <AchievementGallery compact={compact} />
+        </div>
+
         {!compact && (
-          <div className="mt-6 rounded-2xl border border-white/12 bg-black/45 p-3 backdrop-blur-md">
+          <div className="relative z-[1] mt-6 rounded-2xl border border-white/12 bg-black/45 p-3 backdrop-blur-md">
             <ReputationGraph days={14} />
           </div>
         )}
 
-        <div className="mt-6 flex flex-col sm:flex-row gap-2.5">
+        <div className="relative z-[1] mt-6 flex flex-col sm:flex-row gap-2.5">
           <motion.button
             type="button"
             onClick={nextStep.onGo}
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
-            className="flex-1 inline-flex items-center justify-center gap-2 px-5 py-3.5 rounded-2xl bg-white hover:bg-cyan-100 text-black font-mono text-[11px] font-black uppercase tracking-wider cursor-pointer shadow-[0_0_40px_rgba(255,255,255,0.18)]"
+            className="cta-breathe flex-1 inline-flex items-center justify-center gap-2 px-5 py-3.5 rounded-2xl bg-amber-400 hover:bg-amber-300 text-black font-mono text-[11px] font-black uppercase tracking-wider cursor-pointer"
           >
             {firstRitualPending ? 'Start Proof of Attention' : nextStep.label}
             <ArrowRight className="w-3.5 h-3.5" />
@@ -232,18 +270,18 @@ export default function HumanPassportDashboard({
             </button>
           )}
         </div>
-        <p className="mt-2.5 text-[12px] text-slate-200/80 leading-relaxed max-w-xl">
+        <p className="relative z-[1] mt-2.5 text-[12px] text-slate-200/80 leading-relaxed max-w-xl">
           {nextStep.reason}
         </p>
 
-        <div className="mt-5 rounded-2xl border border-white/10 bg-black/35 backdrop-blur-md p-1">
+        <div className="relative z-[1] mt-5 rounded-2xl border border-white/10 bg-black/35 backdrop-blur-md p-1">
           <PassportShareCard name={handle} scores={scores} compact={compact} />
         </div>
 
-        <div className="mt-4 rounded-2xl border border-white/10 bg-black/35 backdrop-blur-md p-1">
+        <div className="relative z-[1] mt-4 rounded-2xl border border-white/10 bg-black/35 backdrop-blur-md p-1">
           <GrowthLoopPanel
             walletAddress={walletAddress}
-            displayName={username}
+            displayName={handle}
             compact={compact}
             onOpenPartners={onOpenPartners}
             onOpenHearing={onOpenHearing}

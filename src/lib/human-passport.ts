@@ -103,7 +103,11 @@ export function buildMemberInvitePost(opts: {
   displayName?: string;
   walletAddress: string;
 }): string {
-  const who = opts.displayName?.trim() || `Builder_${opts.walletAddress.slice(0, 4)}`;
+  const raw = opts.displayName?.trim();
+  const who =
+    raw && !/^op_/i.test(raw)
+      ? raw.replace(/^@/, '')
+      : `Builder_${opts.walletAddress.slice(0, 4)}`;
   const code = opts.walletAddress.slice(0, 6);
   return [
     `${who} invited you to the Human Economy.`,

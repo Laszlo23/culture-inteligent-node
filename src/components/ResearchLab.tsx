@@ -21,6 +21,7 @@ import AttentionAcademy from './AttentionAcademy';
 import SignalDesk from './SignalDesk';
 import { isFirstRitualPending } from '../lib/first-run';
 import { SLOGANS } from '../lib/brand-slogans';
+import LivingAmbient from './fx/LivingAmbient';
 
 interface ResearchLabProps {
   state: GameState;
@@ -137,48 +138,63 @@ export default function ResearchLab({
 
   return (
     <div id="research-room" className="space-y-6">
-      <div
-        className={`relative overflow-hidden rounded-2xl border p-5 mb-2 ${
+      <header
+        className={`relative overflow-hidden rounded-2xl border p-5 md:p-6 mb-2 ${
           ritualPending
-            ? 'border-cyan-400/40 bg-[#06080e] shadow-[0_0_40px_rgba(34,211,238,0.08)]'
-            : 'border-cyan-500/20 bg-[#08090c]'
+            ? 'border-cyan-400/40 bg-gradient-to-br from-[#0a1218]/95 via-[#08060a] to-amber-950/30 shadow-[0_0_48px_rgba(34,211,238,0.12)]'
+            : 'border-amber-400/25 bg-gradient-to-br from-[#141008]/95 via-[#08060a] to-cyan-950/35'
         }`}
       >
-        <div className="absolute inset-0 bg-cyber-grid opacity-40" />
-        <div className="absolute -right-10 -top-10 w-40 h-40 rounded-full bg-cyan-500/15 blur-3xl" />
-        <div className="absolute left-1/3 -bottom-12 w-36 h-36 rounded-full bg-amber-500/10 blur-3xl" />
+        <div className="absolute inset-0 bg-cyber-grid opacity-25" />
+        <LivingAmbient intensity="soft" />
+        <div className="absolute -right-16 -top-16 w-56 h-56 rounded-full bg-amber-400/15 blur-3xl" />
+        <div className="absolute -left-10 bottom-0 w-44 h-44 rounded-full bg-cyan-500/15 blur-3xl" />
         {ritualPending && (
           <div className="absolute inset-y-0 left-0 w-1 bg-gradient-to-b from-cyan-400 via-amber-400/80 to-transparent" />
         )}
         <div className="relative z-10">
-          <p className="text-[10px] font-mono uppercase tracking-[0.25em] text-cyan-400">
+          <p className="font-mono text-[9px] font-black uppercase tracking-[0.28em] text-amber-300/90">
             {ritualPending
               ? "We're here for attention · cold start"
               : 'Attention → Proof → Fuel → Node'}
           </p>
-          <h2 className="font-display mt-1 text-xl md:text-2xl font-extrabold italic text-white">
-            {ritualPending ? 'First Spark' : 'Attention Academy'}
+          <h2 className="font-display mt-2 text-2xl md:text-3xl font-extrabold italic text-white tracking-tight">
+            {ritualPending ? 'First Spark' : 'Proof of Attention'}
           </h2>
-          <p className="mt-1.5 text-sm text-slate-400 max-w-xl">
+          <p className="mt-1.5 text-sm text-slate-300/90 max-w-xl leading-relaxed">
             {ritualPending
               ? `${SLOGANS.firstSpark} ${SLOGANS.firstSparkSupport} Bias check + one honest line — contribution becomes visible when Proof of Attention lands.`
               : 'Verified attention refills knowledge fuel. Complete sessions. Name your hooks. Zen-decide. Mining wakes when attention is live.'}
           </p>
-          {ritualPending && (
-            <div className="mt-3 flex flex-wrap gap-2 text-[9px] font-mono uppercase tracking-wider">
-              <span className="px-2 py-1 rounded-md border border-cyan-400/30 bg-cyan-500/10 text-cyan-200">
-                Proof of Attention
-              </span>
-              <span className="px-2 py-1 rounded-md border border-white/12 bg-white/5 text-slate-300">
-                Not empty hashes
-              </span>
-              <span className="px-2 py-1 rounded-md border border-amber-400/25 bg-amber-500/10 text-amber-100">
-                ~2 min
-              </span>
-            </div>
-          )}
+          <div className="mt-3 flex flex-wrap gap-2 text-[9px] font-mono uppercase tracking-wider">
+            {ritualPending ? (
+              <>
+                <span className="px-2 py-1 rounded-md border border-cyan-400/30 bg-cyan-500/10 text-cyan-200">
+                  Proof of Attention
+                </span>
+                <span className="px-2 py-1 rounded-md border border-white/12 bg-white/5 text-slate-300">
+                  Not empty hashes
+                </span>
+                <span className="px-2 py-1 rounded-md border border-amber-400/25 bg-amber-500/10 text-amber-100">
+                  ~2 min
+                </span>
+              </>
+            ) : (
+              <>
+                <span className="px-2 py-1 rounded-md border border-amber-400/30 bg-amber-500/10 text-amber-100">
+                  Academy
+                </span>
+                <span className="px-2 py-1 rounded-md border border-cyan-400/25 bg-cyan-500/10 text-cyan-200">
+                  Mind ↔ Machine
+                </span>
+                <span className="px-2 py-1 rounded-md border border-white/12 bg-white/5 text-slate-300">
+                  Fuel your node
+                </span>
+              </>
+            )}
+          </div>
         </div>
-      </div>
+      </header>
 
       {!ritualPending && (
         <SignalDesk
@@ -189,30 +205,30 @@ export default function ResearchLab({
       )}
 
       {!ritualPending && (
-      <div className="flex border-b border-white/5 gap-6 font-mono text-xs">
+      <div className="flex flex-wrap gap-2">
         <button
           type="button"
           onClick={() => setActiveTab('academy')}
-          className={`pb-3 px-1 transition-all relative cursor-pointer font-bold tracking-wider flex items-center gap-1.5 ${
+          className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border font-mono text-[10px] font-black uppercase tracking-wider cursor-pointer transition-colors ${
             activeTab === 'academy'
-              ? 'text-cyan-400 border-b-2 border-cyan-500'
-              : 'text-slate-500 hover:text-slate-300'
+              ? 'border-amber-400/55 bg-amber-500/20 text-amber-100 shadow-[0_0_24px_rgba(251,191,36,0.18)]'
+              : 'border-white/12 bg-white/[0.03] text-slate-400 hover:border-white/25 hover:text-slate-200'
           }`}
         >
-          <Brain className="w-4 h-4 text-cyan-400" />
-          ATTENTION INTELLIGENCE MODULE
+          <Brain className="w-3.5 h-3.5" />
+          Academy
         </button>
         <button
           type="button"
           onClick={() => setActiveTab('verify')}
-          className={`pb-3 px-1 transition-all relative cursor-pointer font-bold tracking-wider flex items-center gap-1.5 ${
+          className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border font-mono text-[10px] font-black uppercase tracking-wider cursor-pointer transition-colors ${
             activeTab === 'verify'
-              ? 'text-cyan-400 border-b-2 border-cyan-500'
-              : 'text-slate-500 hover:text-slate-300'
+              ? 'border-cyan-400/50 bg-cyan-500/15 text-cyan-100'
+              : 'border-white/12 bg-white/[0.03] text-slate-400 hover:border-white/25 hover:text-slate-200'
           }`}
         >
-          <Cpu className="w-4 h-4 text-cyan-400" />
-          VERIFICATION TERMINAL
+          <Cpu className="w-3.5 h-3.5" />
+          Quick scan
         </button>
       </div>
       )}
@@ -245,106 +261,115 @@ export default function ResearchLab({
             exit={{ opacity: 0, y: -10 }}
             className="grid grid-cols-1 lg:grid-cols-3 gap-6"
           >
-            <div className="lg:col-span-2 bg-[#0a0a0c] border border-white/5 rounded-2xl p-6 relative overflow-hidden shadow-xl">
-              <p className="text-[10px] text-amber-500/80 font-mono mb-3">
-                Local cosmetic scan — agent-verified PoA lives in Attention Intelligence Module.
-              </p>
-              <h3 className="text-sm font-bold text-white mb-1 flex items-center gap-2">
-                <Sparkles className="w-4 h-4 text-cyan-400" /> VERIFY COGNITIVE STUDY LOGS
-              </h3>
-              <p className="text-xs text-slate-500 mb-4">
-                Submit a quick summary of what you studied. Prefer Academy sessions for real verify + Devnet attest.
-              </p>
+            <div className="lg:col-span-2 relative overflow-hidden rounded-2xl border border-cyan-400/25 bg-gradient-to-br from-[#0c1018]/95 via-[#08060a] to-cyan-950/40 p-6 shadow-xl">
+              <div className="absolute -right-12 -top-12 w-40 h-40 rounded-full bg-cyan-400/15 blur-3xl" />
+              <div className="absolute left-1/4 -bottom-16 w-36 h-36 rounded-full bg-amber-400/10 blur-3xl" />
+              <div className="relative z-10">
+                <p className="font-mono text-[9px] font-black uppercase tracking-[0.28em] text-cyan-300/90 mb-2">
+                  Local practice · not on-chain PoA
+                </p>
+                <h3 className="font-display text-xl md:text-2xl font-extrabold italic text-white tracking-tight flex items-center gap-2">
+                  <Sparkles className="w-5 h-5 text-amber-300" /> Quick study scan
+                </h3>
+                <p className="text-sm text-slate-400 mt-1.5 mb-4 max-w-lg leading-relaxed">
+                  Drop a short summary of what you studied. Real Proof of Attention — verify + Devnet seal — lives in Academy.
+                </p>
 
-              {successResult ? (
-                <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-6 text-center space-y-3">
-                  <CheckCircle className="w-8 h-8 text-emerald-400 mx-auto" />
-                  <p className="text-emerald-200 text-sm font-bold">Local scan recorded</p>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setTopic('');
-                      setSummary('');
-                      setSuccessResult(false);
-                    }}
-                    className="inline-flex items-center gap-1.5 text-xs text-slate-400"
-                  >
-                    <RotateCcw className="w-3 h-3" /> New entry
-                  </button>
-                </div>
-              ) : (
-                <form onSubmit={handleStartInspection} className="space-y-4">
-                  <div>
-                    <label className="text-[10px] font-mono text-slate-500 uppercase block mb-1">
-                      1. Topic studied
-                    </label>
-                    <input
-                      className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-sm text-slate-200"
-                      placeholder="e.g. Solana Program Deserialization Hacks"
-                      value={topic}
-                      onChange={(e) => setTopic(e.target.value)}
-                      required
-                    />
-                  </div>
-                  <div>
-                    <label className="text-[10px] font-mono text-slate-500 uppercase block mb-1">
-                      2. Category
-                    </label>
-                    <select
-                      className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-sm text-slate-200"
-                      value={category}
-                      onChange={(e) => setCategory(e.target.value)}
+                {successResult ? (
+                  <div className="rounded-xl border border-emerald-400/35 bg-emerald-500/10 p-6 text-center space-y-3">
+                    <CheckCircle className="w-8 h-8 text-emerald-400 mx-auto" />
+                    <p className="font-display text-lg italic font-bold text-emerald-100">Local scan recorded</p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setTopic('');
+                        setSummary('');
+                        setSuccessResult(false);
+                      }}
+                      className="inline-flex items-center gap-1.5 text-xs font-mono uppercase tracking-wider text-slate-400 hover:text-slate-200 cursor-pointer"
                     >
-                      <option value="Rust & Solana">Rust & Solana Protocol</option>
-                      <option value="AI & Data Science">AI & Cognitive Science</option>
-                      <option value="Zero Knowledge Proofs">Cryptography & ZKProofs</option>
-                      <option value="Full Stack Dev">Hardware Assembly & IOT</option>
-                    </select>
+                      <RotateCcw className="w-3 h-3" /> New entry
+                    </button>
                   </div>
-                  <div>
-                    <label className="text-[10px] font-mono text-slate-500 uppercase block mb-1">
-                      3. Study brief
-                    </label>
-                    <textarea
-                      className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-sm text-slate-200 min-h-[100px]"
-                      placeholder="Provide a brief summary (at least 15 characters)"
-                      value={summary}
-                      onChange={(e) => setSummary(e.target.value)}
-                      required
-                      minLength={15}
-                    />
-                  </div>
-                  <button
-                    type="submit"
-                    disabled={scanning || summary.trim().length < 15}
-                    className="w-full py-3 rounded-xl bg-cyan-500/20 border border-cyan-400/40 text-cyan-200 text-xs font-bold flex items-center justify-center gap-2 disabled:opacity-40"
-                  >
-                    <Send className="w-3.5 h-3.5" />
-                    {scanning ? scanLogs[Math.min(scanStep, scanLogs.length - 1)] : 'SUBMIT FOR VERIFICATION'}
-                  </button>
-                </form>
-              )}
+                ) : (
+                  <form onSubmit={handleStartInspection} className="space-y-4">
+                    <div>
+                      <label className="text-[10px] font-mono text-amber-300/80 uppercase tracking-wider block mb-1.5">
+                        1. Topic studied
+                      </label>
+                      <input
+                        className="w-full bg-black/45 border border-white/12 rounded-xl px-3.5 py-2.5 text-sm text-slate-100 placeholder:text-slate-600 focus:border-amber-400/40 focus:outline-none"
+                        placeholder="e.g. Solana Program Deserialization Hacks"
+                        value={topic}
+                        onChange={(e) => setTopic(e.target.value)}
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-mono text-amber-300/80 uppercase tracking-wider block mb-1.5">
+                        2. Category
+                      </label>
+                      <select
+                        className="w-full bg-black/45 border border-white/12 rounded-xl px-3.5 py-2.5 text-sm text-slate-100 focus:border-amber-400/40 focus:outline-none"
+                        value={category}
+                        onChange={(e) => setCategory(e.target.value)}
+                      >
+                        <option value="Rust & Solana">Rust & Solana Protocol</option>
+                        <option value="AI & Data Science">AI & Cognitive Science</option>
+                        <option value="Zero Knowledge Proofs">Cryptography & ZKProofs</option>
+                        <option value="Full Stack Dev">Hardware Assembly & IOT</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-mono text-amber-300/80 uppercase tracking-wider block mb-1.5">
+                        3. Study brief
+                      </label>
+                      <textarea
+                        className="w-full bg-black/45 border border-white/12 rounded-xl px-3.5 py-2.5 text-sm text-slate-100 min-h-[100px] placeholder:text-slate-600 focus:border-amber-400/40 focus:outline-none"
+                        placeholder="Provide a brief summary (at least 15 characters)"
+                        value={summary}
+                        onChange={(e) => setSummary(e.target.value)}
+                        required
+                        minLength={15}
+                      />
+                    </div>
+                    <button
+                      type="submit"
+                      disabled={scanning || summary.trim().length < 15}
+                      className="w-full py-3.5 rounded-xl bg-amber-400 hover:bg-amber-300 disabled:opacity-40 text-black font-mono text-xs font-black uppercase tracking-wider flex items-center justify-center gap-2 cursor-pointer shadow-[0_0_28px_rgba(251,191,36,0.28)]"
+                    >
+                      <Send className="w-3.5 h-3.5" />
+                      {scanning
+                        ? scanLogs[Math.min(scanStep, scanLogs.length - 1)]
+                        : 'Scan study log'}
+                    </button>
+                  </form>
+                )}
+              </div>
             </div>
 
-            <div className="bg-[#0a0a0c] border border-white/5 rounded-2xl p-5 shadow-xl">
-              <h4 className="text-xs font-mono font-bold tracking-widest text-slate-400 mb-4 flex items-center gap-1.5">
-                <Database className="w-4 h-4 text-fuchsia-400" />
-                VERIFIED STUDY HISTORY
+            <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-b from-[#121018]/90 to-[#08060a] p-5 shadow-xl">
+              <div className="absolute -left-8 top-0 w-28 h-28 rounded-full bg-rose-500/10 blur-3xl" />
+              <h4 className="relative font-mono text-[10px] font-black uppercase tracking-[0.22em] text-amber-300/90 mb-4 flex items-center gap-1.5">
+                <Database className="w-4 h-4 text-cyan-400" />
+                Recent scans
               </h4>
-              <div className="space-y-3 max-h-[340px] overflow-y-auto">
+              <div className="relative space-y-2.5 max-h-[340px] overflow-y-auto">
                 {history.map((item) => (
                   <div
                     key={item.id}
-                    className="bg-[#050506] border border-white/5 p-3 rounded-xl font-mono text-xs"
+                    className="rounded-xl border border-white/10 bg-white/[0.03] p-3 font-mono text-xs"
                   >
                     <div className="flex justify-between text-[10px] text-slate-500">
                       <span>{item.category}</span>
                       <span>{item.timestamp}</span>
                     </div>
-                    <h5 className="font-semibold text-slate-200 mt-1 truncate">{item.topic}</h5>
-                    <div className="flex justify-between mt-2.5 pt-2 border-t border-white/5 text-[10px]">
-                      <span className="text-slate-400">Duration: {item.duration}m</span>
-                      <span className="text-emerald-400 font-bold">+{item.creditsEarned} CP</span>
+                    <h5 className="font-display text-sm italic font-semibold text-slate-100 mt-1 truncate">
+                      {item.topic}
+                    </h5>
+                    <div className="flex justify-between mt-2.5 pt-2 border-t border-white/8 text-[10px]">
+                      <span className="text-slate-400">{item.duration}m focus</span>
+                      <span className="text-amber-300 font-bold">+{item.creditsEarned} CP</span>
                     </div>
                   </div>
                 ))}

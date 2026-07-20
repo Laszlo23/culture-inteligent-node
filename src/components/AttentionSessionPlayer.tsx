@@ -522,12 +522,13 @@ export default function AttentionSessionPlayer({
   }, [hearingActive, speakLine, completed, ex, hookBait, hookNotice, hookWhy]);
 
   const inputClass =
-    'w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-sm text-slate-200 placeholder:text-slate-600 focus:outline-none focus:border-fuchsia-500/50';
-  const labelClass = 'text-[10px] font-mono tracking-wider text-slate-500 uppercase mb-1.5 block';
+    'w-full bg-black/45 border border-white/12 rounded-xl px-3.5 py-2.5 text-sm text-slate-100 placeholder:text-slate-600 focus:outline-none focus:border-amber-400/45';
+  const labelClass =
+    'text-[10px] font-mono font-black tracking-[0.18em] text-amber-300/80 uppercase mb-1.5 block';
 
   return (
     <div className="relative space-y-5 rounded-xl overflow-hidden">
-      <div className="pointer-events-none absolute inset-0 opacity-55 rounded-xl overflow-hidden">
+      <div className="pointer-events-none absolute inset-0 opacity-50 rounded-xl overflow-hidden">
         <CinematicBackdrop variant="duality" />
       </div>
       <div className="relative z-[1] space-y-5">
@@ -539,7 +540,7 @@ export default function AttentionSessionPlayer({
           onFinish={() => setBriefDone(true)}
         />
       ) : (
-        <p className="rounded-xl border border-white/8 bg-black/30 px-4 py-2.5 text-[12px] italic leading-relaxed text-slate-400">
+        <p className="rounded-xl border border-amber-400/20 bg-amber-500/5 px-4 py-3 font-display text-sm italic leading-relaxed text-slate-200">
           &ldquo;{session.hook}&rdquo;
         </p>
       )}
@@ -632,8 +633,8 @@ export default function AttentionSessionPlayer({
           </div>
 
           {ex.questions.map((q, i) => (
-            <div key={i} className="rounded-xl border border-white/5 p-3 space-y-2">
-              <p className="text-sm text-slate-200">{q.prompt}</p>
+            <div key={i} className="rounded-xl border border-white/10 bg-white/[0.02] p-3.5 space-y-2">
+              <p className="font-display text-sm italic font-semibold text-slate-100">{q.prompt}</p>
               <div className="space-y-1.5">
                 {q.options.map((opt, oi) => (
                   <button
@@ -645,10 +646,10 @@ export default function AttentionSessionPlayer({
                       next[i] = oi;
                       setBiasAnswers(next);
                     }}
-                    className={`w-full text-left text-xs px-3 py-2 rounded-lg border transition-colors ${
+                    className={`w-full text-left text-sm px-3.5 py-2.5 rounded-xl border cursor-pointer transition-colors ${
                       biasAnswers[i] === oi
-                        ? 'border-fuchsia-400/50 bg-fuchsia-500/15 text-fuchsia-200'
-                        : 'border-white/10 text-slate-400 hover:border-white/20'
+                        ? 'border-amber-400/50 bg-amber-500/15 text-amber-50'
+                        : 'border-white/10 text-slate-400 hover:border-amber-400/30 hover:bg-amber-500/5'
                     }`}
                   >
                     {opt}

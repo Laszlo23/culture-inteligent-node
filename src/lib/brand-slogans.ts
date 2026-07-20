@@ -75,6 +75,14 @@ export const SLOGANS = {
   thumbBaitSub: 'Two minutes. Then you own the scroll.',
   hookLoop: 'How they hook you into doomscrolling.',
   hookLoopShare: 'Share a truth. Unlock the next. Perfect loop.',
+  /** Viral quiz — Scroll Trap ID */
+  trapId: 'What’s your bait?',
+  trapIdSub: 'Three taps. One named trap. Challenge a friend.',
+  trapIdShare: 'Share your Trap ID. Make them find theirs.',
+  /** Culture Names — laszlo.culture */
+  cultureName: 'Mine your Culture Name.',
+  cultureNameSub: 'One wallet. One name. Forever yours — like laszlo.culture.',
+  cultureNameShare: 'I mined my .culture name. Grab yours before it’s taken.',
   /** Soft aliases — avoid mining/oath language in new UI */
   firstNight: 'Claim your Human Passport to begin.',
 } as const;

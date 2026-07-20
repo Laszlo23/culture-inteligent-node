@@ -11,7 +11,10 @@ export type UiSound =
   | 'enter'
   | 'success'
   | 'soft'
-  | 'toggle';
+  | 'toggle'
+  | 'xpTick'
+  | 'levelUp'
+  | 'rareDrop';
 
 const SFX_KEY = 'bc_sound_sfx_v1';
 const VIBE_KEY = 'bc_sound_vibe_v1';
@@ -284,6 +287,24 @@ class SoundEngine {
       }
       if (kind === 'toggle') {
         this.tone({ freq: 660, dur: 0.06, type: 'sine', gain: 0.09, when: now });
+        return;
+      }
+      if (kind === 'xpTick') {
+        this.tone({ freq: 740, dur: 0.06, type: 'sine', gain: 0.1, when: now });
+        this.tone({ freq: 988, dur: 0.1, type: 'triangle', gain: 0.07, when: now + 0.05 });
+        return;
+      }
+      if (kind === 'levelUp') {
+        this.tone({ freq: 392, dur: 0.1, type: 'triangle', gain: 0.12, when: now });
+        this.tone({ freq: 523.25, dur: 0.12, type: 'sine', gain: 0.11, when: now + 0.08 });
+        this.tone({ freq: 659.25, dur: 0.14, type: 'sine', gain: 0.1, when: now + 0.18 });
+        this.tone({ freq: 783.99, dur: 0.28, type: 'triangle', gain: 0.12, when: now + 0.3 });
+        return;
+      }
+      if (kind === 'rareDrop') {
+        this.tone({ freq: 880, dur: 0.08, type: 'sine', gain: 0.1, when: now });
+        this.tone({ freq: 1174.66, dur: 0.12, type: 'triangle', gain: 0.09, when: now + 0.07 });
+        this.tone({ freq: 1567.98, dur: 0.22, type: 'sine', gain: 0.07, when: now + 0.16 });
         return;
       }
       const _never: never = kind;

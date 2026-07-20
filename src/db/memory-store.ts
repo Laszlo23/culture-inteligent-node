@@ -286,3 +286,40 @@ export function markZkMinted(
   row.soulboundMinted = true;
   return row;
 }
+
+/** Culture Names — in-memory fallback */
+export type StoredCultureName = {
+  name: string;
+  walletAddress: string;
+  uid?: string;
+  claimedAt: string;
+};
+
+const cultureNameStore: StoredCultureName[] = [];
+
+export function getCultureNameByLabel(name: string): StoredCultureName | null {
+  const key = name.trim().toLowerCase();
+  return cultureNameStore.find((r) => r.name === key) || null;
+}
+
+export function getCultureNameByWallet(walletAddress: string): StoredCultureName | null {
+  const w = walletAddress.trim();
+  return (
+    cultureNameStore.find((r) => r.walletAddress.toLowerCase() === w.toLowerCase()) || null
+  );
+}
+
+export function claimCultureNameMem(row: StoredCultureName): StoredCultureName {
+  const byName = cultureNameStore.findIndex((r) => r.name === row.name);
+  if (byName >= 0) {
+    throw new Error('NAME_TAKEN');
+  }
+  const byWallet = cultureNameStore.findIndex(
+    (r) => r.walletAddress.toLowerCase() === row.walletAddress.toLowerCase()
+  );
+  if (byWallet >= 0) {
+    throw new Error('WALLET_HAS_NAME');
+  }
+  cultureNameStore.unshift(row);
+  return row;
+}

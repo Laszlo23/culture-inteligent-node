@@ -71,6 +71,8 @@ export default function NftGallery({
       const sig = await buyMinerOnChain(assetId, seller);
       await syncLedgerToState(setState);
       await syncMinersToState(setState);
+      const { rewardAction } = await import('../../lib/reward-bus');
+      rewardAction('first_nft', { label: nft.name });
       addLog(
         `GALLERY ON-CHAIN: Bought ${nft.name}. https://solscan.io/tx/${sig}?cluster=devnet`,
         'success'

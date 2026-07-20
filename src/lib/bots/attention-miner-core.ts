@@ -245,9 +245,10 @@ export async function handleBotCommand(ctx: BotContext & { cmd: BotCommand }): P
     case 'claim': {
       const result = await claimDailyMiner(platform, userId, displayName);
       if (!result.ok) {
+        const hoursLeft = 'hoursLeft' in result ? result.hoursLeft : 0;
         return {
           text: [
-            `Daily drip cooling down · ~${result.hoursLeft.toFixed(1)}h left.`,
+            `Daily drip cooling down · ~${hoursLeft.toFixed(1)}h left.`,
             '',
             statusLines(result.player),
             '',

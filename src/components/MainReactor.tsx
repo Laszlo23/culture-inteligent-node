@@ -64,6 +64,18 @@ export default function MainReactor({ state, setState, addLog, logs, onOpenTollS
 
   const featuredNft = (state.minerNFTs || []).find((n) => n.owner === 'Me');
   const miningLive = state.energy > 0;
+  const minerPulseFired = useRef(false);
+
+  useEffect(() => {
+    if (!miningLive || minerPulseFired.current) return;
+    minerPulseFired.current = true;
+    void import('../lib/achievements').then(({ isAchievementUnlocked }) => {
+      if (isAchievementUnlocked('miner_pulse')) return;
+      void import('../lib/reward-bus').then(({ rewardAction }) => {
+        rewardAction('miner_pulse');
+      });
+    });
+  }, [miningLive]);
 
   // Find installed modules for custom visual highlights
   const hasGpu = state.hardware.some(h => h.type === 'gpu' && h.installed);

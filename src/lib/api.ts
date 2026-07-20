@@ -792,3 +792,75 @@ export async function fetchMarketPulse(): Promise<MarketPulseResponse> {
     fetchedAt: new Date().toISOString(),
   };
 }
+
+/** Culture Names — laszlo.culture */
+export type CultureNameCheck = {
+  ok: boolean;
+  available: boolean;
+  name?: string;
+  full?: string;
+  error?: string | null;
+};
+
+export type CultureNameClaimResult = {
+  success: boolean;
+  name: string;
+  full: string;
+  walletAddress: string;
+  claimedAt: string;
+};
+
+export async function checkCultureName(name: string): Promise<CultureNameCheck> {
+  const response = await fetch(`/api/names/check?name=${encodeURIComponent(name)}`);
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error(err.error || 'Name check failed');
+  }
+  return response.json();
+}
+
+export async function resolveCultureName(name: string) {
+  const response = await fetch(`/api/names/resolve?name=${encodeURIComponent(name)}`);
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error(err.error || 'Resolve failed');
+  }
+  return response.json() as Promise<{
+    available: boolean;
+    name: string;
+    full: string;
+    walletAddress?: string;
+    claimedAt?: string;
+  }>;
+}
+
+export async function getCultureNameByWallet(walletAddress: string) {
+  const response = await fetch(
+    `/api/names/by-wallet?wallet=${encodeURIComponent(walletAddress)}`
+  );
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error(err.error || 'Lookup failed');
+  }
+  return response.json() as Promise<{
+    claimed: boolean;
+    walletAddress: string;
+    name?: string;
+    full?: string;
+    claimedAt?: string;
+  }>;
+}
+
+export async function claimCultureName(name: string): Promise<CultureNameClaimResult> {
+  const headers = await authHeaders();
+  const response = await fetch('/api/names/claim', {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ name }),
+  });
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error(err.error || 'Claim failed');
+  }
+  return response.json();
+}

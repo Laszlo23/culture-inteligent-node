@@ -17,6 +17,7 @@ import {
 export const FARCASTER_HOME = `${BRAND.url.replace(/\/?$/, '/')}?fc=1`;
 export const FARCASTER_HEARING = `${BRAND.url.replace(/\/?$/, '/')}?hear=1&fc=1`;
 export const FARCASTER_HOOK_LOOP = `${BRAND.url.replace(/\/?$/, '/')}?room=hook-loop&fc=1`;
+export const FARCASTER_TRAP_ID = `${BRAND.url.replace(/\/?$/, '/')}?room=trap-id&fc=1`;
 export const FARCASTER_PASSPORT = `${BRAND.url.replace(/\/?$/, '/')}?room=passport&fc=1`;
 
 /** Warpcast / Farcaster compose (text + embeds — page and/or OG image). */
@@ -70,6 +71,7 @@ export type CastTemplateId =
   | 'launch'
   | 'passport'
   | 'hook_loop'
+  | 'trap_id'
   | 'proof'
   | 'hearing'
   | 'pricing'
@@ -160,6 +162,23 @@ export const CAST_TEMPLATES: CastTemplate[] = [
       'Perfect loop. Honest this time.',
       '',
       FARCASTER_HOOK_LOOP,
+    ].join('\n'),
+  },
+  {
+    id: 'trap_id',
+    title: 'Scroll Trap ID',
+    channelHint: '/memes /attention',
+    embedUrl: FARCASTER_TRAP_ID,
+    imageUrl: `${BRAND.url.replace(/\/?$/, '')}/campaign/failure-curve.webp`,
+    text: [
+      SLOGANS.trapId,
+      '',
+      SLOGANS.trapIdSub,
+      SLOGANS.trapIdShare,
+      '',
+      FARCASTER_TRAP_ID,
+      '',
+      '#TrapID #ProofOfAttention',
     ].join('\n'),
   },
   withOg('first_spark', {

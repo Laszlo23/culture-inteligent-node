@@ -32,6 +32,7 @@ import {
   Layers,
   Share2,
   Award,
+  Pickaxe,
 } from 'lucide-react';
 
 export type NavDestination =
@@ -54,6 +55,9 @@ export type NavDestination =
   | 'roadmap'
   | 'field-deck'
   | 'hook-loop'
+  | 'trap-id'
+  | 'culture-name'
+  | 'invite-share'
   | 'legal-privacy'
   | 'legal-terms'
   | 'legal-disclaimer';
@@ -183,6 +187,24 @@ const ALL: Record<string, NavItem> = {
     id: 'hook-loop',
     label: 'Hook Loop',
     hint: 'Meme truths · share to unlock',
+    icon: <Share2 className="w-4 h-4" />,
+  },
+  'trap-id': {
+    id: 'trap-id',
+    label: 'Trap ID',
+    hint: 'What’s your bait? · challenge a friend',
+    icon: <Share2 className="w-4 h-4" />,
+  },
+  'culture-name': {
+    id: 'culture-name',
+    label: 'Culture Name',
+    hint: 'Mine laszlo.culture for your wallet',
+    icon: <Pickaxe className="w-4 h-4" />,
+  },
+  'invite-share': {
+    id: 'invite-share',
+    label: 'Invite cards',
+    hint: 'Share a growth card · pull friends in',
     icon: <Share2 className="w-4 h-4" />,
   },
 };
@@ -317,10 +339,21 @@ export default function NavMenu({
 
   const accountIds: NavDestination[] =
     phase === 'ritual'
-      ? ['hook-loop', 'field-deck']
+      ? ['culture-name', 'trap-id', 'invite-share', 'hook-loop', 'field-deck']
       : phase === 'guided'
-        ? ['hook-loop', 'field-deck', 'feedback']
-        : ['hook-loop', 'field-deck', 'treasury', 'onboarding', 'partners', 'feedback', 'void'];
+        ? ['culture-name', 'trap-id', 'invite-share', 'hook-loop', 'field-deck', 'feedback']
+        : [
+            'culture-name',
+            'trap-id',
+            'invite-share',
+            'hook-loop',
+            'field-deck',
+            'treasury',
+            'onboarding',
+            'partners',
+            'feedback',
+            'void',
+          ];
 
   return (
     <AnimatePresence>

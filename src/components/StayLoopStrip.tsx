@@ -4,11 +4,12 @@
  */
 
 import React, { useEffect, useState } from 'react';
-import { ArrowRight, Target, Timer } from 'lucide-react';
+import { ArrowRight, Pickaxe, Share2, Target, Timer } from 'lucide-react';
 import {
   WHEEL_UNLOCK_COMPLETED,
   formatClaimCountdown,
 } from '../lib/daily-quests';
+import { SLOGANS } from '../lib/brand-slogans';
 
 export type StayLoopProps = {
   claimReady: boolean;
@@ -21,6 +22,11 @@ export type StayLoopProps = {
   onClaim: () => void;
   onQuests: () => void;
   onNextQuest: () => void;
+  /** Viral Scroll Trap ID */
+  onTrapId?: () => void;
+  /** Culture Name mine / share */
+  onCultureName?: () => void;
+  cultureName?: string | null;
   compact?: boolean;
 };
 
@@ -35,6 +41,9 @@ export default function StayLoopStrip({
   onClaim,
   onQuests,
   onNextQuest,
+  onTrapId,
+  onCultureName,
+  cultureName = null,
   compact = false,
 }: StayLoopProps) {
   const [msLeft, setMsLeft] = useState(msUntilNext);
@@ -114,6 +123,50 @@ export default function StayLoopStrip({
             <ArrowRight className="w-3 h-3" />
           </button>
         </div>
+        {onTrapId ? (
+          <div className="flex flex-wrap items-center justify-between gap-2 border-t border-white/8 pt-2.5">
+            <p className="flex items-start gap-2 text-[12px] text-slate-200/85 leading-snug min-w-0">
+              <Share2 className="w-3.5 h-3.5 text-rose-300 shrink-0 mt-0.5" />
+              <span>
+                {SLOGANS.trapId}
+                <span className="block text-[11px] text-slate-400 mt-0.5">
+                  {SLOGANS.trapIdSub}
+                </span>
+              </span>
+            </p>
+            <button
+              type="button"
+              onClick={onTrapId}
+              className="shrink-0 inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-rose-400/35 bg-rose-500/15 hover:bg-rose-500/25 text-rose-100 font-mono text-[10px] font-black uppercase tracking-wider cursor-pointer"
+            >
+              Trap ID
+              <ArrowRight className="w-3 h-3" />
+            </button>
+          </div>
+        ) : null}
+        {onCultureName ? (
+          <div className="flex flex-wrap items-center justify-between gap-2 border-t border-white/8 pt-2.5">
+            <p className="flex items-start gap-2 text-[12px] text-slate-200/85 leading-snug min-w-0">
+              <Pickaxe className="w-3.5 h-3.5 text-cyan-300 shrink-0 mt-0.5" />
+              <span>
+                {cultureName || SLOGANS.cultureName}
+                <span className="block text-[11px] text-slate-400 mt-0.5">
+                  {cultureName
+                    ? 'Shown everywhere · share your card'
+                    : SLOGANS.cultureNameSub}
+                </span>
+              </span>
+            </p>
+            <button
+              type="button"
+              onClick={onCultureName}
+              className="shrink-0 inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-cyan-400/35 bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-100 font-mono text-[10px] font-black uppercase tracking-wider cursor-pointer"
+            >
+              {cultureName ? 'Share' : 'Mine'}
+              <ArrowRight className="w-3 h-3" />
+            </button>
+          </div>
+        ) : null}
       </div>
     </div>
   );

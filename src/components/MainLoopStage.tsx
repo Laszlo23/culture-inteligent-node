@@ -20,6 +20,9 @@ import { MoodArt } from './onboarding/StoryChapterArt';
 import { PATH_LOOP_WHISPER, readGrowthPath } from '../lib/growth-path';
 import { LOOP_DECK } from '../lib/decks';
 import StayLoopStrip, { type StayLoopProps } from './StayLoopStrip';
+import { resolveDisplayIdentity } from '../lib/display-identity';
+import PlayerLevelChip from './PlayerLevelChip';
+import LivingAmbient from './fx/LivingAmbient';
 
 export type LoopBeatCta = {
   label: string;
@@ -98,8 +101,12 @@ export default function MainLoopStage({
 }: Props) {
   const reduceMotion = useReducedMotion();
   const rail = buildLoopRail(flags);
-  const handle = username?.replace(/^@/, '') || null;
-  const you = progressTitle?.trim() || handle;
+  const identity = resolveDisplayIdentity({
+    username,
+    progressTitle,
+  });
+  const handle = identity.handle || null;
+  const you = identity.primary;
   const pathWhisper = PATH_LOOP_WHISPER[readGrowthPath() ?? 'balanced'];
   const [selectedStep, setSelectedStep] = useState<LoopStepId | null>(null);
   const [sparkBurst, setSparkBurst] = useState(0);
@@ -146,18 +153,24 @@ export default function MainLoopStage({
           compact
           plate="signal"
         />
+        <LivingAmbient reactive intensity="medium" />
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-[#050608]/75 via-[#050608]/30 to-transparent" />
 
         <div className="relative z-10 px-5 pt-6 pb-5 md:px-8 md:pt-8 md:pb-6">
-          <p className="font-mono text-[10px] font-black uppercase tracking-[0.28em] text-cyan-300">
-            {phase === 'ritual' ? 'Opening · First Spark' : 'Main loop · live'}
-          </p>
-          <p className="mt-2 font-display text-3xl md:text-4xl font-extrabold italic text-white tracking-tight leading-none drop-shadow-[0_4px_28px_rgba(0,0,0,0.75)]">
-            {BRAND.parent}
-          </p>
-          <p className="mt-1.5 text-[11px] font-mono uppercase tracking-[0.22em] text-amber-200/90">
-            {BRAND.passport} · {SLOGANS.zen}
-          </p>
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <p className="font-mono text-[10px] font-black uppercase tracking-[0.28em] text-cyan-300">
+                {phase === 'ritual' ? 'Opening · First Spark' : 'Main loop · live'}
+              </p>
+              <p className="mt-2 font-display text-3xl md:text-4xl font-extrabold italic text-white tracking-tight leading-none drop-shadow-[0_4px_28px_rgba(0,0,0,0.75)]">
+                {BRAND.parent}
+              </p>
+              <p className="mt-1.5 text-[11px] font-mono uppercase tracking-[0.22em] text-amber-200/90">
+                {BRAND.passport} · {SLOGANS.zen}
+              </p>
+            </div>
+            <PlayerLevelChip />
+          </div>
 
           {/* Loop rail — clickable */}
           <nav
@@ -332,8 +345,20 @@ export default function MainLoopStage({
           <div className="mt-6 max-w-xl">
             {you && (
               <span className="text-[10px] font-mono uppercase tracking-[0.2em] text-slate-500">
-                For you · {progressTitle ? you : `@${you}`}
-                {progressTitle && handle ? (
+                For you ·{' '}
+                {identity.isCultureName ? (
+                  <span className="text-cyan-300/90 normal-case tracking-normal">{identity.handle}</span>
+                ) : progressTitle ? (
+                  you
+                ) : (
+                  `@${you}`
+                )}
+                {identity.isCultureName && progressTitle ? (
+                  <span className="text-slate-600 normal-case tracking-normal">
+                    {' '}
+                    · {progressTitle}
+                  </span>
+                ) : !identity.isCultureName && progressTitle && handle ? (
                   <span className="text-slate-600 normal-case tracking-normal"> · @{handle}</span>
                 ) : null}
               </span>
@@ -352,7 +377,7 @@ export default function MainLoopStage({
               onClick={cta.onGo}
               whileHover={reduceMotion ? undefined : { scale: 1.02 }}
               whileTap={reduceMotion ? undefined : { scale: 0.98 }}
-              className="inline-flex items-center justify-center gap-2 px-6 py-3.5 bg-white hover:bg-cyan-100 text-black font-black font-mono text-xs rounded-2xl tracking-wider cursor-pointer shadow-[0_0_40px_rgba(255,255,255,0.2)]"
+              className="cta-breathe inline-flex items-center justify-center gap-2 px-6 py-3.5 bg-amber-400 hover:bg-amber-300 text-black font-black font-mono text-xs rounded-2xl tracking-wider cursor-pointer"
             >
               {cta.label}
               <ArrowRight className="w-4 h-4" />

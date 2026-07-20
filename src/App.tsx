@@ -8,10 +8,16 @@ import { motion, AnimatePresence } from 'motion/react';
 import { 
   Zap, Battery, ShieldAlert, Cpu, Hammer, 
   Compass, Bot, Coins, Users, Calendar, 
-  Map, LogIn, LayoutGrid, Award, Ear, Focus, Activity, RefreshCw, User, Trophy, HelpCircle, Bell, Rocket, Menu, Images, X, EyeOff, Share2
+  Map, LogIn, LayoutGrid, Award, Ear, Focus, Activity, RefreshCw, User, Trophy, HelpCircle, Bell, Rocket, Menu, Images, X, EyeOff, Share2, Sparkles
 } from 'lucide-react';
 
-import { clearWalletToken, ensureWalletApiSession, getWalletToken } from './lib/api';
+import {
+  api,
+  clearWalletToken,
+  ensureWalletApiSession,
+  getCultureNameByWallet,
+  getWalletToken,
+} from './lib/api';
 import type { Keypair } from '@solana/web3.js';
 import { isEconomyConfigured } from './lib/solana-economy';
 import { GameState, HardwareModule, AIWorker, FacilityRoom, Guild, DailyMission, InspectionLog } from './types';
@@ -56,14 +62,24 @@ import {
   RoomEnter,
   buildAttentionBrief,
 } from './components/fx';
+import RewardToastHost from './components/RewardToastHost';
+import PlayerLevelChip from './components/PlayerLevelChip';
+import { rewardAction } from './lib/reward-bus';
 import FacilitySectorCard from './components/FacilitySectorCard';
 import FieldDeckClaim from './components/FieldDeckClaim';
 import HookLoopCampaign from './components/HookLoopCampaign';
+import TrapIdRitual from './components/TrapIdRitual';
+import CultureNameMine from './components/CultureNameMine';
+import InviteSharePanel from './components/InviteSharePanel';
+import GrowthFunStrip from './components/GrowthFunStrip';
 import SoundControls from './components/SoundControls';
+import { resolveDisplayIdentity, shareDisplayName } from './lib/display-identity';
 import { useSound } from './lib/sound/SoundContext';
 import { CORE_ATTENTION_SESSIONS } from './content/attention-intelligence';
 import { normalizeCardCode } from './lib/field-deck';
 import { getTruthById } from './lib/hook-loop-campaign';
+import { getTrapById } from './lib/trap-id';
+import { normalizeCultureLabel } from './lib/culture-names';
 import { getPhantomProvider } from './lib/phantom';
 import {
   dismissStory,
@@ -442,6 +458,27 @@ export default function App() {
     }
   });
 
+  const [pendingTrapId, setPendingTrapId] = useState<string | null>(() => {
+    if (typeof window === 'undefined') return null;
+    try {
+      const id = new URLSearchParams(window.location.search).get('trap');
+      return getTrapById(id)?.id ?? null;
+    } catch {
+      return null;
+    }
+  });
+
+  const [pendingCultureName, setPendingCultureName] = useState<string | null>(() => {
+    if (typeof window === 'undefined') return null;
+    try {
+      const n = new URLSearchParams(window.location.search).get('name');
+      const label = normalizeCultureLabel(n || '');
+      return label || null;
+    } catch {
+      return null;
+    }
+  });
+
   const [inviteCode, setInviteCode] = useState<string | null>(() => {
     if (typeof window === 'undefined') return null;
     return captureInviteFromUrl().record?.code ?? null;
@@ -452,6 +489,7 @@ export default function App() {
     try {
       const params = new URLSearchParams(window.location.search);
       if (normalizeCardCode(params.get('card'))) return 'field-deck';
+      if (getTrapById(params.get('trap'))) return 'trap-id';
       if (getTruthById(params.get('truth'))) return 'hook-loop';
       const room = params.get('room');
       if (
@@ -463,6 +501,9 @@ export default function App() {
         room === 'map' ||
         room === 'field-deck' ||
         room === 'hook-loop' ||
+        room === 'trap-id' ||
+        room === 'culture-name' ||
+        room === 'invite-share' ||
         room === 'passport'
       ) {
         return room;
@@ -795,6 +836,31 @@ export default function App() {
     };
   }, [currentUser?.walletAddress]);
 
+  /** Prefer mined Culture Name (laszlo.culture) over Op_… handle */
+  useEffect(() => {
+    const wallet = currentUser?.walletAddress;
+    if (!wallet) return;
+    let cancelled = false;
+    void getCultureNameByWallet(wallet)
+      .then((r) => {
+        if (cancelled || !r.claimed || !r.full) return;
+        setCurrentUser((prev) => {
+          if (!prev || prev.username === r.full) return prev;
+          const next = { ...prev, username: r.full! };
+          try {
+            localStorage.setItem('solana_current_user_session_v1', JSON.stringify(next));
+          } catch {
+            // ignore
+          }
+          return next;
+        });
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [currentUser?.walletAddress]);
+
   const handleLoginSuccess = (user: {
     username: string;
     email: string;
@@ -995,6 +1061,7 @@ export default function App() {
           ...(prev.notifications || []),
         ],
       }));
+      rewardAction('outer_circuit', { label: ch.reveal.split('—')[0].trim() });
       const fuelBit = ch.rewardEnergy > 0 ? ` · +${ch.rewardEnergy}% fuel` : '';
       setRewardBurst(`OUTER · ${ch.reveal.split('—')[0].trim()} · +${ch.rewardBcc} BCC${fuelBit}`);
       pushFlowToast(
@@ -1247,6 +1314,12 @@ export default function App() {
       roomName = 'Field Deck — Hunt & Claim';
     } else if (roomId === 'hook-loop') {
       roomName = 'Hook Loop — Meme Truths';
+    } else if (roomId === 'trap-id') {
+      roomName = 'Scroll Trap ID — What’s your bait?';
+    } else if (roomId === 'culture-name') {
+      roomName = 'Culture Names — Mine yours';
+    } else if (roomId === 'invite-share') {
+      roomName = 'Invite Cards — Grow the base';
     } else if (roomId === 'passport') {
       roomName = 'Human Passport';
     } else if (roomId === 'lab') {
@@ -1372,7 +1445,10 @@ export default function App() {
           return true;
         }
         const post = buildMemberInvitePost({
-          displayName: user.username,
+          displayName: shareDisplayName({
+            username: user.username,
+            walletAddress: user.walletAddress,
+          }),
           walletAddress: user.walletAddress,
         });
         try {
@@ -1565,6 +1641,17 @@ export default function App() {
     });
   }, [passportScores, currentUser?.walletAddress, firstRitualPending, fuelWin]);
 
+  /** Culture Name wins the headline once mined — everywhere. */
+  const displayIdentity = useMemo(
+    () =>
+      resolveDisplayIdentity({
+        username: currentUser?.username,
+        walletAddress: currentUser?.walletAddress,
+        progressTitle: progressTitle.title,
+      }),
+    [currentUser?.username, currentUser?.walletAddress, progressTitle.title]
+  );
+
   /** One strip: return greeting wins; otherwise room/phase quote */
   const loopMotivation =
     returnGreeting ?? pickQuote(`${activeRoom}:${navPhase}`);
@@ -1576,7 +1663,7 @@ export default function App() {
   };
 
   const navNextStep = (() => {
-    const you = currentUser?.username?.replace(/^@/, '') || 'operator';
+    const you = displayIdentity.handle || 'operator';
     if (firstRitualPending) {
       return {
         id: 'lab' as NavDestination,
@@ -1695,45 +1782,25 @@ export default function App() {
 
   const runLoopSpreadInvite = () => {
     if (!currentUser?.walletAddress) {
-      addLog('Connect a wallet to copy your invite.', 'warn');
+      addLog('Connect a wallet to share your invite.', 'warn');
       return;
     }
-    const post = withRotatingOg({
-      text: buildMemberInvitePost({
-        displayName: currentUser.username,
-        walletAddress: currentUser.walletAddress,
-      }),
-      appendImageLink: true,
-    }).text;
-    void navigator.clipboard?.writeText(post).then(async () => {
-      const first = !hasSpreadLove(currentUser.walletAddress!);
-      markSpreadLove(currentUser.walletAddress!);
-      track('spread_copy', { channel: 'loop_stage', first });
-      void reportGrowthEvent({
-        type: 'spread',
-        actorCode: inviteCodeFromWallet(currentUser.walletAddress),
-        nonce: `spread:loop:${currentUser.walletAddress}:${first ? '1' : Date.now()}`,
-      });
-      addLog(
-        first
-          ? 'Invite copied — pass it to someone who needs the hook.'
-          : 'Invite copied — love & knowledge on the move.',
-        'success'
-      );
-      if (first) {
-        playSound('success');
-        setRewardBurst('SPREAD · INVITE COPIED · LOVE TRAVELS');
-        const res = await sendAttentionProofMemo({
-          kind: 'spread',
-          parts: { channel: 'loop_stage' },
-        });
-        if ('signature' in res) {
-          addLog(`Spread sealed on Devnet — ${res.solscan}`, 'success');
-        }
-      } else {
-        playSound('soft');
-      }
-    });
+    const first = !hasSpreadLove(currentUser.walletAddress);
+    markSpreadLove(currentUser.walletAddress);
+    track('spread_copy', { channel: 'invite_card_room', first });
+    changeRoom('invite-share');
+    addLog('INVITE: Pick a growth card — share image + text.', 'info');
+    void reportGrowthEvent({
+      type: 'spread',
+      actorCode: inviteCodeFromWallet(currentUser.walletAddress),
+      nonce: `spread:invite_card:${currentUser.walletAddress}:${first ? '1' : Date.now()}`,
+    }).catch(() => undefined);
+    if (first) {
+      playSound('success');
+      setRewardBurst('SPREAD · INVITE CARD · LOVE TRAVELS');
+    } else {
+      playSound('soft');
+    }
   };
 
   const handleNavNavigate = (id: NavDestination) => {
@@ -1743,6 +1810,9 @@ export default function App() {
         'map',
         'passport',
         'hook-loop',
+        'trap-id',
+        'culture-name',
+        'invite-share',
         'field-deck',
         'legal-privacy',
         'legal-terms',
@@ -2243,6 +2313,12 @@ export default function App() {
           </div>
         </button>
 
+        <PlayerLevelChip
+          compact
+          className="shrink-0"
+          onClick={() => changeRoom('passport')}
+        />
+
         {/* Desktop facility metrics — hidden during loop sanctuary + phone */}
         {!loopSanctuary && (
         <div
@@ -2290,10 +2366,20 @@ export default function App() {
         {/* Actions — Menu always available; Hear + bell on all viewports */}
         <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
           {currentUser && (
-            <div className="hidden md:flex items-center gap-2 px-3 py-1.5 bg-cyan-950/20 border border-cyan-500/20 rounded-lg font-mono text-[10px] text-cyan-400 font-bold uppercase" title={`@${currentUser.username}${currentUser.walletAddress ? ` · ${currentUser.walletAddress}` : ''}`}>
+            <div className="hidden md:flex items-center gap-2 px-3 py-1.5 bg-cyan-950/20 border border-cyan-500/20 rounded-lg font-mono text-[10px] text-cyan-400 font-bold uppercase" title={`${displayIdentity.atHandle}${currentUser.walletAddress ? ` · ${currentUser.walletAddress}` : ''}`}>
               <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
-              <span className="normal-case tracking-wide text-cyan-200">{progressTitle.title}</span>
-              <span className="text-slate-500 font-normal">@{currentUser.username}</span>
+              {displayIdentity.isCultureName ? (
+                <span className="normal-case tracking-wide text-cyan-100 font-black">
+                  {displayIdentity.handle}
+                </span>
+              ) : (
+                <span className="normal-case tracking-wide text-cyan-200">{progressTitle.title}</span>
+              )}
+              <span className="text-slate-500 font-normal">
+                {displayIdentity.isCultureName
+                  ? progressTitle.title
+                  : displayIdentity.atHandle}
+              </span>
               {currentUser.walletAddress && hasHumanPassport(currentUser.walletAddress) && (
                 <span className="text-amber-400/90 border border-amber-500/30 bg-amber-500/10 px-1.5 py-0.5 rounded" title="Human Passport claimed">
                   Passport
@@ -2311,7 +2397,10 @@ export default function App() {
                   onClick={() => {
                     const post = withRotatingOg({
                       text: buildMemberInvitePost({
-                        displayName: currentUser.username,
+                        displayName: shareDisplayName({
+                          username: currentUser.username,
+                          walletAddress: currentUser.walletAddress!,
+                        }),
                         walletAddress: currentUser.walletAddress!,
                       }),
                       appendImageLink: true,
@@ -2525,6 +2614,9 @@ export default function App() {
                   void: 'SECTOR_VOID',
                   'field-deck': 'SECTOR_FIELD',
                   'hook-loop': 'SECTOR_HOOK',
+                  'trap-id': 'SECTOR_TRAP',
+                  'culture-name': 'SECTOR_NAME',
+                  'invite-share': 'SECTOR_GROW',
                   passport: 'SECTOR_PASS',
                   roadmap: 'SECTOR_PATH',
                   onboarding: 'SECTOR_HUB',
@@ -2668,6 +2760,17 @@ export default function App() {
                             }
                             changeRoom(nextQuest.room);
                           },
+                          onTrapId: () => {
+                            setPendingTrapId(null);
+                            changeRoom('trap-id');
+                          },
+                          onCultureName: () => {
+                            setPendingCultureName(null);
+                            changeRoom('culture-name');
+                          },
+                          cultureName: displayIdentity.isCultureName
+                            ? displayIdentity.handle
+                            : null,
                         }
                   }
                 />
@@ -2758,7 +2861,35 @@ export default function App() {
                     }
                     changeRoom(nextQuest.room);
                   }}
+                  onTrapId={() => {
+                    setPendingTrapId(null);
+                    changeRoom('trap-id');
+                  }}
+                  onCultureName={() => {
+                    setPendingCultureName(null);
+                    changeRoom('culture-name');
+                  }}
+                  cultureName={
+                    displayIdentity.isCultureName ? displayIdentity.handle : null
+                  }
                   compact
+                />
+              )}
+
+              {!focusMode && !firstRitualPending && (
+                <GrowthFunStrip
+                  cultureName={
+                    displayIdentity.isCultureName ? displayIdentity.handle : null
+                  }
+                  onTrapId={() => {
+                    setPendingTrapId(null);
+                    changeRoom('trap-id');
+                  }}
+                  onCultureName={() => {
+                    setPendingCultureName(null);
+                    changeRoom('culture-name');
+                  }}
+                  onInvite={() => changeRoom('invite-share')}
                 />
               )}
 
@@ -2766,7 +2897,7 @@ export default function App() {
                 <motion.div
                   initial={{ opacity: 0, y: 8 }}
                   animate={{ opacity: 1, y: 0 }}
-                  className="relative overflow-hidden rounded-2xl border border-rose-400/35 shadow-[0_20px_60px_rgba(0,0,0,0.45)] px-4 py-4 md:px-5 flex flex-wrap items-center justify-between gap-3"
+                  className="relative overflow-hidden rounded-2xl border border-amber-400/35 shadow-[0_20px_60px_rgba(0,0,0,0.45)] px-4 py-4 md:px-5 flex flex-wrap items-center justify-between gap-3"
                 >
                   <img
                     src="/campaign/failure-curve.webp"
@@ -2776,31 +2907,43 @@ export default function App() {
                   />
                   <div className="absolute inset-0 bg-gradient-to-r from-[#0a0608]/90 via-[#0a080c]/75 to-amber-950/40" />
                   <div className="relative z-10 min-w-0 flex items-start gap-3">
-                    <div className="w-11 h-11 rounded-2xl bg-rose-500/20 border border-rose-300/45 flex items-center justify-center shrink-0 backdrop-blur-md">
-                      <Share2 className="w-4 h-4 text-rose-200" />
+                    <div className="w-11 h-11 rounded-2xl bg-amber-500/20 border border-amber-300/45 flex items-center justify-center shrink-0 backdrop-blur-md">
+                      <Share2 className="w-4 h-4 text-amber-200" />
                     </div>
                     <div className="min-w-0">
-                      <p className="font-mono text-[9px] font-black tracking-[0.22em] uppercase text-rose-300">
-                        Campaign · Hook Loop
+                      <p className="font-mono text-[9px] font-black tracking-[0.22em] uppercase text-amber-300">
+                        Viral · Scroll Trap ID
                       </p>
                       <p className="mt-1 font-display text-lg font-bold italic text-white leading-snug">
-                        {SLOGANS.hookLoop}
+                        {SLOGANS.trapId}
                       </p>
                       <p className="mt-0.5 text-[12px] text-slate-200/85 leading-relaxed">
-                        {SLOGANS.hookLoopShare}
+                        {SLOGANS.trapIdSub} {SLOGANS.trapIdShare}
                       </p>
                     </div>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setPendingTruthId(null);
-                      changeRoom('hook-loop');
-                    }}
-                    className="relative z-10 px-4 py-2.5 rounded-2xl bg-white hover:bg-rose-100 text-black font-mono text-[10px] font-black uppercase tracking-wider cursor-pointer shrink-0"
-                  >
-                    Enter loop
-                  </button>
+                  <div className="relative z-10 flex flex-wrap gap-2 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPendingTrapId(null);
+                        changeRoom('trap-id');
+                      }}
+                      className="px-4 py-2.5 rounded-2xl bg-amber-400 hover:bg-amber-300 text-black font-mono text-[10px] font-black uppercase tracking-wider cursor-pointer"
+                    >
+                      Find mine
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPendingTruthId(null);
+                        changeRoom('hook-loop');
+                      }}
+                      className="px-3 py-2.5 rounded-2xl border border-white/20 hover:border-white/40 text-slate-100 font-mono text-[10px] font-black uppercase tracking-wider cursor-pointer"
+                    >
+                      Hook Loop
+                    </button>
+                  </div>
                 </motion.div>
               )}
 
@@ -2823,12 +2966,12 @@ export default function App() {
                       <div className="min-w-0">
                         <span className="text-[10px] font-mono font-bold text-cyan-400 block tracking-widest uppercase">
                           {currentUser
-                            ? `@${currentUser.username.replace(/^@/, '')} · proof waiting`
+                            ? `${displayIdentity.atHandle} · proof waiting`
                             : 'Proof of Attention · start here'}
                         </span>
                         <h4 className="font-display text-xl font-extrabold italic text-white mt-1 tracking-tight">
                           {currentUser
-                            ? `${currentUser.username.replace(/^@/, '')}, your first Spark`
+                            ? `${displayIdentity.handle}, your first Spark`
                             : 'Your first Spark'}
                         </h4>
                         <p className="text-xs text-slate-400 mt-2 max-w-xl font-sans leading-relaxed">
@@ -3088,7 +3231,7 @@ export default function App() {
                       {firstRitualPending
                         ? 'Your next room · Academy'
                         : currentUser
-                          ? `@${currentUser.username.replace(/^@/, '')} · rooms`
+                          ? `${displayIdentity.atHandle} · rooms`
                           : 'Facility schematic'}
                     </h3>
                   </div>
@@ -3266,6 +3409,68 @@ export default function App() {
                     </div>
                   </div>
 
+                  {/* Culture Names — laszlo.culture */}
+                  <div className="bg-gradient-to-br from-[#081418] to-[#080605] border border-cyan-500/35 hover:border-cyan-400/55 rounded-2xl p-5 shadow-xl flex flex-col justify-between overflow-hidden relative min-h-[210px] transition-all duration-300">
+                    <span className="absolute top-4 right-4 font-mono text-[9px] text-cyan-500/60">SECTOR_NAME</span>
+                    <div>
+                      <div className="flex items-center gap-2 mb-3">
+                        <Sparkles className="w-4 h-4 text-cyan-300" />
+                        <h4 className="font-sans text-sm font-bold text-white tracking-tight">
+                          Culture Names
+                        </h4>
+                      </div>
+                      <p className="text-xs text-slate-400 font-sans leading-relaxed">
+                        Mine a wallet name like laszlo.culture — first come, one per wallet.
+                      </p>
+                    </div>
+                    <div className="mt-5 pt-3.5 border-t border-white/5 flex items-center justify-between gap-3 font-mono text-[11px]">
+                      <span className="border border-cyan-500/25 px-2 py-0.5 rounded-lg text-[9px] font-bold tracking-widest uppercase bg-cyan-950/30 text-cyan-200">
+                        .CULTURE
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setPendingCultureName(null);
+                          changeRoom('culture-name');
+                        }}
+                        className="px-3.5 py-1.5 bg-cyan-400 hover:bg-cyan-300 text-black font-black rounded-lg text-[10px] cursor-pointer tracking-wider"
+                      >
+                        MINE NAME
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Trap ID — viral awareness quiz */}
+                  <div className="bg-gradient-to-br from-[#161208] to-[#080605] border border-amber-500/35 hover:border-amber-400/55 rounded-2xl p-5 shadow-xl flex flex-col justify-between overflow-hidden relative min-h-[210px] transition-all duration-300">
+                    <span className="absolute top-4 right-4 font-mono text-[9px] text-amber-500/60">SECTOR_TRAP</span>
+                    <div>
+                      <div className="flex items-center gap-2 mb-3">
+                        <Share2 className="w-4 h-4 text-amber-300" />
+                        <h4 className="font-sans text-sm font-bold text-white tracking-tight">
+                          Scroll Trap ID
+                        </h4>
+                      </div>
+                      <p className="text-xs text-slate-400 font-sans leading-relaxed">
+                        What’s your bait? Three taps → named trap → challenge a friend to find theirs.
+                      </p>
+                    </div>
+                    <div className="mt-5 pt-3.5 border-t border-white/5 flex items-center justify-between gap-3 font-mono text-[11px]">
+                      <span className="border border-amber-500/25 px-2 py-0.5 rounded-lg text-[9px] font-bold tracking-widest uppercase bg-amber-950/30 text-amber-200">
+                        VIRAL · 30 SEC
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setPendingTrapId(null);
+                          changeRoom('trap-id');
+                        }}
+                        className="px-3.5 py-1.5 bg-amber-400 hover:bg-amber-300 text-black font-black rounded-lg text-[10px] cursor-pointer tracking-wider"
+                      >
+                        FIND MINE
+                      </button>
+                    </div>
+                  </div>
+
                   {/* Hook Loop — social meme campaign */}
                   <div className="bg-gradient-to-br from-[#16080e] to-[#080508] border border-rose-500/35 hover:border-rose-400/55 rounded-2xl p-5 shadow-xl flex flex-col justify-between overflow-hidden relative min-h-[210px] transition-all duration-300">
                     <span className="absolute top-4 right-4 font-mono text-[9px] text-rose-500/60">SECTOR_HOOK</span>
@@ -3414,6 +3619,7 @@ export default function App() {
                     });
                     setLoopFacilityOpen(false);
                     setZenNote(null);
+                    rewardAction('spark');
                     const meta = advanceMetaQuest('first_spark');
                     setMetaView(meta);
                     grantMetaRewards(meta);
@@ -3425,6 +3631,7 @@ export default function App() {
                   }}
                   onAwarenessSessionComplete={(sessionId) => {
                     if (sessionId !== 'ai_hook_mirror') return;
+                    rewardAction('hook_mirror');
                     setLoopFacilityOpen(false);
                     changeRoom('map');
                     addLog(
@@ -3571,6 +3778,51 @@ export default function App() {
                   onOpenMap={() => changeRoom('map')}
                 />
               )}
+              {activeRoom === 'trap-id' && (
+                <TrapIdRitual
+                  challengedTrapId={pendingTrapId}
+                  addLog={addLog}
+                  onOpenHookLoop={() => {
+                    setPendingTruthId(null);
+                    changeRoom('hook-loop');
+                  }}
+                  onOpenAcademy={() => changeRoom('lab')}
+                  onOpenMap={() => changeRoom('map')}
+                />
+              )}
+              {activeRoom === 'culture-name' && (
+                <CultureNameMine
+                  walletAddress={currentUser?.walletAddress ?? null}
+                  seedUsername={currentUser?.username}
+                  initialName={pendingCultureName}
+                  addLog={addLog}
+                  onClaimed={(full) => {
+                    setCurrentUser((prev) => {
+                      if (!prev) return prev;
+                      const next = { ...prev, username: full };
+                      try {
+                        localStorage.setItem(
+                          'solana_current_user_session_v1',
+                          JSON.stringify(next)
+                        );
+                      } catch {
+                        // ignore
+                      }
+                      return next;
+                    });
+                    void api.syncUser(full, currentUser?.walletAddress).catch(() => undefined);
+                  }}
+                  onOpenMap={() => changeRoom('map')}
+                />
+              )}
+              {activeRoom === 'invite-share' && currentUser?.walletAddress && (
+                <InviteSharePanel
+                  username={currentUser.username}
+                  walletAddress={currentUser.walletAddress}
+                  addLog={addLog}
+                  onOpenMap={() => changeRoom('map')}
+                />
+              )}
               {activeRoom === 'passport' && currentUser && (
                 <HumanPassportDashboard
                   username={currentUser.username}
@@ -3629,6 +3881,9 @@ export default function App() {
                 'void',
                 'field-deck',
                 'hook-loop',
+                'trap-id',
+                'culture-name',
+                'invite-share',
                 'passport',
                 'partners',
                 'onboarding',
@@ -3678,7 +3933,7 @@ export default function App() {
             : currentUser?.walletAddress
               ? `${currentUser.walletAddress.slice(0, 4)}…${currentUser.walletAddress.slice(-4)}`
               : currentUser?.username
-                ? `@${currentUser.username}`
+                ? displayIdentity.atHandle
                 : null
         }
         bccBalance={loopSanctuary || firstRitualPending ? undefined : state.credits}
@@ -3839,6 +4094,8 @@ export default function App() {
           </React.Fragment>
         )}
       </AnimatePresence>
+
+      <RewardToastHost />
 
       <ClaimBurst
         show={!!rewardBurst}

@@ -69,6 +69,8 @@ import {
 } from '../lib/growth-path';
 import { friendlyFailureDetail, thrownToUserError } from '../lib/user-errors';
 import PersonalHookGate from './PersonalHookGate';
+import { rewardAction } from '../lib/reward-bus';
+import LivingAmbient from './fx/LivingAmbient';
 
 interface AttentionAcademyProps {
   state: GameState;
@@ -246,6 +248,7 @@ export default function AttentionAcademy({
       saveZenDecision(activeSession.id, decision);
       setLearningDecision(decision);
       track('zen_decision', { sessionId: activeSession.id, decision });
+      rewardAction(decision === 'hold_knowledge' ? 'zen_mind' : 'zen_machine');
       if (decision === 'hold_knowledge') {
         addLog('Mind · knowledge held. Sit with it — fuel can wait.', 'system');
         if (hearing?.active && hearing.speakLine) {
@@ -889,23 +892,24 @@ export default function AttentionAcademy({
     <div className="space-y-6">
       {showMentor && recommendedSession && recommendedIdx != null && (
         <div
-          className={`rounded-2xl border p-4 relative overflow-hidden ${
+          className={`rounded-2xl border p-4 md:p-5 relative overflow-hidden ${
             ritualPending
-              ? 'border-cyan-400/40 bg-[#080a10]/70'
-              : 'border-cyan-400/30 bg-gradient-to-r from-cyan-500/10 via-[#0a0a0c] to-emerald-500/10'
+              ? 'border-cyan-400/40 bg-gradient-to-br from-[#0a1218]/80 via-[#08060a] to-amber-950/25'
+              : 'border-amber-400/30 bg-gradient-to-br from-[#141008]/90 via-[#08060a] to-cyan-950/30'
           }`}
         >
-          <div className="absolute inset-0 opacity-95">
+          <div className="absolute inset-0 opacity-90">
             <CinematicBackdrop variant={ritualPending ? 'ritual' : 'duality'} />
           </div>
+          <div className="absolute -right-10 -top-10 w-36 h-36 rounded-full bg-amber-400/15 blur-3xl" />
           <div className="relative flex flex-wrap items-center gap-2 mb-1.5">
-            <p className="text-[10px] font-mono text-cyan-400 tracking-[0.22em] uppercase flex items-center gap-1.5">
+            <p className="font-mono text-[9px] font-black text-amber-300/90 tracking-[0.28em] uppercase flex items-center gap-1.5">
               <Sparkles className="w-3.5 h-3.5" />{' '}
               {ritualPending
                 ? 'Proof of Attention · Knowledge challenge'
                 : hookMirrorPending
                   ? 'Hook Mirror · why you scroll again'
-                  : 'AI mentor · attention → fuel'}
+                  : 'Next beat · attention → fuel'}
             </p>
             <span
               className={`text-[9px] font-mono uppercase tracking-wider px-2 py-0.5 rounded-md border ${
@@ -929,36 +933,39 @@ export default function AttentionAcademy({
                     : ''}
             </span>
           </div>
-          <p className="text-sm text-slate-100 mt-1.5 relative leading-relaxed">
+          <p className="relative mt-2 font-display text-lg md:text-xl font-bold italic text-white leading-snug">
+            {ritualPending
+              ? 'Not empty hashes — prove attention, earn fuel.'
+              : hookMirrorPending
+                ? 'Name the hook. Then Zen: Mind or Machine.'
+                : `Reserves at ${state.energy}% — refill with focus.`}
+          </p>
+          <p className="text-sm text-slate-300/90 mt-1.5 relative leading-relaxed">
             {ritualPending ? (
               <>
-                We&apos;re here for attention — not empty hashes. Pass a short snap, leave one honest
-                line, watch knowledge become fuel. That&apos;s Proof of Attention.{' '}
+                Pass a short snap, leave one honest line, watch knowledge become fuel.{' '}
                 {recommendedSession ? (
                   <>
-                    <span className="text-amber-300 font-semibold">{recommendedSession.title}</span>
+                    <span className="text-amber-200 font-semibold">{recommendedSession.title}</span>
                     {' '}(~{recommendedSession.durationMin} min).
                   </>
                 ) : null}
               </>
             ) : hookMirrorPending ? (
               <>
-                This is why the Human Passport exists — name what hooks you, what you notice when
-                you&apos;re doomscrolling again, and why you keep going. Then Zen: Mind or Machine.{' '}
+                This is why the Human Passport exists — name what hooks you when you doomscroll again.{' '}
                 {recommendedSession ? (
                   <>
-                    <span className="text-amber-300 font-semibold">{recommendedSession.title}</span>
+                    <span className="text-amber-200 font-semibold">{recommendedSession.title}</span>
                     {' '}(~{recommendedSession.durationMin} min).
                   </>
                 ) : null}
               </>
             ) : (
               <>
-                Reserves at{' '}
-                <span className="text-cyan-300 font-mono font-bold">{state.energy}%</span>.{' '}
                 {recommendedSession ? (
                   <>
-                    <span className="text-fuchsia-300 font-semibold">{recommendedSession.title}</span>{' '}
+                    <span className="text-amber-200 font-semibold">{recommendedSession.title}</span>{' '}
                     can restore ~{recommendedSession.rewards.energy}% energy in ~
                     {recommendedSession.durationMin} min.
                   </>
@@ -970,13 +977,13 @@ export default function AttentionAcademy({
             <button
               type="button"
               onClick={() => setActiveSessionIdx(recommendedIdx)}
-              className="mt-3 relative text-[10px] font-mono uppercase tracking-wider px-3 py-1.5 rounded-lg bg-cyan-500 text-black font-black hover:bg-cyan-400 cursor-pointer"
+              className="mt-4 relative inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-amber-400 hover:bg-amber-300 text-black font-mono text-xs font-black uppercase tracking-wider cursor-pointer shadow-[0_0_28px_rgba(251,191,36,0.35)]"
             >
               {ritualPending
                 ? 'Start Proof of Attention →'
                 : hookMirrorPending
                   ? 'Start Hook Mirror →'
-                  : 'Start recommended session →'}
+                  : 'Start recommended →'}
             </button>
           )}
         </div>
@@ -1007,14 +1014,14 @@ export default function AttentionAcademy({
         <button
           type="button"
           onClick={onOpenRoadmap}
-          className="w-full text-left rounded-xl border border-emerald-500/20 bg-gradient-to-r from-emerald-500/10 to-violet-500/10 px-4 py-3 flex items-center justify-between gap-3 hover:border-emerald-400/40 transition-colors"
+          className="w-full text-left rounded-xl border border-emerald-400/25 bg-gradient-to-r from-emerald-500/10 via-[#0a0c10] to-violet-500/10 px-4 py-3.5 flex items-center justify-between gap-3 hover:border-emerald-400/45 transition-colors cursor-pointer"
         >
           <div>
-            <p className="text-[10px] font-mono text-emerald-400 tracking-widest uppercase">
+            <p className="font-mono text-[9px] font-black text-emerald-300 tracking-[0.22em] uppercase">
               Roadmap · 4 films
             </p>
-            <p className="text-sm text-slate-200">
-              2D mining → weekly intelligence → creator labs → AR — each chapter has its own video
+            <p className="font-display text-sm italic font-semibold text-slate-100 mt-0.5">
+              2D mining → weekly intelligence → creator labs → AR
             </p>
           </div>
           <Map className="w-4 h-4 text-emerald-400 shrink-0" />
@@ -1022,8 +1029,8 @@ export default function AttentionAcademy({
       )}
 
       {!ritualPending && weekly.length > 0 && (
-        <div className="rounded-xl border border-cyan-500/25 bg-cyan-500/5 p-4">
-          <p className="text-[10px] font-mono text-cyan-400 tracking-widest uppercase mb-1 flex items-center gap-1.5">
+        <div className="rounded-xl border border-cyan-400/30 bg-gradient-to-r from-cyan-500/10 via-[#0a0c12] to-amber-500/5 p-4">
+          <p className="font-mono text-[9px] font-black text-cyan-300 tracking-[0.22em] uppercase mb-1.5 flex items-center gap-1.5">
             <Sparkles className="w-3.5 h-3.5" /> This week&apos;s drop
           </p>
           {weekly.map((w) => (
@@ -1046,11 +1053,14 @@ export default function AttentionAcademy({
       <div className={`grid grid-cols-1 gap-6 ${ritualPending ? '' : 'lg:grid-cols-3'}`}>
         {!ritualPending && (
         <div className="space-y-3">
-          <div className="rounded-2xl border border-white/5 bg-[#0a0a0c] p-4">
-            <p className="text-[10px] font-mono text-fuchsia-400 tracking-widest mb-3">SERIES PROGRESS</p>
-            <div className="h-2 rounded-full bg-white/5 overflow-hidden mb-2">
+          <div className="relative overflow-hidden rounded-2xl border border-amber-400/25 bg-gradient-to-br from-[#141008]/90 via-[#0a080c] to-cyan-950/30 p-4">
+            <div className="absolute -right-8 -top-8 w-28 h-28 rounded-full bg-amber-400/15 blur-2xl" />
+            <p className="relative font-mono text-[9px] font-black text-amber-300/90 tracking-[0.28em] uppercase mb-3">
+              Series progress
+            </p>
+            <div className="relative h-2.5 rounded-full bg-black/50 overflow-hidden mb-2 border border-white/8">
               <div
-                className="h-full bg-gradient-to-r from-fuchsia-500 to-cyan-400 transition-all"
+                className="h-full bg-gradient-to-r from-amber-400 via-cyan-400 to-emerald-400 transition-all"
                 style={{
                   width: `${Math.max(
                     4,
@@ -1061,24 +1071,24 @@ export default function AttentionAcademy({
                 }}
               />
             </div>
-            <p className="text-[11px] text-slate-500 font-mono">
+            <p className="relative text-[11px] text-slate-400 font-mono">
               {completedSessions.filter((id) => CORE_ATTENTION_SESSIONS.some((s) => s.id === id)).length} /{' '}
-              {CORE_ATTENTION_SESSIONS.length} CORE
+              {CORE_ATTENTION_SESSIONS.length} core sealed
             </p>
-            <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+            <div className="relative mt-3 flex flex-wrap items-center justify-between gap-2">
               <p className="text-[10px] font-mono uppercase tracking-wider text-cyan-300/90">
                 {PATH_LABELS[growthPath ?? 'balanced']}
               </p>
               <button
                 type="button"
                 onClick={() => setShowPathGate((v) => !v)}
-                className="text-[10px] font-mono uppercase tracking-wider text-slate-500 hover:text-cyan-300 cursor-pointer"
+                className="text-[10px] font-mono uppercase tracking-wider text-slate-500 hover:text-amber-300 cursor-pointer"
               >
                 {showPathGate ? 'Close' : 'Change path'}
               </button>
             </div>
             {isMaster && (
-              <p className="mt-2 text-xs text-amber-300 flex items-center gap-1.5">
+              <p className="relative mt-2 text-xs text-amber-200 flex items-center gap-1.5">
                 <Award className="w-3.5 h-3.5" /> Core series mastered
               </p>
             )}
@@ -1096,7 +1106,7 @@ export default function AttentionAcademy({
             />
           )}
 
-          <div className="space-y-1.5 max-h-[420px] overflow-y-auto pr-1">
+          <div className="space-y-2 max-h-[420px] overflow-y-auto pr-1">
             {catalog.map((session, idx) => {
               const done = completedSessions.includes(session.id);
               const locked = isSessionLocked(idx);
@@ -1107,33 +1117,41 @@ export default function AttentionAcademy({
                   type="button"
                   disabled={locked}
                   onClick={() => setActiveSessionIdx(idx)}
-                  className={`w-full text-left rounded-xl border px-3 py-2.5 transition-colors ${
+                  className={`w-full text-left rounded-xl border px-3.5 py-3 transition-colors ${
                     recommended
-                      ? 'border-cyan-400/50 bg-cyan-500/10 shadow-[0_0_24px_rgba(34,211,238,0.15)]'
+                      ? 'border-amber-400/55 bg-amber-500/12 shadow-[0_0_28px_rgba(251,191,36,0.18)]'
                       : activeSessionIdx === idx
-                        ? 'border-fuchsia-400/40 bg-fuchsia-500/10'
-                        : 'border-white/5 bg-white/[0.02] hover:border-white/15'
-                  } ${locked ? 'opacity-40 cursor-not-allowed' : ''}`}
+                        ? 'border-cyan-400/45 bg-cyan-500/10'
+                        : 'border-white/10 bg-white/[0.03] hover:border-amber-400/30 hover:bg-amber-500/5'
+                  } ${locked ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'}`}
                 >
                   <div className="flex items-center gap-2">
                     {done ? (
-                      <Check className="w-3.5 h-3.5 text-emerald-400" />
+                      <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
                     ) : locked ? (
-                      <Lock className="w-3.5 h-3.5 text-slate-600" />
+                      <Lock className="w-3.5 h-3.5 text-slate-600 shrink-0" />
                     ) : (
-                      <Brain className="w-3.5 h-3.5 text-fuchsia-400" />
+                      <Brain className="w-3.5 h-3.5 text-amber-300 shrink-0" />
                     )}
-                    <span className="text-xs font-semibold text-slate-200 truncate">
+                    <span
+                      className={`truncate ${
+                        recommended || activeSessionIdx === idx
+                          ? 'font-display text-sm italic font-bold text-white'
+                          : 'text-xs font-semibold text-slate-200'
+                      }`}
+                    >
                       {session.seriesOrder}. {session.title}
                     </span>
                   </div>
                   <div className="mt-1.5 flex items-center gap-2 flex-wrap">
-                    <span className="text-[9px] font-mono text-emerald-400/90 bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.5 rounded">
-                      +{session.rewards.energy}% FUEL
+                    <span className="text-[9px] font-mono text-emerald-300/90 bg-emerald-500/10 border border-emerald-500/25 px-1.5 py-0.5 rounded">
+                      +{session.rewards.energy}% fuel
                     </span>
-                    <span className="text-[9px] font-mono text-amber-400/80">+{session.rewards.cp} CP</span>
+                    <span className="text-[9px] font-mono text-amber-300/90">+{session.rewards.cp} CP</span>
                     {recommended && (
-                      <span className="text-[8px] font-mono text-cyan-300 tracking-wider uppercase">Recommended</span>
+                      <span className="text-[8px] font-mono text-amber-200 tracking-wider uppercase">
+                        Up next
+                      </span>
                     )}
                   </div>
                 </button>
@@ -1143,27 +1161,33 @@ export default function AttentionAcademy({
         </div>
         )}
 
-        <div className={`${ritualPending ? '' : 'lg:col-span-2'} rounded-2xl border border-white/10 bg-[#0a0a0c]/80 p-5 relative overflow-hidden`}>
-          <div className="absolute inset-0 opacity-80">
+        <div
+          className={`${ritualPending ? '' : 'lg:col-span-2'} relative overflow-hidden rounded-2xl border border-amber-400/20 bg-gradient-to-br from-[#121018]/85 via-[#0a080c]/90 to-cyan-950/25 p-5 md:p-6`}
+        >
+          <div className="absolute inset-0 opacity-75">
             <CinematicBackdrop variant="duality" />
           </div>
+          <LivingAmbient intensity="soft" />
+          <div className="absolute -right-16 top-0 w-48 h-48 rounded-full bg-cyan-400/10 blur-3xl" />
           {justUpgraded && (
-            <div className="absolute inset-x-0 top-0 bg-emerald-500/20 text-emerald-300 text-center text-[11px] font-mono py-1.5 z-10">
+            <div className="absolute inset-x-0 top-0 z-10 bg-gradient-to-r from-amber-500/25 via-emerald-500/25 to-cyan-500/25 text-amber-50 text-center text-[11px] font-mono font-bold tracking-wider py-2">
               {fuelProofToast
-                ? 'PROOF ACCEPTED — YOUR NODE HAS FUEL'
-                : 'NEURAL REWIRE SECURED · ENERGY ROUTED TO REACTOR'}
+                ? 'Proof accepted — your node has fuel'
+                : 'Neural rewire secured · energy routed'}
             </div>
           )}
 
           <div className="relative z-[1] flex items-start justify-between gap-3 mb-4">
             <div>
-              <p className="text-[10px] font-mono text-amber-300/90 tracking-widest">
-                SESSION {String(activeSession.seriesOrder).padStart(2, '0')} · MIND ↔ MACHINE
+              <p className="font-mono text-[9px] font-black text-amber-300/90 tracking-[0.28em] uppercase">
+                Session {String(activeSession.seriesOrder).padStart(2, '0')} · Mind ↔ Machine
               </p>
-              <h3 className="text-lg font-bold text-white mt-1">{activeSession.title}</h3>
+              <h3 className="font-display text-xl md:text-2xl font-extrabold italic text-white mt-1.5 tracking-tight">
+                {activeSession.title}
+              </h3>
             </div>
-            <span className="text-[10px] font-mono text-cyan-400/80 shrink-0">
-              EST {activeSession.durationMin} MIN
+            <span className="shrink-0 px-2.5 py-1 rounded-lg border border-cyan-400/30 bg-cyan-500/10 font-mono text-[10px] font-bold text-cyan-200">
+              ~{activeSession.durationMin} min
             </span>
           </div>
 
@@ -1200,7 +1224,7 @@ export default function AttentionAcademy({
                     type="button"
                     disabled={!exerciseReady || learningDecision !== 'convert_fuel'}
                     onClick={() => claimSessionRewards(activeSessionIdx)}
-                    className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-500/25 to-cyan-500/25 border border-cyan-400/40 text-cyan-100 text-xs font-bold disabled:opacity-40"
+                    className="inline-flex items-center gap-2 px-5 py-3.5 rounded-xl bg-amber-400 hover:bg-amber-300 disabled:opacity-40 text-black font-mono text-xs font-black uppercase tracking-wider cursor-pointer shadow-[0_0_28px_rgba(251,191,36,0.3)]"
                   >
                     Prove it · Neural Snap <ArrowRight className="w-3.5 h-3.5" />
                   </button>
@@ -1209,7 +1233,7 @@ export default function AttentionAcademy({
                   <button
                     type="button"
                     onClick={() => void attestPendingPoa()}
-                    className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-500/15 border border-emerald-400/40 text-emerald-300 text-xs font-bold"
+                    className="inline-flex items-center gap-2 px-4 py-3 rounded-xl bg-emerald-500/15 border border-emerald-400/40 text-emerald-200 font-mono text-[10px] font-black uppercase tracking-wider cursor-pointer"
                   >
                     <ShieldCheck className="w-3.5 h-3.5" /> Seal PoA on Devnet
                   </button>
@@ -1218,14 +1242,14 @@ export default function AttentionAcademy({
                   <button
                     type="button"
                     onClick={openSoulboundRitual}
-                    className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-cyan-500/20 border border-cyan-400/45 text-cyan-100 text-xs font-bold"
+                    className="inline-flex items-center gap-2 px-4 py-3 rounded-xl bg-cyan-500/15 border border-cyan-400/40 text-cyan-100 font-mono text-[10px] font-black uppercase tracking-wider cursor-pointer"
                   >
-                    <Sparkles className="w-3.5 h-3.5" /> SEAL SOULBOUND · ZK
+                    <Sparkles className="w-3.5 h-3.5" /> Seal soulbound · ZK
                   </button>
                 )}
               </div>
-              <p className="mt-3 text-[10px] text-slate-500">
-                Rewards: +{activeSession.rewards.cp} CP · +{activeSession.rewards.energy}% energy · +
+              <p className="mt-3 text-[10px] font-mono text-slate-500 tracking-wide">
+                Rewards · +{activeSession.rewards.cp} CP · +{activeSession.rewards.energy}% energy · +
                 {activeSession.rewards.efficiency} efficiency
               </p>
             </>
@@ -1240,32 +1264,38 @@ export default function AttentionAcademy({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[80] bg-black/75 backdrop-blur-sm flex items-center justify-center p-4"
+            className="fixed inset-0 z-[80] bg-black/80 backdrop-blur-md flex items-center justify-center p-4"
           >
-            <div className="absolute inset-0 opacity-50 pointer-events-none">
+            <div className="absolute inset-0 opacity-45 pointer-events-none">
               <CinematicBackdrop variant="duality" />
             </div>
-            <div className="relative z-[1] w-full max-w-lg rounded-2xl border border-cyan-400/30 bg-[#0c0c12]/90 p-6 shadow-2xl overflow-hidden">
-              <div className="absolute inset-0 opacity-40 pointer-events-none">
+            <div className="relative z-[1] w-full max-w-lg overflow-hidden rounded-2xl border border-amber-400/35 bg-gradient-to-br from-[#141008]/95 via-[#0c0c12]/95 to-cyan-950/50 p-6 shadow-[0_0_60px_rgba(251,191,36,0.15)]">
+              <div className="absolute -right-12 -top-12 w-40 h-40 rounded-full bg-amber-400/20 blur-3xl pointer-events-none" />
+              <div className="absolute inset-0 opacity-30 pointer-events-none">
                 <CinematicBackdrop variant="duality" />
               </div>
               <div className="relative z-[1]">
-              <p className="text-[10px] font-mono text-amber-300 tracking-widest mb-2">
-                NEURAL SNAP · MIND ↔ MACHINE
-              </p>
-              <p className="text-sm text-slate-200 mb-4">
+              <div className="flex items-center justify-between gap-3 mb-3">
+                <p className="font-mono text-[9px] font-black text-amber-300 tracking-[0.28em] uppercase">
+                  Neural Snap · Mind ↔ Machine
+                </p>
+                <span className="font-mono text-[10px] text-cyan-300/90">
+                  {currentQuizIdx + 1}/{activeQuizQuestions.length}
+                </span>
+              </div>
+              <p className="font-display text-lg md:text-xl font-bold italic text-white leading-snug mb-5">
                 {activeQuizQuestions[currentQuizIdx].question}
               </p>
-              <div className="space-y-2">
+              <div className="space-y-2.5">
                 {activeQuizQuestions[currentQuizIdx].options.map((opt, oi) => (
                   <button
                     key={oi}
                     type="button"
                     onClick={() => setSelectedQuizAnswer(oi)}
-                    className={`w-full text-left text-xs px-3 py-2.5 rounded-xl border ${
+                    className={`w-full text-left text-sm px-4 py-3.5 rounded-xl border cursor-pointer transition-colors ${
                       selectedQuizAnswer === oi
-                        ? 'border-cyan-400/50 bg-cyan-500/15 text-cyan-100'
-                        : 'border-white/10 text-slate-400'
+                        ? 'border-amber-400/55 bg-amber-500/15 text-amber-50 shadow-[0_0_20px_rgba(251,191,36,0.12)]'
+                        : 'border-white/12 bg-white/[0.03] text-slate-300 hover:border-amber-400/35 hover:bg-amber-500/8'
                     }`}
                   >
                     {opt}
@@ -1303,18 +1333,24 @@ export default function AttentionAcademy({
                       total,
                       sessionId: activeSession?.id,
                     });
+                    if (
+                      !ritualPending &&
+                      activeSession?.id !== FIRST_SPARK_SESSION.id
+                    ) {
+                      rewardAction('neural_snap');
+                    }
                     if (pendingSessionIdx != null) {
                       void runAgentVerification(pendingSessionIdx, finalScore, total);
                     }
                   }
                 }}
-                className="mt-4 w-full py-2.5 rounded-xl bg-gradient-to-r from-amber-500/30 to-cyan-500/30 border border-cyan-400/40 text-cyan-50 text-xs font-bold disabled:opacity-40"
+                className="mt-5 w-full py-3.5 rounded-xl bg-amber-400 hover:bg-amber-300 disabled:opacity-40 text-black font-mono text-xs font-black uppercase tracking-wider cursor-pointer shadow-[0_0_28px_rgba(251,191,36,0.35)]"
               >
                 {isScanningOverlay
-                  ? 'CONFIDENTIAL VERIFY…'
+                  ? 'Confidential verify…'
                   : currentQuizIdx < activeQuizQuestions.length - 1
-                    ? 'NEXT'
-                    : 'VERIFY (ARCIUM + COACH)'}
+                    ? 'Next →'
+                    : 'Verify · seal the proof'}
               </button>
               {agentVerifyMsg && (
                 <p className="mt-2 text-[11px] text-slate-500">{agentVerifyMsg}</p>

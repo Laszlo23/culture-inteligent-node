@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { GameState } from '../types';
 import { ClaimBurst, markEnergySurge } from './fx';
+import { rewardAction } from '../lib/reward-bus';
 import {
   REAL_DAILY_QUESTS,
   REAL_WHEEL_PRIZES,
@@ -139,6 +140,7 @@ export default function DailyMissions({
             `Daily Signal logged (${result.reason}). Builder boost applied locally.`,
             'warn'
           );
+          rewardAction('daily_claim', { label: prize.label });
           setClaimBurst({ show: true, label: `SIGNAL · ${prize.label}` });
           return;
         }
@@ -150,6 +152,7 @@ export default function DailyMissions({
           notifications: [newNotification, ...(prev.notifications || [])],
         }));
         if (prize.energyPercent > 0) markEnergySurge();
+        rewardAction('daily_claim', { label: prize.label });
         setClaimBurst({ show: true, label: `ON-CHAIN · ${prize.label}` });
         addLog(`${prize.logMessage} — ${result.solscan}`, 'success');
         return;
@@ -168,6 +171,7 @@ export default function DailyMissions({
       notifications: [newNotification, ...(prev.notifications || [])],
     }));
     if (prize.energyPercent > 0) markEnergySurge();
+    rewardAction('daily_claim', { label: prize.label });
     addLog(`${prize.logMessage} (practice — not on-chain)`, 'warn');
     setClaimBurst({ show: true, label: `CLAIMED · ${prize.label}` });
   };

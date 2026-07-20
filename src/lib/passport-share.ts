@@ -6,6 +6,7 @@ import { BRAND } from './brand-slogans';
 import type { HumanScores } from './human-economy';
 import { buildFarcasterComposeUrl } from './farcaster';
 import { nextOgPack, withRotatingOg } from './og-share';
+import { achievementsForShare } from './achievements';
 
 export type PassportSharePayload = {
   name: string;
@@ -113,6 +114,8 @@ export function buildPassportCastCompose(payload: PassportSharePayload, baseUrl?
 }
 
 export function achievementsFromScores(scores: HumanScores): string[] {
+  const unlocked = achievementsForShare(3);
+  if (unlocked.length > 0) return unlocked;
   const chips: string[] = [];
   const creativity = scores.creativity ?? scores.builder;
   if (scores.knowledge >= 10) chips.push('Curious Mind');

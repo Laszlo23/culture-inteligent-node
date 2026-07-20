@@ -9,6 +9,7 @@ import {
   attentionVerifications,
   kpiProofs,
   tollPayments,
+  cultureNames,
 } from './schema.ts';
 import { eq, or, and, desc } from 'drizzle-orm';
 import {
@@ -28,10 +29,14 @@ import {
   getTollBySignature as memGetTollBySig,
   getTollStats as memGetTollStats,
   listTollPayments as memListTollPayments,
+  getCultureNameByLabel as memCultureByLabel,
+  getCultureNameByWallet as memCultureByWallet,
+  claimCultureNameMem as memClaimCulture,
   type StoredZkBinding,
   type StoredAttentionVerification,
   type StoredKpiProof,
   type StoredTollPayment,
+  type StoredCultureName,
 } from './memory-store.ts';
 
 let voidTablesReady: Promise<void> | null = null;
@@ -831,4 +836,164 @@ export async function getTollStats() {
   } catch {
     return memStats;
   }
+}
+
+let cultureNameTablesReady: Promise<void> | null = null;
+
+export async function ensureCultureNameTables() {
+  if (!cultureNameTablesReady) {
+    cultureNameTablesReady = (async () => {
+      const pool = createPool();
+      try {
+        await pool.query(`
+          CREATE TABLE IF NOT EXISTS culture_names (
+            name text PRIMARY KEY,
+            wallet_address text NOT NULL UNIQUE,
+            uid text,
+            claimed_at timestamp DEFAULT now() NOT NULL
+          );
+        `);
+      } finally {
+        await pool.end();
+      }
+    })().catch((err) => {
+      cultureNameTablesReady = null;
+      throw err;
+    });
+  }
+  return cultureNameTablesReady;
+}
+
+function rowToCultureName(r: typeof cultureNames.$inferSelect): StoredCultureName {
+  return {
+    name: r.name,
+    walletAddress: r.walletAddress,
+    uid: r.uid || undefined,
+    claimedAt:
+      r.claimedAt instanceof Date ? r.claimedAt.toISOString() : String(r.claimedAt),
+  };
+}
+
+export async function getCultureNameByLabel(name: string): Promise<StoredCultureName | null> {
+  const key = name.trim().toLowerCase();
+  try {
+    await ensureCultureNameTables();
+    const rows = await db
+      .select()
+      .from(cultureNames)
+      .where(eq(cultureNames.name, key))
+      .limit(1);
+    if (rows[0]) return rowToCultureName(rows[0]);
+  } catch {
+    // Postgres unavailable
+  }
+  return memCultureByLabel(key);
+}
+
+export async function getCultureNameByWallet(
+  walletAddress: string
+): Promise<StoredCultureName | null> {
+  const w = walletAddress.trim();
+  try {
+    await ensureCultureNameTables();
+    const rows = await db
+      .select()
+      .from(cultureNames)
+      .where(eq(cultureNames.walletAddress, w))
+      .limit(1);
+    if (rows[0]) return rowToCultureName(rows[0]);
+  } catch {
+    // fall through
+  }
+  return memCultureByWallet(w);
+}
+
+export type ClaimCultureNameResult =
+  | { ok: true; record: StoredCultureName }
+  | { ok: false; code: 'INVALID' | 'NAME_TAKEN' | 'WALLET_HAS_NAME'; error: string };
+
+export async function claimCultureName(opts: {
+  name: string;
+  walletAddress: string;
+  uid?: string;
+}): Promise<ClaimCultureNameResult> {
+  const name = opts.name.trim().toLowerCase();
+  const walletAddress = opts.walletAddress.trim();
+  if (!name || !walletAddress) {
+    return { ok: false, code: 'INVALID', error: 'Name and wallet required.' };
+  }
+
+  const existingName = await getCultureNameByLabel(name);
+  if (existingName) {
+    if (existingName.walletAddress.toLowerCase() === walletAddress.toLowerCase()) {
+      return { ok: true, record: existingName };
+    }
+    return { ok: false, code: 'NAME_TAKEN', error: 'That name is already mined.' };
+  }
+
+  const existingWallet = await getCultureNameByWallet(walletAddress);
+  if (existingWallet) {
+    return {
+      ok: false,
+      code: 'WALLET_HAS_NAME',
+      error: `This wallet already mined ${existingWallet.name}.culture.`,
+    };
+  }
+
+  const claimedAt = new Date();
+  const record: StoredCultureName = {
+    name,
+    walletAddress,
+    uid: opts.uid,
+    claimedAt: claimedAt.toISOString(),
+  };
+
+  try {
+    await ensureCultureNameTables();
+    await db.insert(cultureNames).values({
+      name,
+      walletAddress,
+      uid: opts.uid || null,
+      claimedAt,
+    });
+    // Keep username in sync when possible
+    if (opts.uid) {
+      try {
+        await db
+          .update(users)
+          .set({ username: `${name}.culture` })
+          .where(eq(users.uid, opts.uid));
+      } catch {
+        // non-fatal
+      }
+    }
+    return { ok: true, record };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (/unique|duplicate/i.test(msg)) {
+      return { ok: false, code: 'NAME_TAKEN', error: 'That name is already mined.' };
+    }
+    try {
+      const mem = memClaimCulture(record);
+      return { ok: true, record: mem };
+    } catch (memErr: unknown) {
+      const code =
+        memErr instanceof Error && memErr.message === 'WALLET_HAS_NAME'
+          ? 'WALLET_HAS_NAME'
+          : 'NAME_TAKEN';
+      return {
+        ok: false,
+        code,
+        error:
+          code === 'WALLET_HAS_NAME'
+            ? 'This wallet already has a Culture Name.'
+            : 'That name is already mined.',
+      };
+    }
+  }
+}
+
+export async function isCultureNameAvailable(name: string): Promise<boolean> {
+  const row = await getCultureNameByLabel(name);
+  return !row;
 }

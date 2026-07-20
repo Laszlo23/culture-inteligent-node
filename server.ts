@@ -63,7 +63,33 @@ import {
   saveTollPayment,
   getTollBySignature,
   getTollStats,
+  ensureCultureNameTables,
+  getCultureNameByLabel,
+  getCultureNameByWallet,
+  claimCultureName,
+  isCultureNameAvailable,
 } from "./src/db/queries.ts";
+import {
+  formatCultureName,
+  validateCultureLabel,
+} from "./src/lib/culture-names.ts";
+import {
+  cultureNameCardImageUrl,
+  isCultureCardStyle,
+  pickCultureCardStyle,
+} from "./src/lib/culture-name-card.ts";
+import {
+  parseCultureCardQuery,
+  renderCultureNameCard,
+} from "./src/lib/culture-name-card-render.ts";
+import {
+  isTrapCardStyle,
+  pickTrapCardStyle,
+  trapIdCardImageUrl,
+} from "./src/lib/trap-id-card.ts";
+import { renderTrapIdCard } from "./src/lib/trap-id-card-render.ts";
+import { getTrapById } from "./src/lib/trap-id.ts";
+import { renderInviteCard } from "./src/lib/invite-card-render.ts";
 import {
   verifyZkPassportPayload,
   serverZkDevMode,
@@ -277,6 +303,160 @@ async function startServer() {
       res.json({ ...profile, isAdmin: isAdminUser(profile.email) });
     } catch (error: any) {
       res.status(500).json({ error: error.message || "Failed to retrieve user profile" });
+    }
+  });
+
+  // Culture Names — laszlo.culture (public resolve + wallet claim)
+  app.get("/api/names/resolve", async (req, res) => {
+    try {
+      await ensureCultureNameTables().catch(() => undefined);
+      const raw = String(req.query.name || req.query.n || "").trim();
+      const v = validateCultureLabel(raw);
+      if (v.ok === false) return res.status(400).json({ error: v.error });
+      const row = await getCultureNameByLabel(v.label);
+      if (!row) {
+        return res.json({ available: true, name: v.label, full: v.full });
+      }
+      return res.json({
+        available: false,
+        name: row.name,
+        full: formatCultureName(row.name),
+        walletAddress: row.walletAddress,
+        claimedAt: row.claimedAt,
+      });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message || "Resolve failed" });
+    }
+  });
+
+  app.get("/api/names/by-wallet", async (req, res) => {
+    try {
+      await ensureCultureNameTables().catch(() => undefined);
+      const wallet = String(req.query.wallet || req.query.address || "").trim();
+      if (!wallet || wallet.length < 32) {
+        return res.status(400).json({ error: "wallet required" });
+      }
+      const row = await getCultureNameByWallet(wallet);
+      if (!row) return res.json({ claimed: false, walletAddress: wallet });
+      return res.json({
+        claimed: true,
+        name: row.name,
+        full: formatCultureName(row.name),
+        walletAddress: row.walletAddress,
+        claimedAt: row.claimedAt,
+      });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message || "Lookup failed" });
+    }
+  });
+
+  app.get("/api/names/check", async (req, res) => {
+    try {
+      const raw = String(req.query.name || "").trim();
+      const v = validateCultureLabel(raw);
+      if (v.ok === false) return res.json({ ok: false, available: false, error: v.error });
+      const available = await isCultureNameAvailable(v.label);
+      return res.json({
+        ok: true,
+        available,
+        name: v.label,
+        full: v.full,
+        error: available ? null : "That name is already mined.",
+      });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message || "Check failed" });
+    }
+  });
+
+  /** Personalized Culture Name share card — JPEG with name baked in */
+  app.get("/api/og/culture-name", async (req, res) => {
+    try {
+      const { name, style } = parseCultureCardQuery(req.query);
+      const rendered = await renderCultureNameCard({ name, style });
+      if ("error" in rendered) {
+        return res.status(400).json({ error: rendered.error });
+      }
+      res.setHeader("Content-Type", "image/jpeg");
+      res.setHeader("Cache-Control", "public, max-age=86400, stale-while-revalidate=604800");
+      res.setHeader("Content-Disposition", `inline; filename="${rendered.full}.jpg"`);
+      return res.send(rendered.jpeg);
+    } catch (error: any) {
+      console.error("Culture name card render failed:", error);
+      res.status(500).json({ error: error.message || "Card render failed" });
+    }
+  });
+
+  /** Personalized Trap ID share card — handle + roast/meme on image */
+  app.get("/api/og/trap-id", async (req, res) => {
+    try {
+      const trap = String(req.query.trap || req.query.id || "").trim();
+      const style = req.query.style != null ? String(req.query.style) : null;
+      const rendered = await renderTrapIdCard({ trap, style });
+      if ("error" in rendered) {
+        return res.status(400).json({ error: rendered.error });
+      }
+      const file = `${rendered.trap.handle.replace(/\s+/g, "-").toLowerCase()}.jpg`;
+      res.setHeader("Content-Type", "image/jpeg");
+      res.setHeader("Cache-Control", "public, max-age=86400, stale-while-revalidate=604800");
+      res.setHeader("Content-Disposition", `inline; filename="${file}"`);
+      return res.send(rendered.jpeg);
+    } catch (error: any) {
+      console.error("Trap ID card render failed:", error);
+      res.status(500).json({ error: error.message || "Card render failed" });
+    }
+  });
+
+  /** Growth invite share card */
+  app.get("/api/og/invite", async (req, res) => {
+    try {
+      const name = String(req.query.name || "Builder").trim();
+      const style = req.query.style != null ? String(req.query.style) : null;
+      const rendered = await renderInviteCard({ name, style });
+      if ("error" in rendered) {
+        return res.status(400).json({ error: rendered.error });
+      }
+      res.setHeader("Content-Type", "image/jpeg");
+      res.setHeader("Cache-Control", "public, max-age=86400, stale-while-revalidate=604800");
+      res.setHeader(
+        "Content-Disposition",
+        `inline; filename="invite-${rendered.name.replace(/[^a-z0-9._-]+/gi, "-")}.jpg"`
+      );
+      return res.send(rendered.jpeg);
+    } catch (error: any) {
+      console.error("Invite card render failed:", error);
+      res.status(500).json({ error: error.message || "Card render failed" });
+    }
+  });
+
+  app.post("/api/names/claim", requireWalletAuth, async (req: AuthRequest, res) => {
+    try {
+      const wallet =
+        req.walletUser?.walletAddress ||
+        (req.user as { walletAddress?: string } | undefined)?.walletAddress ||
+        "";
+      if (!wallet) return res.status(401).json({ error: "Wallet auth required" });
+      const raw = String(req.body?.name || "").trim();
+      const v = validateCultureLabel(raw);
+      if (v.ok === false) return res.status(400).json({ error: v.error, code: "INVALID" });
+
+      const result = await claimCultureName({
+        name: v.label,
+        walletAddress: wallet,
+        uid: req.walletUser?.uid || (req.user as { uid?: string } | undefined)?.uid,
+      });
+      if (result.ok === false) {
+        const status = result.code === "NAME_TAKEN" ? 409 : 400;
+        return res.status(status).json({ error: result.error, code: result.code });
+      }
+      return res.json({
+        success: true,
+        name: result.record.name,
+        full: formatCultureName(result.record.name),
+        walletAddress: result.record.walletAddress,
+        claimedAt: result.record.claimedAt,
+      });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message || "Claim failed" });
     }
   });
 
@@ -1578,30 +1758,81 @@ async function startServer() {
   });
 
   /** Inject pack-specific OG + fc:miniapp so each ?share= URL scrapes differently. */
-  function injectShareMeta(html: string, pack: OgPack | null): string {
-    const imageUrl = pack?.imageUrl ?? defaultOgImageUrl();
-    const title = pack
-      ? `${pack.title} — Building Culture`
-      : "Human value was never measured correctly — Building Culture";
-    const description = pack?.alt
-      ?? "The AI era needs a new measurement: what you learn, create, and contribute. Build your Human Passport.";
-    const pageUrl = pack?.embedPage ?? "https://mining.buildingcultureid.space/";
-    const mini = pack
-      ? buildMiniAppEmbedJson(pack)
-      : JSON.stringify({
+  function injectShareMeta(
+    html: string,
+    pack: OgPack | null,
+    cultureCard?: { name: string; style: string; imageUrl: string; full: string } | null,
+    trapCard?: { trapId: string; handle: string; style: string; imageUrl: string } | null
+  ): string {
+    const imageUrl =
+      cultureCard?.imageUrl ??
+      trapCard?.imageUrl ??
+      pack?.imageUrl ??
+      defaultOgImageUrl();
+    const title = cultureCard
+      ? `${cultureCard.full} — Culture Name · Building Culture`
+      : trapCard
+        ? `I'm a ${trapCard.handle} — Trap ID · Building Culture`
+        : pack
+          ? `${pack.title} — Building Culture`
+          : "Human value was never measured correctly — Building Culture";
+    const description = cultureCard
+      ? `I mined ${cultureCard.full}. Mine your Culture Name in the Human Economy.`
+      : trapCard
+        ? `I'm a ${trapCard.handle}. Find your Scroll Trap ID — challenge a friend.`
+        : pack?.alt
+          ?? "The AI era needs a new measurement: what you learn, create, and contribute. Build your Human Passport.";
+    const pageUrl = cultureCard
+      ? `https://mining.buildingcultureid.space/?room=culture-name&name=${encodeURIComponent(cultureCard.name)}&card=${encodeURIComponent(cultureCard.style)}&share=culture_name&fc=1`
+      : trapCard
+        ? `https://mining.buildingcultureid.space/?room=trap-id&trap=${encodeURIComponent(trapCard.trapId)}&card=${encodeURIComponent(trapCard.style)}&share=trap_id&fc=1`
+        : pack?.embedPage ?? "https://mining.buildingcultureid.space/";
+    const mini = cultureCard
+      ? JSON.stringify({
           version: "next",
-          imageUrl: versionedOgImage("/miniapp/hero-1200x630.png"),
+          imageUrl: cultureCard.imageUrl,
           button: {
-            title: "Build Passport",
+            title: "Mine your name",
             action: {
               type: "launch_miniapp",
               name: "Building Culture",
-              url: "https://mining.buildingcultureid.space/?fc=1",
+              url: pageUrl,
               splashImageUrl: versionedOgImage("/miniapp/splash-200.png"),
               splashBackgroundColor: "#050608",
             },
           },
-        });
+        })
+      : trapCard
+        ? JSON.stringify({
+            version: "next",
+            imageUrl: trapCard.imageUrl,
+            button: {
+              title: "Find your Trap ID",
+              action: {
+                type: "launch_miniapp",
+                name: "Building Culture",
+                url: pageUrl,
+                splashImageUrl: versionedOgImage("/miniapp/splash-200.png"),
+                splashBackgroundColor: "#050608",
+              },
+            },
+          })
+        : pack
+          ? buildMiniAppEmbedJson(pack)
+          : JSON.stringify({
+              version: "next",
+              imageUrl: versionedOgImage("/miniapp/hero-1200x630.png"),
+              button: {
+                title: "Build Passport",
+                action: {
+                  type: "launch_miniapp",
+                  name: "Building Culture",
+                  url: "https://mining.buildingcultureid.space/?fc=1",
+                  splashImageUrl: versionedOgImage("/miniapp/splash-200.png"),
+                  splashBackgroundColor: "#050608",
+                },
+              },
+            });
 
     let out = html;
     out = out.replace(
@@ -1682,7 +1913,52 @@ async function startServer() {
         const raw = await readFile(path.join(distPath, "index.html"), "utf8");
         const shareRaw = typeof req.query.share === "string" ? req.query.share : null;
         const pack = isOgPackId(shareRaw) ? getOgPack(shareRaw) : null;
-        const html = injectShareMeta(raw, pack);
+        const nameRaw =
+          typeof req.query.name === "string" ? req.query.name : null;
+        const cardRaw =
+          typeof req.query.card === "string" ? req.query.card : null;
+        const nameOk = nameRaw ? validateCultureLabel(nameRaw) : null;
+        const cultureCard =
+          nameOk && nameOk.ok && (shareRaw === "culture_name" || req.query.room === "culture-name")
+            ? {
+                name: nameOk.label,
+                style: isCultureCardStyle(cardRaw)
+                  ? cardRaw
+                  : pickCultureCardStyle(nameOk.label),
+                full: formatCultureName(nameOk.label),
+                imageUrl: cultureNameCardImageUrl(
+                  nameOk.label,
+                  isCultureCardStyle(cardRaw)
+                    ? cardRaw
+                    : pickCultureCardStyle(nameOk.label),
+                  { nonce: typeof req.query.n === "string" ? req.query.n : Date.now().toString(36) }
+                ),
+              }
+            : null;
+        const trapRaw =
+          typeof req.query.trap === "string" ? req.query.trap : null;
+        const trapArchetype = getTrapById(trapRaw);
+        const trapStyle = isTrapCardStyle(cardRaw)
+          ? cardRaw
+          : trapArchetype
+            ? pickTrapCardStyle(trapArchetype.id)
+            : "roast";
+        const trapCard =
+          trapArchetype &&
+          (shareRaw === "trap_id" || req.query.room === "trap-id")
+            ? {
+                trapId: trapArchetype.id,
+                handle: trapArchetype.handle,
+                style: trapStyle,
+                imageUrl: trapIdCardImageUrl(trapArchetype.id, trapStyle, {
+                  nonce:
+                    typeof req.query.n === "string"
+                      ? req.query.n
+                      : Date.now().toString(36),
+                }),
+              }
+            : null;
+        const html = injectShareMeta(raw, pack, cultureCard, trapCard);
         res.setHeader("Cache-Control", "public, max-age=60, must-revalidate");
         res.type("html").send(html);
       } catch (err) {

@@ -85,18 +85,69 @@ export function markCultureBroadcastSeen(): void {
 export async function shareCultureText(
   text: string,
   title = `${BRAND.product} — ${BRAND.parent}`,
-  url: string = HEARING_MODE_URL
+  url: string = HEARING_MODE_URL,
+  opts?: {
+    /** Skip OG rotation — use this image URL in body + try file share */
+    imageUrl?: string;
+    /** Filename when attaching a fetched image file */
+    fileName?: string;
+  }
 ): Promise<'share' | 'clipboard'> {
-  // Rotate OG art into the body so native/clipboard shares also change image
-  const rotated = withRotatingOg({
-    text,
-    embedPage: url,
-    appendImageLink: true,
-  });
-  const shareText = rotated.text;
-  const shareUrl = rotated.embedUrl;
+  let shareText: string;
+  let shareUrl: string;
+  let imageUrl: string | undefined = opts?.imageUrl;
+
+  if (imageUrl) {
+    shareUrl = url;
+    shareText = text.includes(imageUrl)
+      ? text
+      : `${text.trim()}\n\n🖼 Card\n${imageUrl}`;
+  } else {
+    // Rotate OG art into the body so native/clipboard shares also change image
+    const rotated = withRotatingOg({
+      text,
+      embedPage: url,
+      appendImageLink: true,
+    });
+    shareText = rotated.text;
+    shareUrl = rotated.embedUrl;
+    imageUrl = rotated.imageUrl;
+  }
 
   if (typeof navigator !== 'undefined' && typeof navigator.share === 'function') {
+    // Prefer sharing the actual image file when the OS supports it
+    if (imageUrl && typeof navigator.canShare === 'function') {
+      try {
+        const res = await fetch(imageUrl);
+        if (res.ok) {
+          const blob = await res.blob();
+          const file = new File(
+            [blob],
+            opts?.fileName || 'culture-card.jpg',
+            { type: blob.type || 'image/jpeg' }
+          );
+          const payload: ShareData = {
+            title,
+            text: shareText,
+            url: shareUrl,
+            files: [file],
+          };
+          if (navigator.canShare(payload)) {
+            await navigator.share(payload);
+            return 'share';
+          }
+          const filesOnly: ShareData = { files: [file], title, text: shareText };
+          if (navigator.canShare(filesOnly)) {
+            await navigator.share(filesOnly);
+            return 'share';
+          }
+        }
+      } catch (err) {
+        if (err instanceof DOMException && err.name === 'AbortError') throw err;
+        // fall through to text share
+      }
+    }
+
     try {
       await navigator.share({ title, text: shareText, url: shareUrl });
       return 'share';

@@ -21,6 +21,8 @@ type Props = {
   /** Override text/embed (e.g. Hook Loop truth) */
   text?: string;
   embedUrl?: string;
+  /** Personalized card image (Culture Name, etc.) */
+  imageUrl?: string;
   truth?: HookingTruth;
   label?: string;
   variant?: Variant;
@@ -54,6 +56,7 @@ export default function FarcasterCastButton({
   templateId = 'launch',
   text,
   embedUrl,
+  imageUrl,
   truth,
   label,
   variant = 'primary',
@@ -63,6 +66,7 @@ export default function FarcasterCastButton({
   const onClick = () => {
     let castText = text;
     let castEmbed = embedUrl;
+    let castImage = imageUrl;
     let source: string = templateId;
 
     if (truth) {
@@ -76,8 +80,8 @@ export default function FarcasterCastButton({
       castEmbed = castEmbed ?? t.embedUrl;
     }
 
-    // No fixed template image — openFarcasterCompose rotates OG every share
-    openFarcasterCompose(castText!, castEmbed);
+    // Personalized imageUrl wins; otherwise openFarcasterCompose rotates OG packs
+    openFarcasterCompose(castText!, castEmbed, castImage);
     track('farcaster_cast', { template: source });
     onCast?.();
   };

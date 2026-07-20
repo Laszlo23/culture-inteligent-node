@@ -93,6 +93,17 @@ export const voidReplies = pgTable('void_replies', {
 });
 
 /**
+ * Culture Names — unique wallet handles like laszlo.culture
+ * `name` is the label only (no suffix). One name per wallet.
+ */
+export const cultureNames = pgTable('culture_names', {
+  name: text('name').primaryKey(),
+  walletAddress: text('wallet_address').notNull().unique(),
+  uid: text('uid'),
+  claimedAt: timestamp('claimed_at').defaultNow().notNull(),
+});
+
+/**
  * ZKPassport-bound soulbound reputation — nullifier hash only (no PII).
  */
 export const zkBindings = pgTable('zk_bindings', {
